@@ -97,7 +97,7 @@ bool sanitize_set_config(nlohmann::json& action, OllamaActionSanitizeResult& out
         action["preset"] = "print";
         warn(out, "set_config: invalid preset, defaulted to print");
     }
-
+ 
     nlohmann::json filtered = nlohmann::json::object();
     for (auto it = action["options"].begin(); it != action["options"].end(); ++it) {
         const std::string key = it.key();
