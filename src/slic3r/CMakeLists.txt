@@ -88,6 +88,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/BambuSmartPrint/BambuSmartPrintBatchDialog.hpp
     GUI/OllamaAssistant/OllamaActionExecutor.cpp
     GUI/OllamaAssistant/OllamaActionExecutor.hpp
+    GUI/OllamaAssistant/OllamaActionValidator.cpp
+    GUI/OllamaAssistant/OllamaActionValidator.hpp
     GUI/OllamaAssistant/OllamaChatDialog.cpp
     GUI/OllamaAssistant/OllamaChatDialog.hpp
     GUI/OllamaAssistant/OllamaChatPanel.cpp

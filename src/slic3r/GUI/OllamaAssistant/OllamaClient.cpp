@@ -32,6 +32,8 @@ void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessag
     body["stream"]  = false;
     // Ask Ollama to return valid JSON (reduces "plain text" failures).
     body["format"]  = "json";
+    // Lower temperature improves setting/action accuracy.
+    body["options"] = {{"temperature", 0.15}, {"top_p", 0.9}};
     body["messages"] = nlohmann::json::array();
     for (const OllamaMessage& msg : messages) {
         body["messages"].push_back({{"role", msg.role}, {"content", msg.content}});

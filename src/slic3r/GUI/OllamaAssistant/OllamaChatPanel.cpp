@@ -1,5 +1,6 @@
 #include "OllamaChatPanel.hpp"
 #include "OllamaActionExecutor.hpp"
+#include "OllamaActionValidator.hpp"
 
 #include "../BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "../GUI_App.hpp"
@@ -41,6 +42,15 @@ static bool contains_support_intent(const std::string& s)
     return s.find("서포트") != std::string::npos || s.find("support") != std::string::npos;
 }
 
+/** Symptom-only messages that often need supports (mid-air / failed print). */
+static bool contains_midair_or_failure_intent(const std::string& s)
+{
+    return s.find("공중") != std::string::npos || s.find("실패") != std::string::npos ||
+           s.find("떠") != std::string::npos || s.find("문제") != std::string::npos ||
+           s.find("failed") != std::string::npos || s.find("failure") != std::string::npos ||
+           s.find("mid-air") != std::string::npos || s.find("mid air") != std::string::npos;
+}
+
 static bool contains_flip_intent(const std::string& s)
 {
     return s.find("뒤집") != std::string::npos || s.find("flip") != std::string::npos;
@@ -58,7 +68,7 @@ static void patch_common_intents(nlohmann::json& root, const std::string& user_r
 {
     if (!root.contains("actions") || !root["actions"].is_array())
         return;
-    const bool wants_support = contains_support_intent(user_req);
+    const bool wants_support = contains_support_intent(user_req) || contains_midair_or_failure_intent(user_req);
     const bool wants_flip    = contains_flip_intent(user_req);
     const bool wants_file    = contains_file_intent(user_req);
 
@@ -455,7 +465,10 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
     wxString display;
     try {
         nlohmann::json root = OllamaActionExecutor::extract_action_json(assistant_text);
-        patch_common_intents(root, last_user_request_text(m_messages));
+        const std::string user_req = last_user_request_text(m_messages);
+        patch_common_intents(root, user_req);
+        const OllamaActionSanitizeResult sanitized =
+            OllamaActionValidator::sanitize(root, user_req);
         if (root.contains("message") && root["message"].is_string()) {
             display = wxString::FromUTF8(root["message"].get<std::string>());
         } else {
@@ -465,10 +478,18 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
         m_messages.push_back({"assistant", assistant_text});
         trim_message_history();
         const auto results = OllamaActionExecutor::execute(root);
+        if (!sanitized.warnings.empty()) {
+            display += "\n\n" + _L("Safety:");
+            for (const auto& w : sanitized.warnings)
+                display += "\n• " + wxString::FromUTF8(w);
+        }
         if (!results.empty()) {
             display += "\n\n" + _L("Applied:");
             for (const auto& r : results)
                 display += "\n• " + wxString::FromUTF8(r.message);
+        } else if (root.contains("actions") && root["actions"].is_array() && root["actions"].empty() &&
+                   sanitized.blocked_count > 0) {
+            display += "\n\n" + _L("No actions were applied after safety checks.");
         }
     } catch (const std::exception& e) {
         // If the model didn't follow the JSON-only contract, execute a safe local fallback for common intents.
@@ -481,6 +502,7 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
                 {"preset", "print"},
                 {"options", {{"enable_support", true}}}
             }});
+            OllamaActionValidator::sanitize(root, user_req);
             m_messages.push_back({"assistant", "Enabling supports."});
             const auto results = OllamaActionExecutor::execute(root);
             display = _L("Enabling supports.");

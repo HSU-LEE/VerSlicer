@@ -606,7 +606,13 @@ Rules:
 - menu_item: use only when needed; menu and item must match existing UI wording.
 - translate/rotate/scale apply to the current selection on the build plate (mm, degrees, scale factor).
 - If you only need to answer a question, use "actions": [].
-- Do not invent option keys not listed in context.)OLLAMA";
+- Do not invent option keys not listed in context.
+- Never use delete_selection unless the user explicitly asked to delete/remove something.
+- If the user describes a print failure or problem (e.g. mid-air printing, failed output), explain briefly and propose helpful "actions" (e.g. enable_support, brim, re-orient) when appropriate — never delete_selection unless they asked to delete.
+- Never use add_model unless the user gave a file path or asked to import/load a model.
+- Never use menu_item for File/save/export/quit unless the user explicitly asked for that workflow.
+- Prefer one focused set_config per request; combine related keys in a single action.
+- For transforms, only act when the user asked to move/rotate/scale/flip/arrange; use realistic values.)OLLAMA";
 }
 
 std::string OllamaActionExecutor::build_context_json()
@@ -649,6 +655,12 @@ std::string OllamaActionExecutor::build_context_json()
     }
 
     ctx["menus"] = build_menu_context_json();
+    ctx["allowed_config_keys"] = nlohmann::json::array({
+        "layer_height", "initial_layer_print_height", "line_width", "sparse_infill_density",
+        "sparse_infill_pattern", "wall_loops", "top_shell_layers", "bottom_shell_layers",
+        "enable_support", "brim_width", "outer_wall_speed", "sparse_infill_speed",
+        "support_type", "support_on_build_plate_only", "raft_layers",
+    });
     return ctx.dump(2);
 }
 
@@ -712,6 +724,19 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
         return results;
     if (!root.contains("actions") || !root["actions"].is_array())
         return results;
+
+    bool needs_batch_snapshot = false;
+    for (const auto& action : root["actions"]) {
+        if (!action.is_object() || !action.contains("type") || !action["type"].is_string())
+            continue;
+        const std::string type = action["type"].get<std::string>();
+        if (type != "translate" && type != "rotate" && type != "scale")
+            needs_batch_snapshot = true;
+    }
+    if (needs_batch_snapshot) {
+        if (Plater* plater = wxGetApp().plater())
+            plater->take_snapshot("AI Assistant", UndoRedo::SnapshotType::Action);
+    }
 
     for (const auto& action : root["actions"]) {
         if (!action.contains("type") || !action["type"].is_string())
