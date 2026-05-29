@@ -612,6 +612,7 @@ Rules:
 - Never use add_model unless the user gave a file path or asked to import/load a model.
 - Never use menu_item for File/save/export/quit unless the user explicitly asked for that workflow.
 - Prefer one focused set_config per request; combine related keys in a single action.
+- After set_config is applied, Verslicer automatically re-slices the current plate; do not add a separate slice action unless the user only asked to slice without changing settings.
 - For transforms, only act when the user asked to move/rotate/scale/flip/arrange; use realistic values.)OLLAMA";
 }
 
@@ -738,33 +739,53 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
             plater->take_snapshot("AI Assistant", UndoRedo::SnapshotType::Action);
     }
 
+    bool config_applied = false;
+    bool had_slice_action = false;
+    nlohmann::json deferred_slice = nlohmann::json::object({{"scope", "plate"}});
+
     for (const auto& action : root["actions"]) {
         if (!action.contains("type") || !action["type"].is_string())
             continue;
 
         const std::string type = action["type"].get<std::string>();
+        if (type == "slice") {
+            had_slice_action = true;
+            deferred_slice = action;
+            continue;
+        }
+
+        OllamaActionResult result;
         if (type == "set_config")
-            results.push_back(apply_set_config(action));
+            result = apply_set_config(action);
         else if (type == "ui_select_tab")
-            results.push_back(apply_ui_select_tab(action));
-        else if (type == "slice")
-            results.push_back(apply_slice(action));
+            result = apply_ui_select_tab(action);
         else if (type == "delete_selection")
-            results.push_back(apply_delete_selection());
+            result = apply_delete_selection();
         else if (type == "clone_selection")
-            results.push_back(apply_clone_selection());
+            result = apply_clone_selection();
         else if (type == "arrange")
-            results.push_back(apply_arrange());
+            result = apply_arrange();
         else if (type == "save_project")
-            results.push_back(apply_save_project(action));
+            result = apply_save_project(action);
         else if (type == "add_model")
-            results.push_back(apply_add_model(action));
+            result = apply_add_model(action);
         else if (type == "menu_item")
-            results.push_back(apply_menu_item(action));
+            result = apply_menu_item(action);
         else if (type == "translate" || type == "rotate" || type == "scale")
-            results.push_back(apply_transform(action, type.c_str()));
+            result = apply_transform(action, type.c_str());
         else
-            results.push_back(OllamaActionResult{false, "Unknown action: " + type});
+            result = OllamaActionResult{false, "Unknown action: " + type};
+
+        if (type == "set_config" && result.success)
+            config_applied = true;
+        results.push_back(std::move(result));
+    }
+
+    // Settings changes require a fresh slice before preview/print.
+    if (config_applied) {
+        results.push_back(apply_slice(nlohmann::json::object({{"scope", "plate"}})));
+    } else if (had_slice_action) {
+        results.push_back(apply_slice(deferred_slice));
     }
 
     return results;

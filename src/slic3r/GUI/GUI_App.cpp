@@ -3,6 +3,7 @@
 #include "libslic3r/Technologies.hpp"
 #include "GUI_App.hpp"
 #include "OllamaAssistant/OllamaVoiceInput.hpp"
+#include "OllamaAssistant/OllamaServerManager.hpp"
 #include "GUI_Init.hpp"
 #include "GUI_ObjectList.hpp"
 #include "slic3r/GUI/UserManager.hpp"
@@ -1063,6 +1064,7 @@ void GUI_App::shutdown()
 
     if (m_is_recreating_gui) return;
     stop_http_server();
+    OllamaServerManager::shutdown_if_started();
     set_closing(true);
     BOOST_LOG_TRIVIAL(info) << "GUI_App::shutdown exit";
 }
@@ -2245,6 +2247,8 @@ GUI_App::~GUI_App()
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< boost::format(": destroy app_config");
         delete app_config;
     }
+
+    OllamaServerManager::shutdown_if_started();
 
     if (ollama_chat_dialog != nullptr) {
         delete ollama_chat_dialog;

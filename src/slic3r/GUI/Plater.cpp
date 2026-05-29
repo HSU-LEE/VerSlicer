@@ -10284,14 +10284,8 @@ void Plater::priv::on_action_print_plate(SimpleEvent&)
         BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << ":received print plate event\n" ;
     }
 
-    // Smart Print: one flow from model → settings → slice → send (Prepare bar + toolbar Print).
-    if (GUI::BambuSmartPrintService::is_enabled()
-        && GUI::BambuSmartPrintService::is_bbl_printer_active()) {
-        if (model.objects.empty()) {
-            Slic3r::GUI::show_error(q, _L("Load a model on the plate first."));
-            return;
-        }
-        GUI::BambuSmartPrintService::instance().run_one_click_print(q);
+    if (model.objects.empty()) {
+        Slic3r::GUI::show_error(q, _L("Load a model on the plate first."));
         return;
     }
 
@@ -10300,11 +10294,18 @@ void Plater::priv::on_action_print_plate(SimpleEvent&)
 
     PresetBundle& preset_bundle = *wxGetApp().preset_bundle;
     if (preset_bundle.use_bbl_network()) {
-        // BBS
+        // Open send dialog only — user picks printer, filament, and options before Send.
         if (!m_select_machine_dlg)
             m_select_machine_dlg = new SelectMachineDialog(q);
+        m_select_machine_dlg->set_auto_send_on_ready(false);
         m_select_machine_dlg->set_print_type(PrintFromType::FROM_NORMAL);
         m_select_machine_dlg->prepare(partplate_list.get_curr_plate_index());
+        if (notification_manager) {
+            notification_manager->push_notification(
+                NotificationType::CustomNotification,
+                NotificationManager::NotificationLevel::RegularNotificationLevel,
+                format(_L("Set printer, filament, and print options, then press Send.")));
+        }
         m_select_machine_dlg->ShowModal();
     } else {
         Slic3r::GUI::show_error(q, _L("Install the Bambu network plugin to send print jobs."));

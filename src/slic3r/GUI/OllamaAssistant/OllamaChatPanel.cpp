@@ -1,6 +1,8 @@
 #include "OllamaChatPanel.hpp"
 #include "OllamaActionExecutor.hpp"
+#include "OllamaServerManager.hpp"
 #include "OllamaActionValidator.hpp"
+#include "OllamaActionWorkflow.hpp"
 
 #include "../BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "../GUI_App.hpp"
@@ -317,18 +319,9 @@ void OllamaChatPanel::ensure_ollama_running()
 
             if (m_status)
                 m_status->SetLabel(_L("Starting Ollama…"));
-            const wxString candidates[] = {
-                "/opt/homebrew/bin/ollama",
-                "/usr/local/bin/ollama",
-                "ollama"
-            };
-            wxString cmd;
-            for (const auto& c : candidates) {
-                if (c.Contains("/") && wxFileExists(c)) { cmd = c; break; }
-                if (!c.Contains("/")) { cmd = c; break; }
-            }
-            if (cmd.empty()) cmd = "ollama";
-            wxExecute(cmd + " serve", wxEXEC_ASYNC);
+            const wxString cmd = OllamaServerManager::resolve_ollama_command();
+            const long pid = wxExecute(cmd + " serve", wxEXEC_ASYNC);
+            OllamaServerManager::mark_started(pid);
             schedule_model_poll(1200);
         });
     });
@@ -434,17 +427,7 @@ void OllamaChatPanel::ensure_default_model_ready(const std::vector<std::string>&
 
     m_pull_in_progress = true;
     m_status->SetLabel(_L("Downloading llama3.2… (ollama pull)"));
-    const wxString candidates[] = {
-        "/opt/homebrew/bin/ollama",
-        "/usr/local/bin/ollama",
-        "ollama"
-    };
-    wxString cmd;
-    for (const auto& c : candidates) {
-        if (c.Contains("/") && wxFileExists(c)) { cmd = c; break; }
-        if (!c.Contains("/")) { cmd = c; break; }
-    }
-    if (cmd.empty()) cmd = "ollama";
+    const wxString cmd = OllamaServerManager::resolve_ollama_command();
     wxExecute(cmd + " pull llama3.2", wxEXEC_ASYNC);
     schedule_model_poll(5000);
 }
@@ -477,15 +460,19 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
         }
         m_messages.push_back({"assistant", assistant_text});
         trim_message_history();
-        const auto results = OllamaActionExecutor::execute(root);
         if (!sanitized.warnings.empty()) {
             display += "\n\n" + _L("Safety:");
             for (const auto& w : sanitized.warnings)
                 display += "\n• " + wxString::FromUTF8(w);
         }
-        if (!results.empty()) {
+        const OllamaWorkflowRun workflow = OllamaActionWorkflow::confirm_and_execute(root, this);
+        if (workflow.cancelled) {
+            display += "\n\n" + _L("Cancelled — no changes applied.");
+        } else if (workflow.preview_only) {
+            display += "\n\n" + _L("Preview only — close the compare dialog, then apply from Smart Print if needed.");
+        } else if (!workflow.results.empty()) {
             display += "\n\n" + _L("Applied:");
-            for (const auto& r : results)
+            for (const auto& r : workflow.results)
                 display += "\n• " + wxString::FromUTF8(r.message);
         } else if (root.contains("actions") && root["actions"].is_array() && root["actions"].empty() &&
                    sanitized.blocked_count > 0) {
@@ -504,11 +491,13 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
             }});
             OllamaActionValidator::sanitize(root, user_req);
             m_messages.push_back({"assistant", "Enabling supports."});
-            const auto results = OllamaActionExecutor::execute(root);
+            const OllamaWorkflowRun workflow = OllamaActionWorkflow::confirm_and_execute(root, this);
             display = _L("Enabling supports.");
-            if (!results.empty()) {
+            if (workflow.cancelled) {
+                display += "\n\n" + _L("Cancelled — no changes applied.");
+            } else if (!workflow.results.empty()) {
                 display += "\n\n" + _L("Applied:");
-                for (const auto& r : results)
+                for (const auto& r : workflow.results)
                     display += "\n• " + wxString::FromUTF8(r.message);
             }
         } else {
