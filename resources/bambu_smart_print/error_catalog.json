@@ -1,0 +1,71 @@
+﻿{
+    "mc_errors":  {
+                      "50348044":  {
+                                       "category":  "filament",
+                                       "title":  "Filament runout",
+                                       "description":  "The printer detected that filament ran out during printing.",
+                                       "title_ko":  "필라멘트 소진",
+                                       "action":  "Reload AMS slot and Reprint",
+                                       "action_ko":  "AMS 슬롯을 확인하고 Reprint"
+                                   },
+                      "50364417":  {
+                                       "category":  "adhesion",
+                                       "title":  "First layer issue",
+                                       "description":  "The first layer may have failed to adhere to the build plate.",
+                                       "title_ko":  "첫 층 부착 문제",
+                                       "action":  "Clean plate, add brim, Reprint",
+                                       "action_ko":  "베드 청소·브림 추가 후 Reprint"
+                                   },
+                      "50364418":  {
+                                       "category":  "adhesion",
+                                       "title":  "Print detached",
+                                       "description":  "The print may have detached from the build plate during printing.",
+                                       "title_ko":  "출력물 분리",
+                                       "action":  "Check adhesion, Reprint",
+                                       "action_ko":  "부착 설정 확인 후 Reprint"
+                                   },
+                      "50331648":  {
+                                       "category":  "gcode",
+                                       "title":  "G-code error",
+                                       "description":  "The printer reported an error while executing G-code."
+                                   },
+                      "50397184":  {
+                                       "category":  "mechanical",
+                                       "title":  "Motion error",
+                                       "description":  "A motion or homing related error occurred."
+                                   },
+                      "50348032":  {
+                                       "category":  "filament",
+                                       "title":  "Filament entangled",
+                                       "description":  "Filament may be tangled on the spool or in the AMS path.",
+                                       "title_ko":  "필라멘트 엉킴",
+                                       "action":  "Clear AMS path, Reprint",
+                                       "action_ko":  "AMS 경로 정리 후 Reprint"
+                                   },
+                      "50348049":  {
+                                       "category":  "filament",
+                                       "title":  "Filament grinding",
+                                       "description":  "Extruder may be grinding filament — check tension and temperature.",
+                                       "title_ko":  "필라멘트 갈림",
+                                       "action":  "Adjust tension/temp, Reprint",
+                                       "action_ko":  "장력·온도 조정 후 Reprint"
+                                   },
+                      "50348050":  {
+                                       "category":  "temperature",
+                                       "title":  "Nozzle temperature fault",
+                                       "description":  "Nozzle heating failed or dropped out of range."
+                                   },
+                      "50348051":  {
+                                       "category":  "temperature",
+                                       "title":  "Bed temperature fault",
+                                       "description":  "Heatbed heating failed or dropped out of range."
+                                   }
+                  },
+    "hms_prefixes":  {
+                         "0300":  "filament",
+                         "0500":  "filament",
+                         "0700":  "temperature",
+                         "0800":  "temperature",
+                         "1200":  "adhesion"
+                     }
+}

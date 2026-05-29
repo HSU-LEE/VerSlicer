@@ -1,0 +1,12 @@
+cd /Users/hsu/Documents/Slicer
+
+cat > .gitignore << EOF
+build/
+deps/build/
+deps/DL_CACHE/
+
+*.dmg
+*.zip
+*.app
+*.a
+EOF
