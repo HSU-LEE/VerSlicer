@@ -4,66 +4,70 @@
 
 # VerSlicer
 
-Fork of [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer) with Bambu Lab workflow kept intact, plus an Ollama-backed chat panel in the 3D view. You can ask it to change print settings, move/rotate models, slice, and a few other things. Voice input works on macOS.
+### AI-Powered 3D Printing Slicer
 
-macOS only for now (build script is `build_release_macos.sh`).
+> OrcaSlicer fork with a local Ollama assistant — natural language and voice on macOS.
 
-## What’s in here
+<p align="center">
+  <img src="docs/images/main-ui.png" alt="VerSlicer main window with Ollama chat" width="900" />
+</p>
 
-- Same slicing stack as OrcaSlicer (presets, multi-plate, preview, etc.)
-- Bambu network plugin, cloud, Device tab, Smart Print UI
-- Floating Ollama chat + optional voice button on the plater toolbar
-- Model replies with JSON; the app runs the `actions` list ([`OllamaAssistant/`](src/slic3r/GUI/OllamaAssistant/))
+<p align="center">
+  <video src="docs/test.mp4" width="900" controls>
+    <a href="docs/test.mp4">Watch demo (MP4)</a>
+  </video>
+</p>
 
-## Ollama
+**VerSlicer** is an AI-powered 3D printing slicer built on [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer).
 
-Install [Ollama](https://ollama.com/) and pull a model. The UI defaults to `llama3.2` at `http://127.0.0.1:11434`; change host/model in the chat panel if you need to.
+It keeps OrcaSlicer’s slicing workflow (presets, multi-plate, preview, Bambu Lab network/cloud/Device tab) and adds a **local** [Ollama](https://ollama.com/) assistant in the 3D view. You describe what you want in plain language; the model returns structured actions (change layer height, rotate a part, slice, and so on) that VerSlicer runs for you. No cloud API key for the AI part — it talks to Ollama on your machine.
+
+macOS builds only for now.
+
+## Why VerSlicer?
+
+- Control the slicer with **natural language** instead of hunting through every setting
+- **Local AI** via Ollama — your prompts and context stay on your Mac
+- **Voice** workflow on macOS (toolbar → chat)
+- **Compatible** with existing OrcaSlicer print/filament/printer presets
+- **Bambu Lab** workflow (network plugin, cloud, Smart Print UI) carried over from the Orca base
+
+## What it does
+
+- Floating **Ollama chat** on the plater toolbar (plus voice on macOS)
+- Sends plate/preset context to the model; expects one JSON reply with an `actions` list
+- Implementation: [`src/slic3r/GUI/OllamaAssistant/`](src/slic3r/GUI/OllamaAssistant/)
+
+### Ollama setup
+
+Install [Ollama](https://ollama.com/), pull a model, leave it running. Defaults in the chat panel: `llama3.2` at `http://127.0.0.1:11434`.
 
 ```bash
 ollama pull llama3.2
 ```
 
-Open **Ollama chat** from the 3D toolbar. On macOS, **Voice** sends transcribed text into the chat. The assistant gets current preset keys and plate context, then returns one JSON object. Supported `actions[].type` values include:
+Open **Ollama chat** from the 3D toolbar. Supported action types include `set_config`, `ui_select_tab`, `slice`, `translate` / `rotate` / `scale`, `delete_selection`, `clone_selection`, `arrange`, `add_model`, `menu_item`.
 
-| `type` | |
-| --- | --- |
-| `set_config` | print / filament / printer options |
-| `ui_select_tab` | e.g. prepare, preview, monitor |
-| `slice` | plate or all |
-| `translate`, `rotate`, `scale` | selection on the bed |
-| `delete_selection`, `clone_selection`, `arrange` | |
-| `add_model` | absolute path to STL, 3MF, etc. |
-| `menu_item` | run a menu entry by name |
+## Build (developers)
 
-## Build
-
-Needs macOS 11.3+, Xcode or CLT, CMake 3.13+. Use Ninja if you pass `-x`.
+macOS 11.3+, Xcode or CLT, CMake 3.13+. Ninja recommended (`-x`).
 
 ```bash
 ./build_release_macos.sh       # deps + app
-./build_release_macos.sh -x    # Ninja multi-config (handy for dev)
-./build_release_macos.sh -s    # app only, after deps are built
-./build_release_macos.sh -h    # other flags
+./build_release_macos.sh -x    # Ninja multi-config
+./build_release_macos.sh -s    # app only
+./build_release_macos.sh -h
 ```
 
-Output under `build/<arch>/`. DMG: `./build_release_macos.sh -s -x -M`.
-
-## Layout
-
-```
-src/slic3r/GUI/OllamaAssistant/   chat UI, HTTP client, action runner
-src/libslic3r/                    slicing core
-build_release_macos.sh
-resources/images/Verslicer.svg
-```
+Output: `build/<arch>/`. DMG: `./build_release_macos.sh -s -x -M`.
 
 ## License & copyright
 
 VerSlicer is developed based on OrcaSlicer.
 
-OrcaSlicer and related upstream code stay under their original open-source licenses; copyright remains with the upstream authors.
+OrcaSlicer and related upstream code remain under their original open-source licenses; copyright belongs to the upstream authors.
 
-Additional features, UI changes, and AI-related code in VerSlicer are copyright **Lee Hee Seung**. See [LICENSE](LICENSE) for the MIT terms on those additions.
+Additional features, UI improvements, and AI-related functionality in VerSlicer are copyright **Lee Hee Seung**. See [LICENSE](LICENSE).
 
 ## Links
 
