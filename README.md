@@ -6,60 +6,74 @@
 
 ### AI-Powered 3D Printing Slicer
 
-> OrcaSlicer fork with a local Ollama assistant — natural language and voice on macOS.
+> [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer) fork with [Ollama](https://ollama.com/) on your Mac — chat and voice
 
 <p align="center">
-  <img src="docs/images/main-ui.png" alt="VerSlicer main window with Ollama chat" width="900" />
+  <img src="docs/images/main-ui.png" alt="VerSlicer with Ollama chat open" width="900" />
 </p>
 
+## Demo
+
 <p align="center">
-  <video src="docs/test.mp4" width="900" controls>
-    <a href="docs/test.mp4">Watch demo (MP4)</a>
+  <video src="docs/test.mp4" width="900" controls playsinline poster="docs/images/main-ui.png">
+    <a href="docs/test.mp4"><img src="docs/images/main-ui.png" alt="Play demo" width="900" /></a>
   </video>
 </p>
 
-**VerSlicer** is an AI-powered 3D printing slicer built on [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer).
+<p align="center">
+  <a href="docs/test.mp4"><strong>Watch demo (MP4)</strong></a>
+</p>
 
-It keeps OrcaSlicer’s slicing workflow (presets, multi-plate, preview, Bambu Lab network/cloud/Device tab) and adds a **local** [Ollama](https://ollama.com/) assistant in the 3D view. You describe what you want in plain language; the model returns structured actions (change layer height, rotate a part, slice, and so on) that VerSlicer runs for you. No cloud API key for the AI part — it talks to Ollama on your machine.
+**VerSlicer** starts from OrcaSlicer and adds an assistant that can change the slicer for you — presets, parts on the bed, slice, and the usual menus — from a chat window on the 3D view.
 
-macOS builds only for now.
+Type what you want, or use the mic on macOS. Ollama runs locally; the app turns the reply into real steps. No separate “advisor” window that only talks: it uses the same plater you already have.
 
-## Why VerSlicer?
+Bambu network plugin, cloud, Device tab, and Smart Print are still there. Builds are **macOS-only** right now.
 
-- Control the slicer with **natural language** instead of hunting through every setting
-- **Local AI** via Ollama — your prompts and context stay on your Mac
-- **Voice** workflow on macOS (toolbar → chat)
-- **Compatible** with existing OrcaSlicer print/filament/printer presets
-- **Bambu Lab** workflow (network plugin, cloud, Smart Print UI) carried over from the Orca base
+## Examples
 
-## What it does
+Works in English or Korean for many requests:
 
-- Floating **Ollama chat** on the plater toolbar (plus voice on macOS)
-- Sends plate/preset context to the model; expects one JSON reply with an `actions` list
-- Implementation: [`src/slic3r/GUI/OllamaAssistant/`](src/slic3r/GUI/OllamaAssistant/)
+| You might say | |
+| --- | --- |
+| *Rotate this to use less support* | moves / rotates the selection |
+| *Lay it flat* / *Flip it* | flip & rotate (flip defaults to 180° on X) |
+| *Layer height 0.12* | print preset |
+| *Make it stronger* | walls, infill, etc. |
+| *Supports on* | `enable_support` |
+| *Arrange the plate* | auto-arrange |
+| *Slice* | slice current plate |
+| *Preview* | switch tab |
 
-### Ollama setup
+Voice on macOS: hit the mic on the toolbar, speak, send.
 
-Install [Ollama](https://ollama.com/), pull a model, leave it running. Defaults in the chat panel: `llama3.2` at `http://127.0.0.1:11434`.
+Implementation lives in [`src/slic3r/GUI/OllamaAssistant/`](src/slic3r/GUI/OllamaAssistant/) — chat UI, HTTP to Ollama, JSON `actions` (`set_config`, `slice`, `rotate`, `arrange`, …).
+
+## Setup
 
 ```bash
 ollama pull llama3.2
 ```
 
-Open **Ollama chat** from the 3D toolbar. Supported action types include `set_config`, `ui_select_tab`, `slice`, `translate` / `rotate` / `scale`, `delete_selection`, `clone_selection`, `arrange`, `add_model`, `menu_item`.
+Install [Ollama](https://ollama.com/), leave it running, open VerSlicer, then **Ollama chat** on the 3D toolbar. Change host or model in the panel if you use something other than the default.
 
-## Build (developers)
+## Build
 
-macOS 11.3+, Xcode or CLT, CMake 3.13+. Ninja recommended (`-x`).
+macOS 11.3+, Xcode or CLT, CMake 3.13+.
 
 ```bash
 ./build_release_macos.sh       # deps + app
-./build_release_macos.sh -x    # Ninja multi-config
+./build_release_macos.sh -x    # Ninja, nicer for dev
 ./build_release_macos.sh -s    # app only
-./build_release_macos.sh -h
 ```
 
-Output: `build/<arch>/`. DMG: `./build_release_macos.sh -s -x -M`.
+Output under `build/<arch>/`. DMG: `./build_release_macos.sh -s -x -M`.
+
+## Where this is going
+
+Right now the assistant is good at everyday plate and preset work — tune, orient, slice — without treating the slicer like a settings encyclopedia.
+
+Later I want to go further (e.g. helping when prints fail, from logs).
 
 ## License & copyright
 
