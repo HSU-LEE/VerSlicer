@@ -24,6 +24,7 @@ public:
 
     void refresh_models(); // keeps Ollama warm / triggers auto-pull if needed
     void submit_text_and_send(const wxString& text);
+    void set_input_text(const wxString& text);
 
     void set_collapsed(bool collapsed);
     bool is_collapsed() const { return m_collapsed; }

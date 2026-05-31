@@ -1696,6 +1696,65 @@ void NotificationManager::PrintHostUploadNotification::render_cancel_button(ImGu
 	}
 	ImGui::PopStyleColor(5);
 }
+//------OllamaProcessingNotification-------
+namespace {
+void render_ollama_spinner(ImDrawList* draw_list, const ImVec2& center, float radius, float thickness,
+                           ImU32 color, float anim01)
+{
+    constexpr float kTwoPi = 6.28318530718f;
+    const float start = kTwoPi * anim01;
+    const float end   = start + kTwoPi * 0.72f;
+    draw_list->PathClear();
+    draw_list->PathArcTo(center, radius, start, end, 32);
+    draw_list->PathStroke(color, 0, thickness);
+}
+} // namespace
+
+void NotificationManager::OllamaProcessingNotification::init()
+{
+    PopNotification::init();
+    m_state = EState::NotFading;
+}
+
+void NotificationManager::OllamaProcessingNotification::count_spaces()
+{
+    PopNotification::count_spaces();
+    m_spinner_size      = m_line_height * 1.15f;
+    m_left_indentation  = m_line_height + m_spinner_size + m_line_height * 0.25f;
+    m_window_width_offset = m_left_indentation + m_line_height * 3.f;
+}
+
+bool NotificationManager::OllamaProcessingNotification::update_state(bool paused, const int64_t delta)
+{
+    PopNotification::update_state(paused, delta);
+    if (m_state == EState::Finished || m_state == EState::ClosePending || m_state == EState::Hidden)
+        return false;
+    m_next_render = std::min<int64_t>(m_next_render, 50);
+    if (GLCanvas3D* canvas = wxGetApp().plater() ? wxGetApp().plater()->get_current_canvas3D() : nullptr)
+        canvas->schedule_extra_frame(50);
+    return true;
+}
+
+void NotificationManager::OllamaProcessingNotification::render_text(ImGuiWrapper& imgui,
+                                                                  const float win_size_x, const float win_size_y,
+                                                                  const float /*win_pos_x*/, const float /*win_pos_y*/)
+{
+    const float starting_y = (m_lines_count == 2 ? win_size_y / 2.f - m_line_height
+                                                 : (m_lines_count == 1 ? win_size_y / 2.f - m_line_height / 2.f
+                                                                       : m_line_height / 2.f));
+    const float radius     = m_line_height * 0.38f;
+    const float thickness  = std::max(2.f, m_line_height * 0.09f);
+    const ImVec2 center(m_line_height * 0.55f + radius, starting_y + m_line_height * 0.5f);
+
+    const int64_t now_ms = GLCanvas3D::timestamp_now();
+    const float   anim   = float((now_ms % 1200) / 1200.0);
+    ImU32 spinner_clr = ImGui::GetColorU32(ImVec4(m_CurrentColor.x, m_CurrentColor.y, m_CurrentColor.z,
+                                                 m_current_fade_opacity));
+    render_ollama_spinner(ImGui::GetWindowDrawList(), center, radius, thickness, spinner_clr, anim);
+
+    PopNotification::render_text(imgui, win_size_x, win_size_y, 0.f, 0.f);
+}
+
 //------ProgressIndicatorNotification-------
 void NotificationManager::ProgressIndicatorNotification::set_status_text(const char* text)
 {
@@ -3128,6 +3187,8 @@ void NotificationManager::set_in_preview(bool preview)
             notification->hide(!preview);
         if (notification->get_type() == NotificationType::BBLObjectInfo)
             notification->hide(preview);
+        if (notification->get_type() == NotificationType::BBLOllamaProcessing)
+            notification->hide(preview);
         if (notification->get_type() == NotificationType::BBLSeqPrintInfo)
             notification->hide(preview);
 		if (m_in_preview && notification->get_type() == NotificationType::DidYouKnowHint)
@@ -3289,6 +3350,28 @@ void NotificationManager::bbl_close_objectsinfo_notification()
 {
     for (std::unique_ptr<PopNotification> &notification : m_pop_notifications)
         if (notification->get_type() == NotificationType::BBLObjectInfo) { notification->close(); }
+}
+
+void NotificationManager::bbl_show_ollama_processing_notification(const std::string& text)
+{
+    NotificationData data{ NotificationType::BBLOllamaProcessing, NotificationLevel::PrintInfoNotificationLevel, 0, text };
+    for (std::unique_ptr<PopNotification>& notification : m_pop_notifications) {
+        if (notification->get_type() == NotificationType::BBLOllamaProcessing) {
+            notification->update(data);
+            notification->set_Multiline(text.find('\n') != std::string::npos);
+            return;
+        }
+    }
+    auto notification = std::make_unique<OllamaProcessingNotification>(data, m_id_provider, m_evt_handler);
+    notification->set_Multiline(text.find('\n') != std::string::npos);
+    push_notification_data(std::move(notification), 0);
+}
+
+void NotificationManager::bbl_close_ollama_processing_notification()
+{
+    for (std::unique_ptr<PopNotification>& notification : m_pop_notifications)
+        if (notification->get_type() == NotificationType::BBLOllamaProcessing)
+            notification->close();
 }
 
 void NotificationManager::bbl_show_seqprintinfo_notification(const std::string &text)

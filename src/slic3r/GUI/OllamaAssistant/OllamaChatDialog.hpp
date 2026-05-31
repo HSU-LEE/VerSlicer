@@ -17,6 +17,7 @@ public:
     void toggle();
     void ensure_visible_near_canvas();
     void submit_text_and_send(const wxString& text);
+    void set_input_text(const wxString& text);
 
 private:
     OllamaChatPanel* m_panel{nullptr};

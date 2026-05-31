@@ -38,6 +38,7 @@
 #include "Notebook.hpp"
 #include "BitmapCache.hpp"
 #include "BindDialog.hpp"
+#include "PrintErrorUi.hpp"
 
 namespace Slic3r { namespace GUI {
 
@@ -817,6 +818,8 @@ void SelectMachineDialog::show_print_failed_info(bool show, int code, wxString d
         m_st_txt_error_code->Wrap(FromDIP(500));
         m_st_txt_error_desc->Wrap(FromDIP(500));
         m_st_txt_extra_info->Wrap(FromDIP(500));
+        update_bambu_server_status_link_visibility(m_link_network_state, m_print_error_code);
+        layout_print_failed_scrolled_panel(m_sw_print_failed_info);
         Layout();
         Fit();
     }

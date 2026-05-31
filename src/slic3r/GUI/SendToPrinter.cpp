@@ -26,6 +26,7 @@
 #include "DeviceCore/DevManager.h"
 #include "DeviceCore/DevStorage.h"
 #include "slic3r/Utils/FileTransferUtils.hpp"
+#include "PrintErrorUi.hpp"
 
 
 namespace Slic3r {
@@ -675,20 +676,22 @@ void SendToPrinterDialog::update_print_error_info(int code, std::string msg, std
 void SendToPrinterDialog::show_print_failed_info(bool show, int code, wxString description, wxString extra)
 {
     if (show) {
-        if (!m_sw_print_failed_info->IsShown()) {
-            m_sw_print_failed_info->Show(true);
+        if (code != 0)
+            m_print_error_code = code;
+        if (!description.IsEmpty())
+            m_print_error_msg = description.ToUTF8().data();
+        if (!extra.IsEmpty())
+            m_print_error_extra = extra.ToUTF8().data();
 
-            m_st_txt_error_code->SetLabelText(wxString::Format("%d", m_print_error_code));
-            m_st_txt_error_desc->SetLabelText( wxGetApp().filter_string(m_print_error_msg));
-            m_st_txt_extra_info->SetLabelText( wxGetApp().filter_string(m_print_error_extra));
-
-            m_st_txt_error_code->Wrap(FromDIP(260));
-            m_st_txt_error_desc->Wrap(FromDIP(260));
-            m_st_txt_extra_info->Wrap(FromDIP(260));
-        }
-        else {
-            m_sw_print_failed_info->Show(false);
-        }
+        m_sw_print_failed_info->Show(true);
+        m_st_txt_error_code->SetLabelText(wxString::Format("%d", m_print_error_code));
+        m_st_txt_error_desc->SetLabelText(wxGetApp().filter_string(m_print_error_msg));
+        m_st_txt_extra_info->SetLabelText(wxGetApp().filter_string(m_print_error_extra));
+        m_st_txt_error_code->Wrap(FromDIP(260));
+        m_st_txt_error_desc->Wrap(FromDIP(260));
+        m_st_txt_extra_info->Wrap(FromDIP(260));
+        update_bambu_server_status_link_visibility(m_link_network_state, m_print_error_code);
+        layout_print_failed_scrolled_panel(m_sw_print_failed_info);
         Layout();
         Fit();
     }

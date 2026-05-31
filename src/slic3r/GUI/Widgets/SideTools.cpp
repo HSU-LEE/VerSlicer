@@ -1,4 +1,5 @@
 #include "SideTools.hpp"
+#include "../PrintErrorUi.hpp"
 #include "bambu_networking.hpp"
 #include <wx/dcmemory.h>
 #include <wx/dcgraph.h>
@@ -443,12 +444,12 @@ void SideTools::update_connect_err_info(int code, wxString desc, wxString info)
     m_st_txt_error_desc->SetLabelText(desc);
     m_st_txt_extra_info->SetLabelText(info);
 
-    if (code == BAMBU_NETWORK_ERR_CONNECTION_TO_PRINTER_FAILED) {
-        m_link_network_state->Hide();
-    }
-    else if (code == BAMBU_NETWORK_ERR_CONNECTION_TO_SERVER_FAILED) {
-        m_link_network_state->Show();
-    }
+    update_bambu_server_status_link_visibility(m_link_network_state, code);
+
+    m_side_error_panel->Layout();
+    if (auto* sizer = m_side_error_panel->GetSizer())
+        sizer->Layout();
+    Layout();
 }
 
 void SideTools::update_status(MachineObject* obj)

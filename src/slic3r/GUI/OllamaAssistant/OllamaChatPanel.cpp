@@ -3,6 +3,7 @@
 #include "OllamaServerManager.hpp"
 #include "OllamaActionValidator.hpp"
 #include "OllamaActionWorkflow.hpp"
+#include "OllamaProcessingNotice.hpp"
 
 #include "../BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "../GUI_App.hpp"
@@ -273,6 +274,14 @@ void OllamaChatPanel::submit_text_and_send(const wxString& text)
     on_send(evt);
 }
 
+void OllamaChatPanel::set_input_text(const wxString& text)
+{
+    if (!m_input_ctrl)
+        return;
+    m_input_ctrl->SetValue(text);
+    m_input_ctrl->SetFocus();
+}
+
 void OllamaChatPanel::set_collapsed(bool collapsed)
 {
     m_collapsed = collapsed;
@@ -312,6 +321,7 @@ void OllamaChatPanel::ensure_ollama_running()
             if (!alive->load() || wxGetApp().is_closing())
                 return;
             if (error.empty()) {
+                OllamaProcessingNotice::hide(wxGetApp().plater());
                 if (m_status)
                     m_status->SetLabel(_L("Ready"));
                 return;
@@ -319,6 +329,7 @@ void OllamaChatPanel::ensure_ollama_running()
 
             if (m_status)
                 m_status->SetLabel(_L("Starting Ollama…"));
+            OllamaProcessingNotice::show(wxGetApp().plater(), _u8L("Starting Ollama…"));
             const wxString cmd = OllamaServerManager::resolve_ollama_command();
             const long pid = wxExecute(cmd + " serve", wxEXEC_ASYNC);
             OllamaServerManager::mark_started(pid);
@@ -358,8 +369,16 @@ void OllamaChatPanel::set_busy(bool busy)
         m_send_btn->Enable(!busy);
     if (m_input_ctrl)
         m_input_ctrl->Enable(!busy);
-    if (busy)
-        m_status->SetLabel(_L("Waiting for Ollama…"));
+    Plater* plater = wxGetApp().plater();
+    if (busy) {
+        if (m_status)
+            m_status->SetLabel(_L("Waiting for Ollama…"));
+        OllamaProcessingNotice::show(plater, _u8L("AI is thinking…"));
+    } else {
+        OllamaProcessingNotice::hide(plater);
+        if (m_status && m_status->GetLabel().IsEmpty())
+            m_status->SetLabel(_L("Ready"));
+    }
 }
 
 void OllamaChatPanel::on_send(wxCommandEvent&)

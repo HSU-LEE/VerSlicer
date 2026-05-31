@@ -8760,11 +8760,15 @@ void GLCanvas3D::_render_canvas_toolbar()
                             });
                         });
                         app.ollama_voice_input->set_on_final_text([](const std::string& text) {
+                            if (text.empty())
+                                return;
                             wxGetApp().CallAfter([text] {
                                 if (wxGetApp().is_closing() || wxGetApp().mainframe == nullptr)
                                     return;
                                 if (wxGetApp().ollama_chat_dialog == nullptr)
                                     wxGetApp().ollama_chat_dialog = new OllamaChatDialog(wxGetApp().mainframe);
+                                if (wxGetApp().ollama_chat_dialog == nullptr)
+                                    return;
                                 wxGetApp().ollama_chat_dialog->Show();
                                 wxGetApp().ollama_chat_dialog->Raise();
                                 wxGetApp().ollama_chat_dialog->submit_text_and_send(wxString::FromUTF8(text));
@@ -8782,7 +8786,9 @@ void GLCanvas3D::_render_canvas_toolbar()
                         app.plater()->get_notification_manager()->push_notification(
                             NotificationType::CustomNotification,
                             NotificationManager::NotificationLevel::RegularNotificationLevel,
-                            app.ollama_voice_input->is_listening() ? "Listening…" : "Voice stopped."
+                            app.ollama_voice_input->is_listening()
+                                ? "Listening… Tap mic again when done speaking."
+                                : "Processing voice…"
                         );
                     }
                 } else if (app.plater() && app.plater()->get_notification_manager()) {

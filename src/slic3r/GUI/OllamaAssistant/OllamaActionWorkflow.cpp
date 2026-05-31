@@ -68,6 +68,10 @@ std::string describe_action(const nlohmann::json& action)
     if (type == "scale") {
         return (boost::format("scale selection (factor %1%)") % action.value("factor", 1.0)).str();
     }
+    if (type == "clone_selection")
+        return "copy (duplicate) selection";
+    if (type == "arrange")
+        return "auto-arrange objects on plate";
     if (type == "slice")
         return action.value("scope", "plate") == "all" ? "slice all plates" : "slice current plate";
     if (type == "ui_select_tab")

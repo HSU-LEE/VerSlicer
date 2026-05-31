@@ -74,6 +74,7 @@
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "BambuSmartPrint/BambuSmartPrintService.hpp"
+#include "OllamaAssistant/OllamaModelLoadAdvisor.hpp"
 #include "libslic3r/SlicePilot/SlicePilotRestrictions.hpp"
 #include "GuiColor.hpp"
 #include "GUI_ObjectList.hpp"
@@ -7229,12 +7230,15 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
 
     this->schedule_background_process();
 
-    if (wxGetApp().preset_bundle && Slic3r::SlicePilot::is_active_printer_bbl(*wxGetApp().preset_bundle)
+    const auto load_mode = GUI::BambuSmartPrintService::auto_load_mode();
+    if (load_mode == GUI::BambuSmartPrintService::AutoLoadMode::FullDialog) {
+        GUI::OllamaModelLoadAdvisor::schedule_after_model_load(this->q);
+    } else if (wxGetApp().preset_bundle && Slic3r::SlicePilot::is_active_printer_bbl(*wxGetApp().preset_bundle)
         && GUI::BambuSmartPrintService::is_enabled()) {
         wxGetApp().CallAfter([]() {
             GUI::BambuSmartPrintService::instance().refresh_all_panels();
         });
-        if (GUI::BambuSmartPrintService::auto_on_model_load())
+        if (load_mode != GUI::BambuSmartPrintService::AutoLoadMode::Off)
             GUI::BambuSmartPrintService::instance().schedule_auto_workflow_after_load(this->q);
     }
 

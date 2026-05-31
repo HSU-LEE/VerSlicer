@@ -16,6 +16,7 @@
 #include "BambuSmartPrintBatchDialog.hpp"
 
 #include "../GUI_App.hpp"
+#include "../OllamaAssistant/OllamaModelLoadAdvisor.hpp"
 #include "../MainFrame.hpp" // EVT_UPDATE_MACHINE_LIST
 #include "../Plater.hpp"
 #include "../Tab.hpp"
@@ -1588,12 +1589,14 @@ void BambuSmartPrintService::on_models_loaded(Plater* plater)
     BambuSmartPrint::MeshAnalysisCache::instance().clear();
     m_last_slice_analysis = BambuSmartPrint::SliceAnalysis{};
 
-    auto_prepare_safe_on_load(plater);
-
     const AutoLoadMode mode = auto_load_mode();
-    if (mode == AutoLoadMode::FullDialog)
-        run_auto_workflow(plater);
-    else if (mode == AutoLoadMode::Notify)
+    if (mode == AutoLoadMode::FullDialog) {
+        OllamaModelLoadAdvisor::schedule_after_model_load(plater);
+        return;
+    }
+
+    auto_prepare_safe_on_load(plater);
+    if (mode == AutoLoadMode::Notify)
         notify_model_load_summary(plater);
 }
 

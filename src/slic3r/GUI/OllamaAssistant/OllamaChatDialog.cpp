@@ -90,5 +90,11 @@ void OllamaChatDialog::submit_text_and_send(const wxString& text)
         m_panel->submit_text_and_send(text);
 }
 
+void OllamaChatDialog::set_input_text(const wxString& text)
+{
+    if (m_panel)
+        m_panel->set_input_text(text);
+}
+
 }} // namespace
 

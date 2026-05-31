@@ -19,6 +19,7 @@
 #include "Widgets/WebView.hpp"
 
 #include "DeviceCore/DevManager.h"
+#include "PrintErrorUi.hpp"
 
 namespace Slic3r {
 namespace GUI {
@@ -720,20 +721,23 @@ PingCodeBindDialog::~PingCodeBindDialog() {
  void BindMachineDialog::show_bind_failed_info(bool show, int code, wxString description, wxString extra)
  {
      if (show) {
-         if (!m_sw_bind_failed_info->IsShown()) {
-             m_sw_bind_failed_info->Show(true);
-             m_result_extra = get_print_error(m_result_extra);
-             m_st_txt_error_code->SetLabelText(wxString::Format("%d", m_result_code));
-             m_st_txt_error_desc->SetLabelText( wxGetApp().filter_string(m_result_info));
-             m_st_txt_extra_info->SetLabelText( wxGetApp().filter_string(m_result_extra));
+         if (code != 0)
+             m_result_code = code;
+         if (!description.IsEmpty())
+             m_result_info = description.ToUTF8().data();
+         if (!extra.IsEmpty())
+             m_result_extra = extra.ToUTF8().data();
 
-             m_st_txt_error_code->Wrap(FromDIP(330));
-             m_st_txt_error_desc->Wrap(FromDIP(330));
-             m_st_txt_extra_info->Wrap(FromDIP(330));
-         }
-         else {
-             m_sw_bind_failed_info->Show(false);
-         }
+         m_sw_bind_failed_info->Show(true);
+         m_result_extra = get_print_error(m_result_extra);
+         m_st_txt_error_code->SetLabelText(wxString::Format("%d", m_result_code));
+         m_st_txt_error_desc->SetLabelText(wxGetApp().filter_string(m_result_info));
+         m_st_txt_extra_info->SetLabelText(wxGetApp().filter_string(m_result_extra));
+         m_st_txt_error_code->Wrap(FromDIP(330));
+         m_st_txt_error_desc->Wrap(FromDIP(330));
+         m_st_txt_extra_info->Wrap(FromDIP(330));
+         update_bambu_server_status_link_visibility(m_link_network_state, m_result_code);
+         layout_print_failed_scrolled_panel(m_sw_bind_failed_info);
          Layout();
          Fit();
      }

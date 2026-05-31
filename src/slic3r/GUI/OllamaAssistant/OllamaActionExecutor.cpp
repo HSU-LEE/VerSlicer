@@ -29,6 +29,20 @@ namespace {
 
 constexpr double kPi = 3.14159265358979323846;
 
+/** Select plate objects when transforms/copy run with nothing selected (e.g. right after model load). */
+bool ensure_selection_for_object_ops(Plater* plater)
+{
+    if (!plater || plater->model().objects.empty())
+        return false;
+    GLCanvas3D* canvas = plater->canvas3D();
+    if (!canvas)
+        return false;
+    if (!canvas->get_selection().is_empty())
+        return true;
+    plater->select_all();
+    return !canvas->get_selection().is_empty();
+}
+
 Preset::Type preset_type_from_string(const std::string& s)
 {
     if (s == "filament")
@@ -293,7 +307,7 @@ OllamaActionResult apply_transform(const nlohmann::json& action, const char* typ
     }
 
     Selection& sel = canvas->get_selection();
-    if (sel.is_empty()) {
+    if (sel.is_empty() && !ensure_selection_for_object_ops(plater)) {
         result.message = "Select at least one object on the plate";
         return result;
     }
@@ -412,6 +426,16 @@ OllamaActionResult apply_delete_selection()
 
 OllamaActionResult apply_clone_selection()
 {
+    OllamaActionResult result;
+    Plater* plater = wxGetApp().plater();
+    if (!plater) {
+        result.message = "Plater not available";
+        return result;
+    }
+    if (!ensure_selection_for_object_ops(plater)) {
+        result.message = "Select at least one object to copy";
+        return result;
+    }
     return apply_plater_event(EVT_GLTOOLBAR_CLONE, "Cloned selection");
 }
 

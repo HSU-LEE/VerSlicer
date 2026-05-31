@@ -25,6 +25,8 @@ public:
 protected:
     void emit_final(const std::string& s) { if (m_on_final) m_on_final(s); }
     void emit_error(const std::string& e) { if (m_on_error) m_on_error(e); }
+    FinalTextCallback final_callback() const { return m_on_final; }
+    ErrorCallback     error_callback() const { return m_on_error; }
 
 private:
     FinalTextCallback m_on_final;

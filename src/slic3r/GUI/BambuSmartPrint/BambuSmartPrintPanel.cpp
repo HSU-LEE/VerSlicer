@@ -191,9 +191,9 @@ BambuSmartPrintPanel::BambuSmartPrintPanel(wxWindow* parent, LayoutStyle style)
         {
             _L("Do not show automatically"),
             _L("Brief notification (recommended)"),
-            _L("Open full suggestions dialog"),
+            _L("Apply AI recommendations (Ollama)"),
         },
-        _L("How Smart Print responds after you load a model on the plate"));
+        _L("How the assistant responds after you load a model on the plate"));
     {
         const int mode = int(BambuSmartPrintService::auto_load_mode());
         m_auto_load_choice->SetSelection(std::max(0, std::min(2, mode)));

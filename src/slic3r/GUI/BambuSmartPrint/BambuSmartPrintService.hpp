@@ -32,7 +32,7 @@ public:
     enum class AutoLoadMode : int {
         Off = 0,
         Notify = 1,
-        FullDialog = 2,
+        FullDialog = 2, // Apply AI recommendations via Ollama on model load
     };
 
     static AutoLoadMode auto_load_mode();

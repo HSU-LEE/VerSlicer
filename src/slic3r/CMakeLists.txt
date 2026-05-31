@@ -98,6 +98,10 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaChatPanel.hpp
     GUI/OllamaAssistant/OllamaClient.cpp
     GUI/OllamaAssistant/OllamaClient.hpp
+    GUI/OllamaAssistant/OllamaModelLoadAdvisor.cpp
+    GUI/OllamaAssistant/OllamaModelLoadAdvisor.hpp
+    GUI/OllamaAssistant/OllamaProcessingNotice.cpp
+    GUI/OllamaAssistant/OllamaProcessingNotice.hpp
     GUI/OllamaAssistant/OllamaServerManager.cpp
     GUI/OllamaAssistant/OllamaServerManager.hpp
     GUI/OllamaAssistant/OllamaVoiceInput.cpp
@@ -792,9 +796,9 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     )
 elseif (APPLE)
     if(CMAKE_VERSION VERSION_GREATER_EQUAL "4.0")
-        target_link_libraries(libslic3r_gui ${DISKARBITRATION_LIBRARY} "-framework Security" "-framework OpenGL" "-framework AVFoundation" "-framework Speech")
+        target_link_libraries(libslic3r_gui ${DISKARBITRATION_LIBRARY} "-framework Security" "-framework OpenGL" "-framework AVFoundation" "-framework AVFAudio" "-framework Speech")
     else()
-        target_link_libraries(libslic3r_gui ${DISKARBITRATION_LIBRARY} "-framework Security" "-framework AVFoundation" "-framework Speech")
+        target_link_libraries(libslic3r_gui ${DISKARBITRATION_LIBRARY} "-framework Security" "-framework AVFoundation" "-framework AVFAudio" "-framework Speech")
     endif()
 endif()
 

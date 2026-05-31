@@ -162,6 +162,8 @@ enum class NotificationType
     BBLMixUsePLAAndPETG,
 	BBLNozzleFilamentIncompatible,
     OrcaSharedProfilesAvailable,
+	// Verslicer AI (Ollama) busy indicator on the 3D canvas
+	BBLOllamaProcessing,
     NotificationTypeCount
 
 };
@@ -354,6 +356,10 @@ public:
 	//BBS--Objects Info
 	void bbl_show_objectsinfo_notification(const std::string &text, bool is_warning, bool is_hidden);
     void bbl_close_objectsinfo_notification();
+
+	// Verslicer AI — orange-bar toast with spinning indicator while Ollama is working
+	void bbl_show_ollama_processing_notification(const std::string& text);
+	void bbl_close_ollama_processing_notification();
 
     void bbl_show_seqprintinfo_notification(const std::string &text);
     void bbl_close_seqprintinfo_notification();
@@ -764,6 +770,23 @@ private:
 		float			    m_file_size;
 		long				m_hover_time{ 0 };
 		UploadJobState		m_uj_state{ UploadJobState::PB_PROGRESS };
+	};
+
+	class OllamaProcessingNotification : public PopNotification
+	{
+	public:
+		OllamaProcessingNotification(const NotificationData& n, NotificationIDProvider& id_provider, wxEvtHandler* evt_handler)
+			: PopNotification(n, id_provider, evt_handler)
+		{}
+	protected:
+		void init() override;
+		void count_spaces() override;
+		int  get_duration() override { return 0; }
+		bool update_state(bool paused, const int64_t delta) override;
+		void render_text(ImGuiWrapper& imgui,
+		                 const float win_size_x, const float win_size_y,
+		                 const float win_pos_x, const float win_pos_y) override;
+		float m_spinner_size{ 0.f };
 	};
 
 	class ProgressIndicatorNotification : public ProgressBarNotification
