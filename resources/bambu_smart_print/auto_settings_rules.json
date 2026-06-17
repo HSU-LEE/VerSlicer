@@ -1,0 +1,13 @@
+﻿{
+  "overhang_moderate": 0.14,
+  "overhang_steep": 0.18,
+  "overhang_high": 0.30,
+  "overhang_fan": 0.18,
+  "first_layer_contact_low": 0.30,
+  "first_layer_brim": 0.28,
+  "tall_height_mm": 100.0,
+  "very_tall_height_mm": 180.0,
+  "large_volume_mm3": 500000.0,
+  "large_flat_xy_mm": 140.0,
+  "complexity_thin_wall": 65
+}

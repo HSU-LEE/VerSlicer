@@ -1,0 +1,85 @@
+#include "OllamaActionRegistry.hpp"
+
+#include <boost/algorithm/string.hpp>
+#include <unordered_set>
+
+namespace Slic3r { namespace GUI {
+
+namespace {
+
+const OllamaActionTypeSpec kActionTypes[] = {
+    {"set_config", true, true, true, "Change print/filament/printer preset options", "프리셋 설정 변경"},
+    {"translate", true, true, true, "Move selection on the bed", "선택 모델 이동"},
+    {"rotate", true, true, true, "Rotate selection", "선택 모델 회전"},
+    {"scale", true, false, false, "Scale selection", "선택 모델 크기 조절"},
+    {"clone_selection", true, true, true, "Duplicate selection", "선택 복제"},
+    {"arrange", true, true, true, "Auto-arrange on build plate", "플레이트 자동 배치"},
+    {"delete_selection", true, false, false, "Delete selected models", "선택 삭제"},
+    {"ui_select_tab", true, false, false, "Switch main tab", "탭 전환"},
+    {"slice", true, false, false, "Slice current plate", "슬라이스"},
+    {"add_model", true, false, false, "Import local model file", "로컬 모델 추가"},
+    {"makerworld_search", true, false, false, "Search MakerWorld catalog", "MakerWorld 검색"},
+    {"import_makerworld", true, false, false, "Import from MakerWorld", "MakerWorld 가져오기"},
+};
+
+const std::unordered_set<std::string> kBlockedTypes = {
+    "save_project",
+    "export_gcode",
+    "quit",
+    "exit",
+    "menu_item",
+};
+
+} // namespace
+
+const std::vector<OllamaActionTypeSpec>& OllamaActionRegistry::all()
+{
+    static const std::vector<OllamaActionTypeSpec> specs(std::begin(kActionTypes), std::end(kActionTypes));
+    return specs;
+}
+
+bool OllamaActionRegistry::is_blocked_type(const std::string& type)
+{
+    return kBlockedTypes.find(type) != kBlockedTypes.end();
+}
+
+bool OllamaActionRegistry::is_allowed_type(const std::string& type)
+{
+    if (is_blocked_type(type))
+        return false;
+    for (const auto& spec : all()) {
+        if (type == spec.type)
+            return true;
+    }
+    return false;
+}
+
+bool OllamaActionRegistry::is_allowed_in_advisor(const std::string& type)
+{
+    if (is_blocked_type(type))
+        return false;
+    for (const auto& spec : all()) {
+        if (type == spec.type)
+            return spec.allowed_in_advisor;
+    }
+    return false;
+}
+
+std::string OllamaActionRegistry::action_types_prompt_block(bool ko_ui, bool apply_mode)
+{
+    std::string out;
+    for (const auto& spec : all()) {
+        if (!apply_mode && spec.type != std::string("set_config"))
+            continue;
+        if (apply_mode && !spec.allowed_in_apply)
+            continue;
+        out += "- ";
+        out += spec.type;
+        out += ": ";
+        out += ko_ui ? spec.desc_ko : spec.desc_en;
+        out += "\n";
+    }
+    return out;
+}
+
+}} // namespace
