@@ -18,7 +18,8 @@ class OllamaResponseNormalizer
 public:
     /** Patch/coerce LLM JSON using user intent heuristics (shared by chat and model-load advisor). */
     static OllamaNormalizeResult normalize(nlohmann::json& root, const std::string& user_request,
-                                           bool include_makerworld = true);
+                                           bool include_makerworld = true,
+                                           bool force_user_intent  = false);
     static void drop_redundant_slice_actions(nlohmann::json& root);
 };
 

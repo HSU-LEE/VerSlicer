@@ -11,6 +11,7 @@
 #include "OllamaProcessingNotice.hpp"
 #include "OllamaSettingSearch.hpp"
 #include "OllamaRequestRouter.hpp"
+#include "OllamaResponseNormalizer.hpp"
 #include "OllamaTelemetry.hpp"
 #include "../MakerWorld/MakerWorldImportFlow.hpp"
 #include "../MakerWorld/MakerWorldSearchService.hpp"
@@ -94,6 +95,37 @@ static bool message_looks_like_manual_instruction(const std::string& msg)
     return false;
 }
 
+static bool looks_like_json_parse_error(const std::string& what)
+{
+    return what.find("parse") != std::string::npos || what.find("JSON") != std::string::npos
+        || what.find("json.exception") != std::string::npos
+        || what.find("balanced JSON") != std::string::npos;
+}
+
+static wxString format_assistant_failure(const std::string& what, const std::string& assistant_text, bool apply_mode)
+{
+    if (what == "Empty assistant response")
+        return _L("Ollama returned an empty reply. Try sending again.");
+
+    const bool parse_error = looks_like_json_parse_error(what);
+    if (!assistant_text.empty()) {
+        wxString display = wxString::FromUTF8(assistant_text);
+        if (display.Length() > 600)
+            display = display.Left(600) + "\n…";
+        if (parse_error)
+            display += "\n\n" + wxString::Format(_L("(Could not parse the model reply: %s)"), wxString::FromUTF8(what));
+        else if (apply_mode)
+            display += "\n\n" + wxString::Format(_L("(Could not apply changes: %s)"), wxString::FromUTF8(what));
+        else
+            display += "\n\n" + wxString::Format(_L("(Error: %s)"), wxString::FromUTF8(what));
+        return display;
+    }
+
+    if (parse_error)
+        return wxString::Format(_L("Could not parse the model reply (%s). Try again."), wxString::FromUTF8(what));
+    return wxString::Format(_L("Something went wrong (%s). Try again."), wxString::FromUTF8(what));
+}
+
 static wxString summarize_applied_changes(const std::string& user_req,
                                           const std::vector<OllamaActionResult>& results)
 {
@@ -119,8 +151,11 @@ static wxString summarize_applied_changes(const std::string& user_req,
         return saw_success;
     };
     if (!had_effective_change()) {
-        if (had_noop_only())
+        if (had_noop_only()) {
+            if (mentioned_rotate || mentioned_place)
+                return _L("The model is already at the requested rotation or position — nothing changed.");
             return _L("Settings were already at the requested values — nothing changed.");
+        }
         if (mentioned_rotate || mentioned_place)
             return _L("I couldn't rotate or arrange the model. Make sure there is at least one model on the plate, or name which one you mean.");
         return _L("I couldn't apply that change. Select a model on the plate and try again.");
@@ -170,10 +205,6 @@ static wxString summarize_applied_changes(const std::string& user_req,
         add_once(_L("Enabled supports for overhanging parts."));
     if (mentioned_strength && saw_config)
         add_once(_L("Adjusted infill to make the inside stronger."));
-    if (mentioned_rotate)
-        add_once(_L("Rotated the selected model."));
-    if (mentioned_place && !mentioned_brim && !mentioned_support && !mentioned_strength)
-        add_once(_L("Re-arranged models on the build plate."));
     if (saw_slice && !saw_config)
         add_once(_L("Started slicing the current plate."));
 
@@ -914,6 +945,7 @@ void OllamaChatPanel::on_resolver_llm_response(const std::string& assistant_text
     if (ollama_critic_enabled() && critic_attempt < 1) {
         try {
             nlohmann::json root = OllamaActionPipeline::extract_from_assistant_text(assistant_text);
+            OllamaResponseNormalizer::normalize(root, user_utf8, /*include_makerworld*/ true);
             const OllamaCriticResult critic =
                 OllamaActionCritic::review(root, user_utf8, wiki_context);
             if (critic.verdict == OllamaCriticVerdict::Revise && !critic.suggested_keys.empty()) {
@@ -1136,9 +1168,9 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
         }
     } catch (const std::exception& e) {
         const std::string user_req = last_user_request_text(m_messages);
-        if (m_apply_mode && ollama_rule_only_fallback_enabled()) {
+        if (m_apply_mode) {
             try {
-                nlohmann::json root = OllamaActionPipeline::build_rule_only_root(user_req, true);
+                nlohmann::json root = OllamaActionPipeline::build_recovery_root(assistant_text, user_req, true);
                 if (root.contains("actions") && root["actions"].is_array() && !root["actions"].empty()) {
                     const std::string stub = root.value("message", std::string("Applied fixes from your request."));
                     m_messages.push_back({"assistant", stub});
@@ -1155,17 +1187,7 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
                     throw;
                 }
             } catch (...) {
-                const std::string what = e.what();
-                if (what == "Empty assistant response") {
-                    display = _L("Ollama returned an empty reply. Try sending again.");
-                } else if (!assistant_text.empty()) {
-                    display = wxString::FromUTF8(assistant_text);
-                    if (display.Length() > 600)
-                        display = display.Left(600) + "\n…";
-                    display += "\n\n" + wxString::Format(_L("(Could not parse actions: %s)"), e.what());
-                } else {
-                    display = wxString::Format(_L("Could not parse the model reply (%s). Try again."), e.what());
-                }
+                display = format_assistant_failure(e.what(), assistant_text, m_apply_mode);
                 push_assistant_history_stub(m_messages, parse_failure_history_stub(e.what()));
             }
         } else if (MakerWorldSearchService::is_pure_makerworld_request(user_req)) {
@@ -1174,17 +1196,7 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
             MakerWorldImportFlow::run_user_makerworld_request(this, user_req, m_apply_mode, makerworld_flow_callbacks());
             return;
         } else {
-            const std::string what = e.what();
-            if (what == "Empty assistant response") {
-                display = _L("Ollama returned an empty reply. Try sending again.");
-            } else if (!assistant_text.empty()) {
-                display = wxString::FromUTF8(assistant_text);
-                if (display.Length() > 600)
-                    display = display.Left(600) + "\n…";
-                display += "\n\n" + wxString::Format(_L("(Could not parse actions: %s)"), e.what());
-            } else {
-                display = wxString::Format(_L("Could not parse the model reply (%s). Try again."), e.what());
-            }
+            display = format_assistant_failure(e.what(), assistant_text, m_apply_mode);
             push_assistant_history_stub(m_messages, parse_failure_history_stub(e.what()));
         }
     }

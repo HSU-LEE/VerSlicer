@@ -6,6 +6,7 @@
 #include "OllamaSettingRegistry.hpp"
 #include "OllamaSettingSearch.hpp"
 #include "OllamaSystemPrompts.hpp"
+#include "OllamaUserFlow.hpp"
 #include "BambuLabWikiSearch.hpp"
 #include "OllamaTelemetry.hpp"
 
@@ -1457,6 +1458,7 @@ static nlohmann::json build_context_object(bool compact)
     }
 
     ctx["engineering_hints"] = OllamaIntentContext::build_engineering_hints_json();
+    ctx["user_flow"]         = OllamaUserFlow::build_flow_context_json();
 
     append_slice_and_readiness(ctx, plater);
 
@@ -1534,6 +1536,8 @@ std::string OllamaActionExecutor::build_system_prompt(bool apply_mode)
 {
     const bool ko = ui_prefers_korean();
     std::string prompt = OllamaSystemPrompts::apply_system_prompt(ko);
+    if (apply_mode)
+        prompt += OllamaUserFlow::flow_prompt_block(ko);
     if (!apply_mode)
         prompt += OllamaSystemPrompts::question_mode_suffix(ko);
     return prompt;
@@ -1686,6 +1690,9 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
             result = apply_menu_item(action);
         else if (type == "translate" || type == "rotate" || type == "scale")
             result = apply_transform(action, type.c_str());
+        else if (type == "open_smart_print" || type == "open_setup" || type == "send_print"
+                 || type == "export_gcode" || type == "rollback_apply")
+            result = OllamaUserFlow::apply_flow_action(action, wxGetApp().plater());
         else
             result = OllamaActionResult{false, false, "Unknown action: " + type};
 

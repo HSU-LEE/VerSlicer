@@ -1,4 +1,5 @@
 #include "OllamaResponseNormalizer.hpp"
+#include "OllamaUserFlow.hpp"
 #include "OllamaActionExecutor.hpp"
 #include "OllamaConfig.hpp"
 #include "OllamaIntentContext.hpp"
@@ -6,6 +7,8 @@
 #include "OllamaTelemetry.hpp"
 
 #include "../MakerWorld/MakerWorldSearchService.hpp"
+
+#include <cmath>
 
 namespace Slic3r { namespace GUI {
 
@@ -40,6 +43,28 @@ void prune_misleading_actions(nlohmann::json& root, const std::string& user_req)
         kept.push_back(a);
     }
     root["actions"] = std::move(kept);
+}
+
+static void normalize_set_config_shape(nlohmann::json& action)
+{
+    if (!action.is_object() || action.value("type", "") != "set_config")
+        return;
+    auto merge_alias = [&](const char* alias) {
+        if (!action.contains(alias) || !action[alias].is_object() || action[alias].empty())
+            return;
+        if (!action.contains("options") || !action["options"].is_object())
+            action["options"] = nlohmann::json::object();
+        for (auto it = action[alias].begin(); it != action[alias].end(); ++it) {
+            if (!action["options"].contains(it.key()))
+                action["options"][it.key()] = it.value();
+        }
+        action.erase(alias);
+    };
+    merge_alias("values");
+    merge_alias("settings");
+    merge_alias("params");
+    if (action.contains("options") && action["options"].is_object() && action["options"].empty())
+        action.erase("options");
 }
 
 struct ActionScan
@@ -125,15 +150,33 @@ static void patch_flip_rotation_axes(nlohmann::json& root, bool wants_flip)
     for (auto& a : root["actions"]) {
         if (!a.is_object())
             continue;
-        const std::string type = a.value("type", "");
-        if (type != "rotate")
+        if (a.value("type", "") != "rotate")
             continue;
-        if (!a.contains("x"))
-            a["x"] = 180.0;
-        if (!a.contains("y"))
-            a["y"] = 0.0;
-        if (!a.contains("z"))
-            a["z"] = 0.0;
+        a["x"] = 180.0;
+        a["y"] = 0.0;
+        a["z"] = 0.0;
+    }
+}
+
+/** When the user names a bed rotation angle, trust user text over a wrong LLM z value. */
+static void patch_rotation_from_user_text(nlohmann::json& root, const std::string& user_req)
+{
+    if (!contains_rotate_intent(user_req) || contains_flip_intent(user_req))
+        return;
+    const std::optional<double> z_opt = parse_z_rotation_degrees(user_req);
+    if (!z_opt || !root.contains("actions") || !root["actions"].is_array())
+        return;
+
+    for (auto& a : root["actions"]) {
+        if (!a.is_object() || a.value("type", "") != "rotate")
+            continue;
+        const double x = a.value("x", 0.0);
+        const double y = a.value("y", 0.0);
+        if (std::abs(x) > 0.01 || std::abs(y) > 0.01)
+            continue;
+        a["x"] = 0.0;
+        a["y"] = 0.0;
+        a["z"] = *z_opt;
     }
 }
 
@@ -254,11 +297,15 @@ void OllamaResponseNormalizer::drop_redundant_slice_actions(nlohmann::json& root
 }
 
 OllamaNormalizeResult OllamaResponseNormalizer::normalize(nlohmann::json& root, const std::string& user_req,
-                                                          bool include_makerworld)
+                                                          bool include_makerworld, bool force_user_intent)
 {
     OllamaNormalizeResult result;
     if (!root.contains("actions") || !root["actions"].is_array())
         root["actions"] = nlohmann::json::array();
+    for (auto& a : root["actions"]) {
+        if (a.is_object())
+            normalize_set_config_shape(a);
+    }
     const size_t actions_before = root["actions"].size();
 
     if (include_makerworld && MakerWorldSearchService::is_pure_makerworld_request(user_req)) {
@@ -290,7 +337,7 @@ OllamaNormalizeResult OllamaResponseNormalizer::normalize(nlohmann::json& root, 
 
     prune_misleading_actions(root, user_req);
 
-    const bool keyword_inject = ollama_keyword_inject_enabled();
+    const bool keyword_inject = ollama_keyword_inject_enabled() || force_user_intent;
     bool       wants_support = false;
     bool       wants_brim = false;
     bool       wants_durability = false;
@@ -440,7 +487,9 @@ OllamaNormalizeResult OllamaResponseNormalizer::normalize(nlohmann::json& root, 
     {
         ActionScan geometry_scan = scan_actions(root["actions"]);
         ensure_geometry_actions_from_user_text(root, user_req, geometry_scan);
+        patch_rotation_from_user_text(root, user_req);
     }
+    OllamaUserFlow::ensure_flow_actions_from_user_text(root, user_req);
     OllamaActionExecutor::augment_geometry_object_targets(root, user_req);
     enforce_minimal_set_config(root, user_req);
 

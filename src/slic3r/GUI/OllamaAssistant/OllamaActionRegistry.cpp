@@ -20,6 +20,11 @@ const OllamaActionTypeSpec kActionTypes[] = {
     {"add_model", true, false, false, "Import local model file", "로컬 모델 추가"},
     {"makerworld_search", true, false, false, "Search MakerWorld catalog", "MakerWorld 검색"},
     {"import_makerworld", true, false, false, "Import from MakerWorld", "MakerWorld 가져오기"},
+    {"open_smart_print", true, false, true, "Open Smart Print tab/panel", "스마트 프린트 열기"},
+    {"open_setup", true, false, true, "Open Smart Print setup wizard", "프린터 설정/연결"},
+    {"send_print", true, false, true, "Send sliced job to printer", "프린터로 출력"},
+    {"export_gcode", true, false, true, "Export G-code file", "G-code 내보내기"},
+    {"rollback_apply", true, false, true, "Undo last AI settings apply", "AI 설정 되돌리기"},
 };
 
 const std::unordered_set<std::string> kBlockedTypes = {

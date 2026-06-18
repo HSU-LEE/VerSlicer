@@ -104,6 +104,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaActionExecutor.hpp
     GUI/OllamaAssistant/OllamaSystemPrompts.cpp
     GUI/OllamaAssistant/OllamaSystemPrompts.hpp
+    GUI/OllamaAssistant/OllamaUserFlow.cpp
+    GUI/OllamaAssistant/OllamaUserFlow.hpp
     GUI/OllamaAssistant/OllamaActionRegistry.cpp
     GUI/OllamaAssistant/OllamaActionRegistry.hpp
     GUI/OllamaAssistant/OllamaActionValidator.cpp
@@ -130,6 +132,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaServerManager.hpp
     GUI/OllamaAssistant/OllamaSettingRegistry.cpp
     GUI/OllamaAssistant/OllamaSettingRegistry.hpp
+    GUI/OllamaAssistant/OllamaSettingDescriptions.cpp
+    GUI/OllamaAssistant/OllamaSettingDescriptions.hpp
     GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
     GUI/OllamaAssistant/OllamaSettingCatalogBuilder.hpp
     GUI/OllamaAssistant/OllamaSettingSearch.cpp

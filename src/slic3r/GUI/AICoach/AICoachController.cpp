@@ -17,6 +17,7 @@
 #include "../OllamaAssistant/OllamaActionPipeline.hpp"
 #include "../OllamaAssistant/OllamaActionValidator.hpp"
 #include "../OllamaAssistant/OllamaActionWorkflow.hpp"
+#include "../OllamaAssistant/OllamaUserFlow.hpp"
 #include "../GLToolbar.hpp"
 #include "../NotificationManager.hpp"
 #include "../Plater.hpp"
@@ -164,6 +165,29 @@ void AICoachController::show_next_if_idle()
 
 void AICoachController::handle_button(Plater* plater, const AICoachButton& btn, const AICoachCard& card)
 {
+    if (btn.action_id == "arrange" || btn.action_id == "preview_tab" || btn.action_id == "send_print"
+        || btn.action_id == "export_gcode" || btn.action_id == "open_settings" || btn.action_id == "open_setup"
+        || btn.action_id == "open_smart_print" || btn.action_id == "undo_apply") {
+        const OllamaFlowDispatchResult flow = OllamaUserFlow::dispatch_coach_action(btn.action_id, plater);
+        if (flow.handled) {
+            if (flow.setup_blocked) {
+                AICoachCard err;
+                err.trigger         = AICoachTriggerId::SendGateBlocked;
+                err.importance      = AICoachImportance::Normal;
+                err.body            = flow.blocked_message;
+                err.auto_dismiss_ms = 12000;
+                err.buttons         = {
+                    {_u8L("OK"), AICoachButtonRole::Primary, "dismiss", {}},
+                };
+                show_card(std::move(err));
+            } else {
+                m_overlay.dismiss();
+                show_next_if_idle();
+            }
+            return;
+        }
+    }
+
     if (btn.action_id == "dismiss") {
         m_overlay.dismiss();
         show_next_if_idle();
@@ -175,72 +199,12 @@ void AICoachController::handle_button(Plater* plater, const AICoachButton& btn, 
         return;
     }
 
-    if (btn.action_id == "undo_apply") {
-        BambuSmartPrintService::instance().rollback_last_apply(plater);
-        m_overlay.dismiss();
-        show_next_if_idle();
-        return;
-    }
-
     if (btn.action_id == "feedback_good" || btn.action_id == "feedback_ok" || btn.action_id == "feedback_bad") {
         if (wxGetApp().app_config)
             wxGetApp().app_config->set("ai_coach_last_feedback", btn.action_id);
         m_overlay.dismiss();
         if (btn.action_id == "feedback_bad" && plater)
             enqueue_cards(AICoachRulesEngine::evaluate_personal_trainer(plater));
-        show_next_if_idle();
-        return;
-    }
-
-    if (btn.action_id == "arrange") {
-        nlohmann::json root;
-        nlohmann::json arrange_action = {{"type", "arrange"}};
-        root["actions"] = nlohmann::json::array({arrange_action});
-        OllamaActionWorkflow::execute_inline(root, nullptr);
-        m_overlay.dismiss();
-        show_next_if_idle();
-        return;
-    }
-
-    if (btn.action_id == "preview_tab" && wxGetApp().mainframe) {
-        wxGetApp().mainframe->select_tab(MainFrame::tpPreview);
-        m_overlay.dismiss();
-        show_next_if_idle();
-        return;
-    }
-
-    if (btn.action_id == "send_print" && plater) {
-        if (PrintReadinessGate::run(plater, wxGetApp().mainframe) != PrintGateResult::Proceed) {
-            AICoachCard err;
-            err.trigger         = AICoachTriggerId::SendGateBlocked;
-            err.importance      = AICoachImportance::Normal;
-            err.body            = _u8L("Complete printer setup before sending — open Smart Print Setup to connect your printer.");
-            err.auto_dismiss_ms = 12000;
-            err.buttons         = {
-                {_u8L("OK"), AICoachButtonRole::Primary, "dismiss", {}},
-            };
-            show_card(std::move(err));
-        } else {
-            m_overlay.dismiss();
-            wxPostEvent(plater, SimpleEvent(EVT_GLTOOLBAR_SEND_GCODE));
-            BeginnerJourney::on_sent_or_exported();
-            show_next_if_idle();
-        }
-        return;
-    }
-
-    if (btn.action_id == "export_gcode" && plater) {
-        wxPostEvent(plater, SimpleEvent(EVT_GLTOOLBAR_EXPORT_GCODE));
-        BeginnerJourney::on_sent_or_exported();
-        m_overlay.dismiss();
-        show_next_if_idle();
-        return;
-    }
-
-    if (btn.action_id == "open_settings" && wxGetApp().mainframe) {
-        wxGetApp().save_mode(comSimple);
-        wxGetApp().mainframe->select_tab(MainFrame::tp3DEditor);
-        m_overlay.dismiss();
         show_next_if_idle();
         return;
     }

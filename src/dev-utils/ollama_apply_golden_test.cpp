@@ -64,6 +64,18 @@ int main()
     }
 
     {
+        const std::string llama_brim = R"({"message":"현재 brim_width_mm은 \u{0022}5\u{0022}입니다.","actions":[{"type":"set_config","preset":"print","values":{"brim_width":10,"brim_type":"outer_only"}}]})";
+        const nlohmann::json root     = extract_ollama_action_json_with_repair(llama_brim);
+        expect_true(root.contains("message") && root["message"].is_string(), "es6 unicode json parses");
+        expect_true(root.contains("actions") && root["actions"].is_array() && !root["actions"].empty(),
+                    "es6 unicode json keeps actions");
+        const auto& action = root["actions"][0];
+        expect_true(action.value("type", "") == "set_config", "es6 unicode action type");
+        expect_true(action.contains("values") && action["values"].is_object(), "llama uses values key");
+        expect_true(action["values"].value("brim_width", 0) == 10, "es6 unicode brim_width");
+    }
+
+    {
         const std::string broken = R"({"message":"ok","actions":[{"type":"set_config","preset":"print","options":{"layer_height":0.2},])";
         const nlohmann::json root = extract_ollama_action_json_with_repair(broken);
         expect_true(root.contains("actions") && root["actions"].is_array(), "repair trailing comma json");
@@ -73,6 +85,20 @@ int main()
         const std::string truncated = R"({"message":"ok","actions":[{"type":"set_config","preset":"print","options":{"enable_support":true)";
         const nlohmann::json root = extract_ollama_action_json_with_repair(truncated);
         expect_true(root.contains("actions"), "repair unclosed braces");
+    }
+
+    {
+        const std::string malformed = R"({" "}
+wall_loops: 3,
+sparse_infill_density: 10%)";
+        const nlohmann::json root = try_salvage_ollama_action_json(malformed);
+        expect_true(root.contains("actions") && root["actions"].is_array() && !root["actions"].empty(),
+                    "salvage plain-text settings");
+        const auto& opts = root["actions"][0]["options"];
+        expect_true(opts.value("wall_loops", 0) == 3, "salvage wall_loops");
+        expect_true(opts.value("sparse_infill_density", std::string()) == "10%", "salvage infill density");
+        const nlohmann::json extracted = extract_ollama_action_json_with_repair(malformed);
+        expect_true(extracted.contains("actions") && !extracted["actions"].empty(), "extract falls back to salvage");
     }
 
     {

@@ -90,8 +90,6 @@ bool ollama_keyword_inject_enabled()
 
 bool ollama_rule_only_fallback_enabled()
 {
-    if (!ollama_keyword_inject_enabled())
-        return false;
     return pipeline_flag(kOllamaRuleOnlyKey, "OLLAMA_RULE_ONLY", true);
 }
 

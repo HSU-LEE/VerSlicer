@@ -42,7 +42,7 @@ BambuSmartPrintWorkflowDialog::BambuSmartPrintWorkflowDialog(wxWindow* parent, c
         wxPanel* card_body = nullptr;
         auto* card = create_card(scroll, &inner, &card_body, 12);
         add_card_section_title(card_body, inner, label, {});
-        auto* val = new wxStaticText(card_body, wxID_ANY, text);
+        auto* val = new wxStaticText(card_body, wxID_ANY, text, wxDefaultPosition, wxDefaultSize, wxST_NO_AUTORESIZE);
         style_body_text(val, true);
         wrap_static_text(val, scroll, 480);
         inner->Add(val, 0, wxEXPAND);

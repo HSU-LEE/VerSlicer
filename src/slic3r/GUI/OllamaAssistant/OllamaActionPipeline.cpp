@@ -2,8 +2,10 @@
 #include "OllamaActionJsonExtract.hpp"
 #include "OllamaActionPipelineCore.hpp"
 #include "OllamaActionRegistry.hpp"
+#include "OllamaActionValidator.hpp"
 #include "OllamaConfig.hpp"
 #include "OllamaIntentRules.hpp"
+#include "OllamaResponseNormalizer.hpp"
 
 namespace Slic3r { namespace GUI {
 
@@ -93,6 +95,26 @@ nlohmann::json OllamaActionPipeline::build_rule_only_root(const std::string& use
     opt.include_makerworld = include_makerworld;
     opt.user_request       = user_request;
     process_actions(root, opt);
+    return root;
+}
+
+nlohmann::json OllamaActionPipeline::build_recovery_root(const std::string& assistant_text,
+                                                        const std::string& user_request, bool include_makerworld)
+{
+    nlohmann::json root = try_salvage_ollama_action_json(assistant_text);
+    if (root.empty()) {
+        root                = nlohmann::json::object();
+        root["message"]     = "Applying suggested fixes from your request.";
+        root["actions"]     = nlohmann::json::array();
+    }
+
+    OllamaNormalizeResult norm =
+        OllamaResponseNormalizer::normalize(root, user_request, include_makerworld, /*force_user_intent*/ true);
+    (void) norm;
+    OllamaActionValidator::sanitize(root, user_request);
+    dedupe_actions_in_turn(root);
+    if (root_actions_empty(root) && root.contains("actions"))
+        root.erase("actions");
     return root;
 }
 

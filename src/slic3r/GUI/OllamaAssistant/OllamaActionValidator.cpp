@@ -76,8 +76,10 @@ void block_action(OllamaActionSanitizeResult& out, const std::string& reason, bo
 
 bool sanitize_set_config(nlohmann::json& action, OllamaActionSanitizeResult& out)
 {
-    if (!action.contains("options") || !action["options"].is_object())
+    if (!action.contains("options") || !action["options"].is_object()) {
+        block_action(out, "set_config: missing options object");
         return false;
+    }
 
     std::string preset = action.value("preset", "print");
     if (preset != "print" && preset != "filament" && preset != "printer") {
@@ -150,8 +152,10 @@ bool sanitize_set_config(nlohmann::json& action, OllamaActionSanitizeResult& out
         filtered[key] = value;
     }
 
-    if (filtered.empty())
+    if (filtered.empty()) {
+        block_action(out, "set_config: no allowed options after filtering");
         return false;
+    }
 
     action["options"] = filtered;
 

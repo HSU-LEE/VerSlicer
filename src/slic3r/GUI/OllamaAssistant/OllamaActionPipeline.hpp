@@ -35,6 +35,10 @@ public:
     /** Rule-only recovery when LLM JSON parse fails. */
     static nlohmann::json build_rule_only_root(const std::string& user_request, bool include_makerworld = true);
 
+    /** Salvage plain-text settings and/or infer actions from user intent after parse failure. */
+    static nlohmann::json build_recovery_root(const std::string& assistant_text, const std::string& user_request,
+                                              bool include_makerworld = true);
+
     static nlohmann::json extract_from_assistant_text(const std::string& assistant_text);
 
     static void dedupe_actions_in_turn(nlohmann::json& root);

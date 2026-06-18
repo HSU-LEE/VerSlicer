@@ -133,16 +133,22 @@ OllamaCriticResult OllamaActionCritic::review(const nlohmann::json& root, const 
     if (quality_symptom && !root_has_set_config(root)) {
         const bool has_transform = root.contains("actions") && root["actions"].is_array();
         bool       only_transform = false;
+        bool       only_arrange   = false;
         if (has_transform) {
             only_transform = true;
+            only_arrange   = true;
             for (const auto& a : root["actions"]) {
                 if (!a.is_object())
                     continue;
                 const std::string t = a.value("type", "");
                 if (t != "rotate" && t != "translate" && t != "scale" && t != "arrange" && t != "delete")
                     only_transform = false;
+                if (t != "arrange")
+                    only_arrange = false;
             }
         }
+        if (only_arrange && contains_placement_intent(user_request))
+            return out;
         if (!has_transform || only_transform) {
             out.verdict = OllamaCriticVerdict::Revise;
             out.message = "Symptom request needs set_config actions informed by wiki_context.";
