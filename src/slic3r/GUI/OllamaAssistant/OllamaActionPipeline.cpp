@@ -2,6 +2,7 @@
 #include "OllamaActionJsonExtract.hpp"
 #include "OllamaActionPipelineCore.hpp"
 #include "OllamaActionRegistry.hpp"
+#include "OllamaConfig.hpp"
 #include "OllamaIntentRules.hpp"
 
 namespace Slic3r { namespace GUI {
@@ -59,7 +60,7 @@ void OllamaActionPipeline::strip_actions_for_question_history(nlohmann::json& ro
 
 nlohmann::json OllamaActionPipeline::extract_from_assistant_text(const std::string& assistant_text)
 {
-    return extract_ollama_action_json(assistant_text);
+    return extract_ollama_action_json_with_repair(assistant_text);
 }
 
 OllamaPipelineResult OllamaActionPipeline::process_actions(nlohmann::json& root, const OllamaPipelineOptions& opt)
@@ -82,6 +83,8 @@ OllamaPipelineResult OllamaActionPipeline::process_actions(nlohmann::json& root,
 
 nlohmann::json OllamaActionPipeline::build_rule_only_root(const std::string& user_request, bool include_makerworld)
 {
+    if (!ollama_rule_only_fallback_enabled())
+        return nlohmann::json{{"message", "Could not parse model reply."}, {"actions", nlohmann::json::array()}};
     nlohmann::json root = nlohmann::json::object();
     root["message"]     = "Applying suggested fixes from your request.";
     root["actions"]     = nlohmann::json::array();

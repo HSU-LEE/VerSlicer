@@ -15,6 +15,8 @@ public:
     static void initialize_defaults(Slic3r::AppConfig* cfg);
     static bool is_enabled();
     static void set_enabled(bool enabled);
+    /** Full Orca tab bar: Home, Prepare, Preview, Device, Multi-device, Calibration (no Smart Print tab). */
+    static void apply_orca_layout();
     static void apply(MainFrame* frame);
 };
 

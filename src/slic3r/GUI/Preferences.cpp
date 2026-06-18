@@ -1480,10 +1480,20 @@ void PreferencesDialog::create_items()
 
     auto item_simple_layout = create_item_checkbox(
         _L("Simple layout"),
-        _L("Show a focused toolbar: Prepare, Preview, Device, and Smart Print. "
-           "Turn off anytime to restore the full Orca interface (Home, Project, Calibration, etc.)."),
+        _L("Focused toolbar: Prepare, Preview, and Device only. "
+           "Smart Print controls appear in the Prepare strip above the plate."),
         SlicePilotSimpleLayout::kConfigKey);
     g_sizer->Add(item_simple_layout);
+
+    auto item_orca_layout = create_item_button(
+        _L("Orca-compatible layout"),
+        _L("Apply"),
+        _L("Show the full Orca tab bar: Home, Prepare, Preview, Device, Multi-device, and Calibration."),
+        _L("Turns off Simple layout and hides the Smart Print tab (use the Prepare strip instead)."),
+        []() {
+            SlicePilotSimpleLayout::apply_orca_layout();
+        });
+    g_sizer->Add(item_orca_layout);
 
     auto item_ai_coach = create_item_checkbox(
         _L("AI Coach suggestions"),

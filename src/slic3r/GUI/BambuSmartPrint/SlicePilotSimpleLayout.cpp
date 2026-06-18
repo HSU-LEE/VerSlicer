@@ -7,6 +7,28 @@
 
 namespace Slic3r { namespace GUI {
 
+namespace {
+
+void set_page_visible(MainFrame* frame, wxWindow* page, bool visible)
+{
+    if (!frame || !frame->m_tabpanel || !page)
+        return;
+    const int idx = frame->m_tabpanel->FindPage(page);
+    if (idx >= 0)
+        frame->m_tabpanel->SetPageVisible(static_cast<size_t>(idx), visible);
+}
+
+void set_plater_tab_visible(MainFrame* frame, MainFrame::TabPosition tab, bool visible)
+{
+    if (!frame || !frame->m_tabpanel)
+        return;
+    const int idx = frame->page_index_for(tab);
+    if (idx >= 0)
+        frame->m_tabpanel->SetPageVisible(static_cast<size_t>(idx), visible);
+}
+
+} // namespace
+
 void SlicePilotSimpleLayout::initialize_defaults(Slic3r::AppConfig* cfg)
 {
     if (!cfg)
@@ -31,6 +53,11 @@ void SlicePilotSimpleLayout::set_enabled(bool enabled)
     apply(wxGetApp().mainframe);
 }
 
+void SlicePilotSimpleLayout::apply_orca_layout()
+{
+    set_enabled(false);
+}
+
 void SlicePilotSimpleLayout::apply(MainFrame* frame)
 {
     if (!frame || !frame->m_tabpanel || !wxGetApp().plater())
@@ -38,30 +65,26 @@ void SlicePilotSimpleLayout::apply(MainFrame* frame)
 
     const bool simple = is_enabled();
 
-    // Tab visibility only until the main window layout is fully up (save_mode runs update_mode).
     if (frame->IsBeingDeleted())
         return;
 
-    auto set_vis = [&](MainFrame::TabPosition tab, bool visible) {
-        const int idx = static_cast<int>(tab);
-        if (idx >= 0 && static_cast<size_t>(idx) < frame->m_tabpanel->GetPageCount())
-            frame->m_tabpanel->SetPageVisible(static_cast<size_t>(idx), visible);
-    };
-
     if (simple) {
-        set_vis(MainFrame::tpHome, false);
-        set_vis(MainFrame::tpCalibration, false);
-        set_vis(MainFrame::tpAuxiliary, false);
-        set_vis(MainFrame::toDebugTool, false);
-        set_vis(MainFrame::tp3DEditor, true);
-        set_vis(MainFrame::tpPreview, true);
-        set_vis(MainFrame::tpMonitor, true);
-        set_vis(MainFrame::tpSmartPrint, true);
-        if (wxGetApp().is_enable_multi_machine())
-            set_vis(MainFrame::tpMultiDevice, false);
+        set_page_visible(frame, frame->m_webview, false);
+        set_page_visible(frame, frame->m_calibration, false);
+        set_page_visible(frame, frame->m_smart_print_page, false);
+        if (frame->m_multi_machine)
+            set_page_visible(frame, frame->m_multi_machine, false);
+        set_plater_tab_visible(frame, MainFrame::tp3DEditor, true);
+        set_plater_tab_visible(frame, MainFrame::tpPreview, true);
+        set_page_visible(frame, frame->m_monitor, true);
     } else {
         for (size_t i = 0; i < frame->m_tabpanel->GetPageCount(); ++i)
             frame->m_tabpanel->SetPageVisible(i, true);
+        // Orca-like: Smart Print lives in Prepare strip, not a top-level tab.
+        if (frame->m_smart_print_page)
+            set_page_visible(frame, frame->m_smart_print_page, false);
+        if (!wxGetApp().is_enable_multi_machine() && frame->m_multi_machine)
+            set_page_visible(frame, frame->m_multi_machine, false);
     }
 
     frame->m_tabpanel->Refresh();

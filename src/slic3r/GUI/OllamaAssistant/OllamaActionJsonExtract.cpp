@@ -41,6 +41,62 @@ std::string sanitize_invalid_json_escapes(std::string text)
 
 } // namespace
 
+std::string repair_ollama_json_text(std::string text)
+{
+    boost::trim(text);
+    if (text.empty())
+        return text;
+
+    for (int pass = 0; pass < 4; ++pass) {
+        std::string next;
+        next.reserve(text.size());
+        for (size_t i = 0; i < text.size(); ++i) {
+            const char c = text[i];
+            if (c == ',' && i + 1 < text.size()) {
+                size_t j = i + 1;
+                while (j < text.size() && (text[j] == ' ' || text[j] == '\n' || text[j] == '\r' || text[j] == '\t'))
+                    ++j;
+                if (j < text.size() && (text[j] == '}' || text[j] == ']'))
+                    continue;
+            }
+            next += c;
+        }
+        text.swap(next);
+    }
+
+    const auto brace = text.find('{');
+    if (brace == std::string::npos)
+        return text;
+
+    bool in_str = false;
+    bool esc    = false;
+    int  depth  = 0;
+    for (size_t i = brace; i < text.size(); ++i) {
+        const char c = text[i];
+        if (esc) {
+            esc = false;
+            continue;
+        }
+        if (c == '\\' && in_str) {
+            esc = true;
+            continue;
+        }
+        if (c == '"')
+            in_str = !in_str;
+        if (in_str)
+            continue;
+        if (c == '{')
+            ++depth;
+        else if (c == '}' && depth > 0)
+            --depth;
+    }
+    while (depth > 0) {
+        text += '}';
+        --depth;
+    }
+    return text;
+}
+
 nlohmann::json extract_ollama_action_json(const std::string& assistant_text)
 {
     std::string text = assistant_text;
@@ -96,10 +152,39 @@ nlohmann::json extract_ollama_action_json(const std::string& assistant_text)
             if (depth == 0) { end = i + 1; break; }
         }
     }
-    if (end != std::string::npos && depth == 0)
-        return nlohmann::json::parse(text.substr(start, end - start));
+    if (end != std::string::npos && depth == 0) {
+        const std::string slice = text.substr(start, end - start);
+        try {
+            return nlohmann::json::parse(slice);
+        } catch (...) {
+            return nlohmann::json::parse(repair_ollama_json_text(slice));
+        }
+    }
 
     throw std::runtime_error("No balanced JSON object found in assistant response");
+}
+
+nlohmann::json extract_ollama_action_json_with_repair(const std::string& assistant_text)
+{
+    try {
+        return extract_ollama_action_json(assistant_text);
+    } catch (const std::exception&) {
+        std::string text = assistant_text;
+        boost::trim(text);
+        const std::string fence = "```json";
+        const auto        pos   = text.find(fence);
+        if (pos != std::string::npos) {
+            const auto start = pos + fence.size();
+            const auto end   = text.find("```", start);
+            if (end != std::string::npos)
+                text = text.substr(start, end - start);
+        }
+        boost::trim(text);
+        const auto brace = text.find('{');
+        if (brace != std::string::npos)
+            text = repair_ollama_json_text(text.substr(brace));
+        return nlohmann::json::parse(text);
+    }
 }
 
 }} // namespace

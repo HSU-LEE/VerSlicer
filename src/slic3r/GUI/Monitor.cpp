@@ -32,6 +32,7 @@
 #include "Plater.hpp"
 #include "BindDialog.hpp"
 #include "BambuSmartPrint/BambuSmartPrintDeviceSummary.hpp"
+#include "BambuSmartPrint/BambuSmartPrintUi.hpp"
 
 #include "DeviceCore/DevManager.h"
 
@@ -104,6 +105,7 @@ MonitorPanel::MonitorPanel(wxWindow* parent, wxWindowID id, const wxPoint& pos, 
     : wxPanel(parent, id, pos, size, style),
     m_select_machine(SelectMachinePopup(this))
 {
+    SlicePilotUi::apply_panel_chrome(this);
 #ifdef __WINDOWS__
     SetDoubleBuffered(true);
 #endif //__WINDOWS__

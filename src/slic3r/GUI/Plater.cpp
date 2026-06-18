@@ -4436,6 +4436,7 @@ struct Plater::priv
     GLToolbar collapse_toolbar;
     Preview *preview;
     AssembleView* assemble_view { nullptr };
+    wxPanel*                    panel_center{ nullptr };
     bool first_enter_assemble{ true };
     std::unique_ptr<NotificationManager> notification_manager;
 
@@ -5057,7 +5058,10 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     this->q->Bind(EVT_ADD_CUSTOM_FILAMENT, &priv::on_add_custom_filament, this);
     main_frame->m_tabpanel->Bind(wxEVT_NOTEBOOK_PAGE_CHANGING, &priv::on_tab_selection_changing, this);
 
-    auto* panel_3d = new wxPanel(q);
+    panel_center = new wxPanel(q);
+    auto* center_sizer = new wxBoxSizer(wxVERTICAL);
+
+    auto* panel_3d = new wxPanel(panel_center);
     view3D = new View3D(panel_3d, bed, &model, config, &background_process);
     //BBS: use partplater's gcode
     preview = new Preview(panel_3d, bed, &model, config, &background_process, partplate_list.get_current_slice_result(), [this]() { schedule_background_process(); });
@@ -5106,7 +5110,10 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     panel_sizer->Add(assemble_view, 1, wxEXPAND | wxALL, 0);
     panel_3d->SetSizer(panel_sizer);
 
-    m_aui_mgr.AddPane(panel_3d, wxAuiPaneInfo().Name("main").CenterPane().PaneBorder(false));
+    center_sizer->Add(panel_3d, 1, wxEXPAND);
+    panel_center->SetSizer(center_sizer);
+
+    m_aui_mgr.AddPane(panel_center, wxAuiPaneInfo().Name("main").CenterPane().PaneBorder(false));
 
     m_default_window_layout = m_aui_mgr.SavePerspective();
 
@@ -5507,6 +5514,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     //    sidebar->collapse(is_collapsed);
     //}
     update_sidebar(true);
+
 }
 
 Plater::priv::~priv()
@@ -10394,10 +10402,15 @@ void Plater::priv::on_tab_selection_changing(wxBookCtrlEvent& e)
     }
 
     const int new_sel = e.GetSelection();
-    sidebar_layout.show = new_sel == MainFrame::tp3DEditor || new_sel == MainFrame::tpPreview;
+    const int prepare_idx = main_frame->page_index_for(MainFrame::tp3DEditor);
+    const int preview_idx = main_frame->page_index_for(MainFrame::tpPreview);
+    sidebar_layout.show = (prepare_idx >= 0 && new_sel == prepare_idx)
+                       || (preview_idx >= 0 && new_sel == preview_idx);
     update_sidebar();
     int old_sel = e.GetOldSelection();
-    if (wxGetApp().preset_bundle && wxGetApp().preset_bundle->use_bbl_device_tab() && new_sel == MainFrame::tpMonitor) {
+    const int monitor_idx = main_frame->page_index_for(MainFrame::tpMonitor);
+    if (wxGetApp().preset_bundle && wxGetApp().preset_bundle->use_bbl_device_tab()
+        && monitor_idx >= 0 && new_sel == monitor_idx) {
         if (!Slic3r::NetworkAgent::is_network_module_loaded()) {
             e.Veto();
             BOOST_LOG_TRIVIAL(info) << boost::format("skipped tab switch from %1% to %2%, lack of network plugins") % old_sel % new_sel;
@@ -10407,7 +10420,7 @@ void Plater::priv::on_tab_selection_changing(wxBookCtrlEvent& e)
             }
         }
     } else {
-        if (new_sel == MainFrame::tpMonitor && wxGetApp().preset_bundle != nullptr) {
+        if (monitor_idx >= 0 && new_sel == monitor_idx && wxGetApp().preset_bundle != nullptr) {
             auto     cfg = wxGetApp().preset_bundle->printers.get_edited_preset().config;
             wxString url = cfg.opt_string("print_host_webui").empty() ? cfg.opt_string("print_host") : cfg.opt_string("print_host_webui");
             if (main_frame->m_printer_view && url.empty()) {
@@ -10641,7 +10654,6 @@ void Plater::priv::on_apple_change_color_mode(wxSysColourChangedEvent& evt) {
         preview->get_canvas3d()->on_change_color_mode(m_is_dark);
         assemble_view->get_canvas3d()->on_change_color_mode(m_is_dark);
     }
-
     apply_color_mode();
 }
 

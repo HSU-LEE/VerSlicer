@@ -15,6 +15,7 @@ enum class AICoachSuppression : uint32_t {
     GcodeLegendAutoShow         = 1u << 2,
     BeginnerJourney             = 1u << 3,
     BeginnerTourEnqueue         = 1u << 4,
+    GcodeWindow                 = 1u << 5,
 };
 
 inline AICoachSuppression operator|(AICoachSuppression a, AICoachSuppression b)

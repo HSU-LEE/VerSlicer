@@ -10,6 +10,12 @@ namespace Slic3r { namespace GUI {
 /** Parse the first JSON object from an Ollama assistant reply (no GUI deps). */
 nlohmann::json extract_ollama_action_json(const std::string& assistant_text);
 
+/** Best-effort repair of truncated/malformed JSON object text. */
+std::string repair_ollama_json_text(std::string text);
+
+/** Extract with sanitize + repair retry before throwing. */
+nlohmann::json extract_ollama_action_json_with_repair(const std::string& assistant_text);
+
 }} // namespace
 
 #endif

@@ -5,6 +5,8 @@
 #include "../MakerWorld/MakerWorldImportFlow.hpp"
 #include "OllamaClient.hpp"
 
+#include <nlohmann/json.hpp>
+
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -43,6 +45,15 @@ private:
     void set_busy(bool busy);
     void on_send(wxCommandEvent& event);
     void on_models_loaded(const std::vector<std::string>& models, const std::string& error);
+    void on_planner_response(const std::string& planner_text, const std::string& user_utf8, const std::string& error);
+    void start_resolver_turn(const std::string& planner_text, const std::string& user_utf8);
+    void start_standard_turn(const std::string& user_utf8);
+    void launch_resolver_llm(const std::string& user_utf8, std::vector<std::string> keys,
+                             const nlohmann::json& wiki_context, int critic_attempt);
+    void fetch_wiki_and_launch_resolver(const std::string& user_utf8, std::vector<std::string> keys, int critic_attempt);
+    void on_resolver_llm_response(const std::string& assistant_text, const std::string& error,
+                                  const std::string& user_utf8, std::vector<std::string> keys,
+                                  const nlohmann::json& wiki_context, int critic_attempt);
     void on_chat_response(const std::string& assistant_text, const std::string& error);
     void schedule_model_poll(int delay_ms);
     void trim_message_history();

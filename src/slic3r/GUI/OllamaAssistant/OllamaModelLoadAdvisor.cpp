@@ -31,11 +31,14 @@ namespace {
 
 constexpr const char* kModelLoadUserPrompt = R"(A 3D model was just loaded. The user is likely a beginner.
 
-Review selection_size_mm, print_options, and plain_language_hints in context.
+Review selection_size_mm, print_options, engineering_hints, and plain_language_hints in context.
+Think outcome-first: what print failure should we prevent (adhesion, overhang, strength)?
+
 Reply with JSON only (same rules as the system prompt).
 
 - "message": 1–2 friendly sentences in plain language (no raw config key names).
-- Only suggest changes that clearly help (overhangs → support; small base → brim 3–5 mm; tall narrow → lay flat with rotate).
+- Minimum change: at most 1–2 settings in one set_config.
+- Overhangs → support; small base → brim; tall narrow → lay flat with rotate.
 - Prefer one set_config; no slice (auto re-slice after settings).
 
 Allowed: set_config (print), translate, rotate, clone_selection, arrange.

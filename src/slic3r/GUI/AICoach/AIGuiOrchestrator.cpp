@@ -7,6 +7,7 @@
 #include "../GLCanvas3D.hpp"
 #include "../DailyTips.hpp"
 #include "../NotificationManager.hpp"
+#include "../GUI_App.hpp"
 #include "../Plater.hpp"
 
 namespace Slic3r { namespace GUI {
@@ -114,8 +115,11 @@ void AIGuiOrchestrator::on_chat_apply_begin()
 void AIGuiOrchestrator::on_chat_apply_end(bool applied, const nlohmann::json& root, const char* dedup_source)
 {
     m_chat_apply_in_progress = false;
-    if (applied && !root.empty() && dedup_source && dedup_source[0] != '\0')
-        AICoachApplyDedup::instance().record_applied_root(root, dedup_source);
+    if (applied) {
+        wxGetApp().set_show_gcode_window(false);
+        if (!root.empty() && dedup_source && dedup_source[0] != '\0')
+            AICoachApplyDedup::instance().record_applied_root(root, dedup_source);
+    }
     flush_deferred_coach_cards();
 }
 

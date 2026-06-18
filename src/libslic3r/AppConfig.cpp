@@ -270,7 +270,7 @@ void AppConfig::set_defaults()
         set("drc_bits", DRC_BITS_DEFAULT_STR);
 
     if (get("show_gcode_window").empty())
-        set_bool("show_gcode_window", true);
+        set_bool("show_gcode_window", false);
 
     if (get("show_3d_navigator").empty())
         set_bool("show_3d_navigator", true);

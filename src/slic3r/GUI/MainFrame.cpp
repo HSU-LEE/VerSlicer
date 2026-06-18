@@ -489,9 +489,8 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
     });
 
     //BBS
-    Bind(EVT_SELECT_TAB, [this](wxCommandEvent&evt) {
-        TabPosition pos = (TabPosition)evt.GetInt();
-        m_tabpanel->SetSelection(pos);
+    Bind(EVT_SELECT_TAB, [this](wxCommandEvent& evt) {
+        select_tab(static_cast<TabPosition>(evt.GetInt()));
     });
 
     Bind(EVT_SYNC_CLOUD_PRESET, &MainFrame::on_select_default_preset, this);
@@ -702,7 +701,7 @@ DPIFrame(NULL, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, BORDERLESS_FRAME_
             }
             return;}
 #endif
-        if (evt.CmdDown() && evt.GetKeyCode() == 'R') { if (m_slice_enable) { wxGetApp().plater()->update(true, true); wxPostEvent(m_plater, SimpleEvent(EVT_GLTOOLBAR_SLICE_PLATE)); this->m_tabpanel->SetSelection(tpPreview); } return; }
+        if (evt.CmdDown() && evt.GetKeyCode() == 'R') { if (m_slice_enable) { wxGetApp().plater()->update(true, true); wxPostEvent(m_plater, SimpleEvent(EVT_GLTOOLBAR_SLICE_PLATE)); select_tab(tpPreview); } return; }
         if (evt.CmdDown() && evt.ShiftDown() && evt.GetKeyCode() == 'G') {
             m_plater->apply_background_progress();
             m_print_enable = get_enable_print_status();
@@ -1320,7 +1319,7 @@ void MainFrame::init_tabpanel() {
         m_webview         = new WebViewPanel(m_tabpanel);
         Bind(EVT_LOAD_URL, [this](wxCommandEvent &evt) {
             wxString url = evt.GetString();
-            select_tab(MainFrame::tpHome);
+            select_tab(tpHome);
             m_webview->load_url(url);
         });
         m_tabpanel->AddPage(m_webview, "", "tab_home_active", "tab_home_active", false);
@@ -1353,7 +1352,7 @@ void MainFrame::init_tabpanel() {
         m_multi_machine = new MultiMachinePage(m_tabpanel, wxID_ANY, wxDefaultPosition, wxDefaultSize);
         m_multi_machine->SetBackgroundColour(*wxWHITE);
         // TODO: change the bitmap
-        m_tabpanel->AddPage(m_multi_machine, _L("Multi-device"), std::string("tab_multi_active"), std::string("tab_multi_active"), false);
+        m_tabpanel->AddPage(m_multi_machine, _L("Multi-device"), std::string("tab_monitor_active"), std::string("tab_monitor_active"), false);
     }
 
     m_calibration = new CalibrationPanel(m_tabpanel, wxID_ANY, wxDefaultPosition, wxDefaultSize);
@@ -1415,8 +1414,8 @@ void MainFrame::show_device(bool bBBLPrinter) {
             }
             // TODO: change the bitmap
             m_multi_machine->Show(false);
-            m_tabpanel->InsertPage(tpMultiDevice, m_multi_machine, _L("Multi-device"), std::string("tab_multi_active"),
-                                   std::string("tab_multi_active"), false);
+            m_tabpanel->InsertPage(tpMultiDevice, m_multi_machine, _L("Multi-device"), std::string("tab_monitor_active"),
+                                   std::string("tab_monitor_active"), false);
         }
         if (!m_calibration) {
             m_calibration = new CalibrationPanel(m_tabpanel, wxID_ANY, wxDefaultPosition, wxDefaultSize);
@@ -1949,7 +1948,7 @@ wxBoxSizer* MainFrame::create_side_tools()
                     wxPostEvent(m_plater, SimpleEvent(EVT_GLTOOLBAR_SLICE_ALL));
                 else
                     wxPostEvent(m_plater, SimpleEvent(EVT_GLTOOLBAR_SLICE_PLATE));
-                this->m_tabpanel->SetSelection(tpPreview);
+                select_tab(tpPreview);
             }
         });
 
@@ -3916,7 +3915,9 @@ void MainFrame::select_tab(wxPanel* panel)
         return;
     }
     int page_idx = m_tabpanel->FindPage(panel);
-    if (page_idx == tp3DEditor && m_tabpanel->GetSelection() == tpPreview)
+    const int prepare_idx = page_index_for(tp3DEditor);
+    const int preview_idx = page_index_for(tpPreview);
+    if (page_idx == prepare_idx && preview_idx >= 0 && m_tabpanel->GetSelection() == preview_idx)
         return;
     //BBS GUI refactor: remove unused layout new/dlg
     /*if (page_idx != wxNOT_FOUND && m_layout == ESettingsLayout::Dlg)
@@ -3927,19 +3928,19 @@ void MainFrame::select_tab(wxPanel* panel)
 //BBS
 void MainFrame::jump_to_monitor(std::string dev_id)
 {
-    if(!m_monitor)
+    if (!m_monitor && !m_printer_view)
         return;
-    m_tabpanel->SetSelection(tpMonitor);
-    if (!dev_id.empty()) {
+    select_tab(tpMonitor);
+    if (!dev_id.empty() && m_monitor) {
         ((MonitorPanel*)m_monitor)->select_machine(dev_id);
     }
 }
 
 void MainFrame::jump_to_multipage()
 {
-    if(!m_multi_machine)
+    if (!m_multi_machine)
         return;
-    m_tabpanel->SetSelection(tpMultiDevice);
+    select_tab(tpMultiDevice);
     ((MultiMachinePage*)m_multi_machine)->jump_to_send_page();
 }
 
@@ -3991,8 +3992,69 @@ void MainFrame::select_tab(size_t tab/* = size_t(-1)*/)
 void MainFrame::request_select_tab(TabPosition pos)
 {
     wxCommandEvent* evt = new wxCommandEvent(EVT_SELECT_TAB);
-    evt->SetInt(pos);
+    evt->SetInt(static_cast<int>(pos));
     wxQueueEvent(this, evt);
+}
+
+int MainFrame::page_index_for(TabPosition pos) const
+{
+    if (!m_tabpanel)
+        return wxNOT_FOUND;
+
+    auto find_plater_page = [this](bool preview) -> int {
+        int nth = 0;
+        for (size_t i = 0; i < m_tabpanel->GetPageCount(); ++i) {
+            if (m_tabpanel->GetPage(i) != m_plater)
+                continue;
+            if (preview) {
+                if (nth == 1)
+                    return static_cast<int>(i);
+            } else if (nth == 0) {
+                return static_cast<int>(i);
+            }
+            ++nth;
+        }
+        return wxNOT_FOUND;
+    };
+
+    switch (pos) {
+    case tpHome:
+        return m_webview ? m_tabpanel->FindPage(m_webview) : wxNOT_FOUND;
+    case tp3DEditor:
+        return find_plater_page(false);
+    case tpPreview:
+        return find_plater_page(true);
+    case tpMonitor:
+        if (m_monitor) {
+            const int idx = m_tabpanel->FindPage(m_monitor);
+            if (idx != wxNOT_FOUND)
+                return idx;
+        }
+        return m_printer_view ? m_tabpanel->FindPage(m_printer_view) : wxNOT_FOUND;
+    case tpMultiDevice:
+        return m_multi_machine ? m_tabpanel->FindPage(m_multi_machine) : wxNOT_FOUND;
+    case tpCalibration:
+        return m_calibration ? m_tabpanel->FindPage(m_calibration) : wxNOT_FOUND;
+    case tpSmartPrint:
+        return m_smart_print_page ? m_tabpanel->FindPage(m_smart_print_page) : wxNOT_FOUND;
+    default:
+        return wxNOT_FOUND;
+    }
+}
+
+bool MainFrame::is_tab_selected(TabPosition pos) const
+{
+    if (!m_tabpanel)
+        return false;
+    const int idx = page_index_for(pos);
+    return idx != wxNOT_FOUND && m_tabpanel->GetSelection() == idx;
+}
+
+void MainFrame::select_tab(TabPosition pos)
+{
+    const int idx = page_index_for(pos);
+    if (idx != wxNOT_FOUND)
+        select_tab(static_cast<size_t>(idx));
 }
 
 int MainFrame::get_calibration_curr_tab() {
@@ -4264,7 +4326,7 @@ void MainFrame::load_printer_url()
     }
 }
 
-bool MainFrame::is_printer_view() const { return m_tabpanel->GetSelection() == TabPosition::tpMonitor; }
+bool MainFrame::is_printer_view() const { return is_tab_selected(TabPosition::tpMonitor); }
 
 
 void MainFrame::refresh_plugin_tips()

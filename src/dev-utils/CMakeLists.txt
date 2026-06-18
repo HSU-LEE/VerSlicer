@@ -39,6 +39,9 @@ if (ORCA_TOOLS)
     add_executable(ollama_assistant_test
         ollama_assistant_test.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionRegistry.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaIntentRules.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
@@ -55,6 +58,11 @@ if (ORCA_TOOLS)
         ../slic3r/GUI/OllamaAssistant/OllamaActionPipelineCore.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaIntentRules.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaBenchmarkScenarios.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
     )
     target_include_directories(ollama_pipeline_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -63,8 +71,64 @@ if (ORCA_TOOLS)
     target_link_libraries(ollama_pipeline_test libslic3r boost_headeronly)
     target_compile_definitions(ollama_pipeline_test PRIVATE -DBOOST_ALL_NO_LIB)
 
+    add_executable(ollama_apply_golden_test
+        ollama_apply_golden_test.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaIntentRules.cpp
+    )
+    target_include_directories(ollama_apply_golden_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/..
+        ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
+    )
+    target_link_libraries(ollama_apply_golden_test libslic3r boost_headeronly)
+    target_compile_definitions(ollama_apply_golden_test PRIVATE -DBOOST_ALL_NO_LIB)
+
+    add_executable(bambu_wiki_search_test
+        bambu_wiki_search_test.cpp
+        ../slic3r/GUI/OllamaAssistant/BambuLabWikiSearchCore.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaActionCritic.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaIntentRules.cpp
+    )
+    target_include_directories(bambu_wiki_search_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/..
+        ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
+    )
+    target_link_libraries(bambu_wiki_search_test libslic3r boost_headeronly)
+    target_compile_definitions(bambu_wiki_search_test PRIVATE -DBOOST_ALL_NO_LIB)
+
+    add_executable(ollama_benchmark_test
+        ollama_benchmark_test.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaBenchmarkScenarios.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaIntentRules.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
+    )
+    target_include_directories(ollama_benchmark_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/..
+        ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
+    )
+    target_link_libraries(ollama_benchmark_test libslic3r boost_headeronly)
+    target_compile_definitions(ollama_benchmark_test PRIVATE -DBOOST_ALL_NO_LIB)
+
     add_test(NAME ollama_assistant_test COMMAND ollama_assistant_test)
     add_test(NAME ollama_pipeline_test COMMAND ollama_pipeline_test)
+    add_test(NAME ollama_benchmark_test COMMAND ollama_benchmark_test)
+    add_test(NAME ollama_apply_golden_test COMMAND ollama_apply_golden_test)
+    add_test(NAME bambu_wiki_search_test COMMAND bambu_wiki_search_test)
     add_test(NAME makerworld_search_test COMMAND makerworld_search_test)
 endif()
 

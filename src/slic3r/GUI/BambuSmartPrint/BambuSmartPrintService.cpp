@@ -1,6 +1,5 @@
 #include "BambuSmartPrintService.hpp"
 #include "BambuSmartPrintPanel.hpp"
-#include "BambuSmartPrintPrepareBar.hpp"
 #include "FirstPrintExperience.hpp"
 #include "PrintReadinessGate.hpp"
 #include "SlicePilotNetworkSetup.hpp"
@@ -534,17 +533,6 @@ void BambuSmartPrintService::unregister_main_panel(BambuSmartPrintPanel* panel)
         m_main_panel = nullptr;
 }
 
-void BambuSmartPrintService::register_prepare_bar(BambuSmartPrintPrepareBar* bar)
-{
-    m_prepare_bar = bar;
-}
-
-void BambuSmartPrintService::unregister_prepare_bar(BambuSmartPrintPrepareBar* bar)
-{
-    if (m_prepare_bar == bar)
-        m_prepare_bar = nullptr;
-}
-
 void BambuSmartPrintService::refresh_all_panels()
 {
     try {
@@ -552,8 +540,6 @@ void BambuSmartPrintService::refresh_all_panels()
             m_preferences_panel->refresh_all();
         if (m_main_panel)
             m_main_panel->refresh_all();
-        if (m_prepare_bar)
-            m_prepare_bar->refresh();
     } catch (const std::exception& ex) {
         BOOST_LOG_TRIVIAL(error) << "BambuSmartPrint refresh_all_panels: " << ex.what();
     } catch (...) {
@@ -564,14 +550,12 @@ void BambuSmartPrintService::refresh_all_panels()
 void BambuSmartPrintService::set_one_click_phase(OneClickPhase phase)
 {
     m_one_click_phase = phase;
-    if (m_prepare_bar)
-        m_prepare_bar->refresh();
 }
 
 void BambuSmartPrintService::prompt_enable_smart_print(wxWindow* parent)
 {
     wxMessageDialog dlg(parent,
-        _L("Smart Print is turned off.\n\nEnable it to analyze models, suggest settings, and use one-click Print from the bar above the build plate."),
+        _L("Smart Print is turned off.\n\nEnable it to analyze models, suggest settings, and use one-click Print from Smart Print."),
         _L("Enable Smart Print"),
         wxYES_NO | wxICON_INFORMATION);
     dlg.SetYesNoLabels(_L("Open Smart Print"), _L("Not now"));

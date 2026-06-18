@@ -17,6 +17,8 @@ enum class OllamaCancelDomain
 {
     Chat,
     Advisor,
+    Planner,
+    Resolver,
     All,
 };
 
@@ -24,6 +26,8 @@ enum class OllamaRequestKind
 {
     Chat,
     Advisor,
+    Planner,
+    Resolver,
 };
 
 class OllamaClient

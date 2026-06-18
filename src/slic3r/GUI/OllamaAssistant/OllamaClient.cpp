@@ -40,7 +40,14 @@ ActiveRequestState& active_request_state(OllamaRequestKind kind)
 {
     static ActiveRequestState chat;
     static ActiveRequestState advisor;
-    return kind == OllamaRequestKind::Advisor ? advisor : chat;
+    static ActiveRequestState planner;
+    static ActiveRequestState resolver;
+    switch (kind) {
+    case OllamaRequestKind::Advisor: return advisor;
+    case OllamaRequestKind::Planner: return planner;
+    case OllamaRequestKind::Resolver: return resolver;
+    default: return chat;
+    }
 }
 
 static void cancel_request_state(ActiveRequestState& state)
@@ -73,7 +80,14 @@ std::atomic<uint64_t>& request_serial(OllamaRequestKind kind)
 {
     static std::atomic<uint64_t> chat{0};
     static std::atomic<uint64_t> advisor{0};
-    return kind == OllamaRequestKind::Advisor ? advisor : chat;
+    static std::atomic<uint64_t> planner{0};
+    static std::atomic<uint64_t> resolver{0};
+    switch (kind) {
+    case OllamaRequestKind::Advisor: return advisor;
+    case OllamaRequestKind::Planner: return planner;
+    case OllamaRequestKind::Resolver: return resolver;
+    default: return chat;
+    }
 }
 
 std::string trim_trailing_slash(std::string url)
@@ -396,8 +410,15 @@ OllamaClient::OllamaClient(std::string base_url)
 
 void OllamaClient::cancel_active_requests(OllamaCancelDomain domain)
 {
-    if (domain == OllamaCancelDomain::Chat || domain == OllamaCancelDomain::All)
+    if (domain == OllamaCancelDomain::Chat || domain == OllamaCancelDomain::All) {
         cancel_request_state(active_request_state(OllamaRequestKind::Chat));
+        cancel_request_state(active_request_state(OllamaRequestKind::Planner));
+        cancel_request_state(active_request_state(OllamaRequestKind::Resolver));
+    }
+    if (domain == OllamaCancelDomain::Planner || domain == OllamaCancelDomain::All)
+        cancel_request_state(active_request_state(OllamaRequestKind::Planner));
+    if (domain == OllamaCancelDomain::Resolver || domain == OllamaCancelDomain::All)
+        cancel_request_state(active_request_state(OllamaRequestKind::Resolver));
     if (domain == OllamaCancelDomain::Advisor || domain == OllamaCancelDomain::All)
         cancel_request_state(active_request_state(OllamaRequestKind::Advisor));
 }
@@ -408,8 +429,14 @@ void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessag
     if (!callback)
         return;
 
-    const OllamaCancelDomain cancel_domain =
-        kind == OllamaRequestKind::Advisor ? OllamaCancelDomain::Advisor : OllamaCancelDomain::Chat;
+    const OllamaCancelDomain cancel_domain = [&]() {
+        switch (kind) {
+        case OllamaRequestKind::Advisor: return OllamaCancelDomain::Advisor;
+        case OllamaRequestKind::Planner: return OllamaCancelDomain::Planner;
+        case OllamaRequestKind::Resolver: return OllamaCancelDomain::Resolver;
+        default: return OllamaCancelDomain::Chat;
+        }
+    }();
     cancel_active_requests(cancel_domain);
 
     const uint64_t tok = ++request_serial(kind);

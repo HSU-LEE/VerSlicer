@@ -1,8 +1,12 @@
 #include "OllamaActionExecutor.hpp"
 #include "OllamaActionJsonExtract.hpp"
 #include "OllamaActionValidator.hpp"
+#include "OllamaConfig.hpp"
 #include "OllamaIntentContext.hpp"
 #include "OllamaSettingRegistry.hpp"
+#include "OllamaSettingSearch.hpp"
+#include "OllamaSystemPrompts.hpp"
+#include "BambuLabWikiSearch.hpp"
 #include "OllamaTelemetry.hpp"
 
 #include "../AICoach/AICoachApplyDedup.hpp"
@@ -14,6 +18,7 @@
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
 #include "slic3r/GUI/Selection.hpp"
+#include "slic3r/GUI/PartPlate.hpp"
 #include "slic3r/GUI/Tab.hpp"
 #include "slic3r/GUI/I18N.hpp"
 #include "slic3r/GUI/MainFrame.hpp"
@@ -22,6 +27,7 @@
 
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/PrintConfig.hpp"
+#include "libslic3r/Model.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
 
 #include <boost/algorithm/string.hpp>
@@ -67,18 +73,185 @@ std::optional<double> selection_instance_z_degrees(const Selection& sel)
     return normalize_rotation_degrees(vol->get_instance_rotation(Z) * 180.0 / kPi);
 }
 
-/** Select plate objects when transforms/copy run with nothing selected (e.g. right after model load). */
-bool ensure_selection_for_object_ops(Plater* plater)
+/** 3D prepare canvas — object transforms must not use preview canvas selection. */
+GLCanvas3D* view3d_canvas_for_object_ops(Plater* plater)
+{
+    return plater ? plater->get_view3D_canvas3D() : nullptr;
+}
+
+std::vector<unsigned int> object_indices_on_current_plate(Plater* plater)
+{
+    std::vector<unsigned int> out;
+    if (!plater)
+        return out;
+    PartPlateList& ppl = plater->get_partplate_list();
+    const int      plate = ppl.get_curr_plate_index();
+    Model&         model = plater->model();
+    for (size_t i = 0; i < model.objects.size(); ++i) {
+        if (model.objects[i]->instances.empty())
+            continue;
+        const int on_plate = ppl.find_instance_belongs(static_cast<int>(i), 0);
+        if (on_plate == plate)
+            out.push_back(static_cast<unsigned int>(i));
+    }
+    return out;
+}
+
+bool action_has_object_target(const nlohmann::json& action)
+{
+    if (action.contains("object_id") && action["object_id"].is_number_integer())
+        return true;
+    if (action.contains("object_ids") && action["object_ids"].is_array() && !action["object_ids"].empty())
+        return true;
+    if (action.contains("object_name") && action["object_name"].is_string()
+        && !action["object_name"].get<std::string>().empty())
+        return true;
+    if (action.contains("target") && action["target"].is_string() && !action["target"].get<std::string>().empty())
+        return true;
+    return false;
+}
+
+bool select_objects_for_action(Plater* plater, const nlohmann::json& action)
+{
+    GLCanvas3D* canvas = view3d_canvas_for_object_ops(plater);
+    if (!canvas)
+        return false;
+    Selection& sel = canvas->get_selection();
+    Model&     model = plater->model();
+
+    auto pick_object = [&](unsigned int obj_idx, bool single) {
+        if (obj_idx >= model.objects.size())
+            return false;
+        if (single)
+            sel.clear();
+        sel.add_object(obj_idx, single);
+        return true;
+    };
+
+    if (action.contains("object_ids") && action["object_ids"].is_array()) {
+        sel.clear();
+        bool any = false;
+        for (const auto& id : action["object_ids"]) {
+            if (!id.is_number_integer())
+                continue;
+            const unsigned int obj_idx = id.get<unsigned int>();
+            if (obj_idx < model.objects.size()) {
+                sel.add_object(obj_idx, false);
+                any = true;
+            }
+        }
+        return any && !sel.is_empty();
+    }
+
+    if (action.contains("object_id") && action["object_id"].is_number_integer()) {
+        sel.clear();
+        const unsigned int obj_idx = action["object_id"].get<unsigned int>();
+        pick_object(obj_idx, true);
+        return !sel.is_empty();
+    }
+
+    std::string name_hint;
+    if (action.contains("object_name") && action["object_name"].is_string())
+        name_hint = action["object_name"].get<std::string>();
+    else if (action.contains("target") && action["target"].is_string())
+        name_hint = action["target"].get<std::string>();
+    boost::algorithm::trim(name_hint);
+    if (!name_hint.empty()) {
+        sel.clear();
+        bool any = false;
+        for (size_t i = 0; i < model.objects.size(); ++i) {
+            const std::string& n = model.objects[i]->name;
+            if (boost::icontains(n, name_hint)) {
+                sel.add_object(static_cast<unsigned int>(i), false);
+                any = true;
+            }
+        }
+        if (any && sel.volumes_count() == 1)
+            return !sel.is_empty();
+        if (any)
+            return !sel.is_empty();
+    }
+
+    return false;
+}
+
+/** Select plate objects for transforms when nothing is selected (always uses 3D view). */
+bool ensure_selection_for_object_ops(Plater* plater, const nlohmann::json* action = nullptr)
 {
     if (!plater || plater->model().objects.empty())
         return false;
-    GLCanvas3D* canvas = plater->canvas3D();
+    GLCanvas3D* canvas = view3d_canvas_for_object_ops(plater);
     if (!canvas)
         return false;
-    if (!canvas->get_selection().is_empty())
+
+    if (action && action_has_object_target(*action)) {
+        if (select_objects_for_action(plater, *action))
+            return true;
+    }
+
+    Selection& sel = canvas->get_selection();
+    if (!sel.is_empty())
         return true;
+
+    const std::vector<unsigned int> on_plate = object_indices_on_current_plate(plater);
+    if (on_plate.size() == 1) {
+        sel.clear();
+        sel.add_object(on_plate.front(), true);
+        return !sel.is_empty();
+    }
+
     plater->select_all();
     return !canvas->get_selection().is_empty();
+}
+
+static void ensure_prepare_view_for_object_ops()
+{
+    MainFrame* mf = wxGetApp().mainframe;
+    if (mf)
+        mf->request_select_tab(MainFrame::tp3DEditor);
+}
+
+std::optional<unsigned int> infer_single_geometry_target(Plater* plater)
+{
+    if (!plater)
+        return std::nullopt;
+    if (GLCanvas3D* canvas = view3d_canvas_for_object_ops(plater)) {
+        const Selection& sel = canvas->get_selection();
+        if (!sel.is_empty()) {
+            const int obj_idx = sel.get_object_idx();
+            if (obj_idx >= 0)
+                return static_cast<unsigned int>(obj_idx);
+        }
+    }
+    const std::vector<unsigned int> on_plate = object_indices_on_current_plate(plater);
+    if (on_plate.size() == 1)
+        return on_plate.front();
+    return std::nullopt;
+}
+
+static void augment_geometry_object_targets_impl(nlohmann::json& root, const std::string& /*user*/)
+{
+    if (!root.contains("actions") || !root["actions"].is_array())
+        return;
+    Plater* plater = wxGetApp().plater();
+    if (!plater)
+        return;
+
+    const std::optional<unsigned int> target = infer_single_geometry_target(plater);
+    if (!target)
+        return;
+
+    for (auto& action : root["actions"]) {
+        if (!action.is_object())
+            continue;
+        const std::string type = action.value("type", "");
+        if (type != "rotate" && type != "translate" && type != "scale" && type != "clone_selection"
+            && type != "delete_selection")
+            continue;
+        if (action_has_object_target(action))
+            continue;
+        action["object_id"] = *target;
+    }
 }
 
 Preset::Type preset_type_from_string(const std::string& s)
@@ -536,15 +709,22 @@ OllamaActionResult apply_transform(const nlohmann::json& action, const char* typ
         result.message = "Plater not available";
         return result;
     }
-    GLCanvas3D* canvas = plater->canvas3D();
+    ensure_prepare_view_for_object_ops();
+    GLCanvas3D* canvas = view3d_canvas_for_object_ops(plater);
     if (!canvas) {
         result.message = "3D view not available";
         return result;
     }
 
     Selection& sel = canvas->get_selection();
-    if (sel.is_empty() && !ensure_selection_for_object_ops(plater)) {
-        result.message = "Select at least one object on the plate";
+    if (sel.is_empty() && !ensure_selection_for_object_ops(plater, &action)) {
+        const std::vector<unsigned int> on_plate = object_indices_on_current_plate(plater);
+        if (on_plate.empty())
+            result.message = "No models on the current plate";
+        else if (on_plate.size() > 1 && action_has_object_target(action))
+            result.message = "Could not find the requested model — check object_id or object_name";
+        else
+            result.message = "Select at least one object on the plate";
         return result;
     }
 
@@ -645,8 +825,15 @@ OllamaActionResult apply_ui_select_tab(const nlohmann::json& action)
         pos = MainFrame::tpPreview;
     else if (tab == "monitor")
         pos = MainFrame::tpMonitor;
-    else if (tab == "smart_print")
-        pos = MainFrame::tpSmartPrint;
+    else if (tab == "smart_print") {
+        if (mf->page_index_for(MainFrame::tpSmartPrint) != wxNOT_FOUND)
+            mf->select_tab(MainFrame::tpSmartPrint);
+        else
+            wxGetApp().open_smart_print();
+        result.success = true;
+        result.message = "Switched tab to " + tab;
+        return result;
+    }
     else if (tab == "home")
         pos = MainFrame::tpHome;
     else {
@@ -654,7 +841,7 @@ OllamaActionResult apply_ui_select_tab(const nlohmann::json& action)
         return result;
     }
 
-    mf->request_select_tab(pos);
+    mf->select_tab(pos);
     result.success = true;
     result.message = "Switched tab to " + tab;
     return result;
@@ -696,7 +883,7 @@ OllamaActionResult apply_clone_selection()
         result.message = "Plater not available";
         return result;
     }
-    if (!ensure_selection_for_object_ops(plater)) {
+    if (!ensure_selection_for_object_ops(plater, nullptr)) {
         result.message = "Select at least one object to copy";
         return result;
     }
@@ -968,7 +1155,14 @@ void OllamaActionExecutor::normalize_set_config_options(nlohmann::json& options)
 
 void OllamaActionExecutor::augment_actions_from_user_text(nlohmann::json& root, const std::string& user_request)
 {
+    if (!ollama_keyword_inject_enabled())
+        return;
     augment_actions_from_user_text_impl(root, user_request);
+}
+
+void OllamaActionExecutor::augment_geometry_object_targets(nlohmann::json& root, const std::string& user_request)
+{
+    augment_geometry_object_targets_impl(root, user_request);
 }
 
 OllamaSetConfigDryRunResult OllamaActionExecutor::dry_run_set_config(const nlohmann::json& action)
@@ -1048,9 +1242,10 @@ void OllamaActionExecutor::notify_plater_context_changed(bool clear_coach_dedup)
 
 static std::string selection_bbox_signature(Plater* plater)
 {
-    if (!plater || !plater->canvas3D())
+    GLCanvas3D* canvas = view3d_canvas_for_object_ops(plater);
+    if (!canvas)
         return "none";
-    const Selection& sel = plater->canvas3D()->get_selection();
+    const Selection& sel = canvas->get_selection();
     if (sel.is_empty())
         return "empty";
     const BoundingBoxf3 bb = sel.get_bounding_box();
@@ -1074,8 +1269,8 @@ static std::string build_context_signature()
     if (Plater* plater = wxGetApp().plater()) {
         sig << plater->model().objects.size() << '|';
         sig << plater->get_partplate_list().get_curr_plate_index() << '|';
-        if (plater->canvas3D())
-            sig << plater->canvas3D()->get_selection().volumes_count() << '|';
+        if (GLCanvas3D* v3 = view3d_canvas_for_object_ops(plater))
+            sig << v3->get_selection().volumes_count() << '|';
         sig << selection_bbox_signature(plater) << '|';
         const auto& slice_a = BambuSmartPrintService::instance().last_slice_analysis();
         if (slice_a.valid) {
@@ -1116,6 +1311,50 @@ static void append_slice_and_readiness(nlohmann::json& ctx, Plater* plater)
         ctx["readiness_score"] = readiness.score;
 }
 
+static nlohmann::json build_plate_objects_json(Plater* plater)
+{
+    nlohmann::json arr = nlohmann::json::array();
+    if (!plater)
+        return arr;
+    GLCanvas3D* canvas = view3d_canvas_for_object_ops(plater);
+    if (!canvas)
+        return arr;
+    const Selection& sel = canvas->get_selection();
+    Model&           model = plater->model();
+    PartPlateList&   ppl   = plater->get_partplate_list();
+    const int        plate = ppl.get_curr_plate_index();
+
+    auto object_selected = [&](unsigned int obj_idx) {
+        if (sel.is_empty())
+            return false;
+        for (unsigned int vid : sel.get_volume_idxs()) {
+            const GLVolume* v = sel.get_volume(vid);
+            if (v && static_cast<unsigned int>(v->object_idx()) == obj_idx)
+                return true;
+        }
+        return false;
+    };
+
+    for (size_t i = 0; i < model.objects.size(); ++i) {
+        ModelObject* obj = model.objects[i];
+        if (obj->instances.empty())
+            continue;
+        const int on_plate = ppl.find_instance_belongs(static_cast<int>(i), 0);
+        if (on_plate != plate)
+            continue;
+        const BoundingBoxf3 bb = obj->instance_bounding_box(0);
+        arr.push_back({
+            {"object_index", i},
+            {"name", obj->name},
+            {"plate_index", plate},
+            {"selected", object_selected(static_cast<unsigned int>(i))},
+            {"size_mm",
+             {{"x", bb.size().x()}, {"y", bb.size().y()}, {"z", bb.size().z()}}},
+        });
+    }
+    return arr;
+}
+
 static nlohmann::json build_context_object(bool compact)
 {
     nlohmann::json ctx;
@@ -1152,42 +1391,58 @@ static nlohmann::json build_context_object(bool compact)
         append_printer_capabilities(ctx, &bundle->printers.get_edited_preset().config);
     }
 
-    if (plater && plater->canvas3D()) {
-        const Selection& sel = plater->canvas3D()->get_selection();
-        ctx["selection_count"] = sel.volumes_count();
-        ctx["has_selection"]   = !sel.is_empty();
-        if (!sel.is_empty()) {
-            const BoundingBoxf3 bb = sel.get_bounding_box();
-            ctx["selection_size_mm"] = {
-                {"x", bb.size().x()},
-                {"y", bb.size().y()},
-                {"z", bb.size().z()},
-            };
+    if (plater) {
+        ctx["current_plate_index"] = plater->get_partplate_list().get_curr_plate_index();
+        ctx["plate_objects"]       = build_plate_objects_json(plater);
+        if (GLCanvas3D* v3 = view3d_canvas_for_object_ops(plater)) {
+            const Selection& sel = v3->get_selection();
+            ctx["selection_count"] = sel.volumes_count();
+            ctx["has_selection"]   = !sel.is_empty();
+            if (!sel.is_empty()) {
+                const BoundingBoxf3 bb = sel.get_bounding_box();
+                ctx["selection_size_mm"] = {
+                    {"x", bb.size().x()},
+                    {"y", bb.size().y()},
+                    {"z", bb.size().z()},
+                };
+                const int obj_idx = sel.get_object_idx();
+                if (obj_idx >= 0)
+                    ctx["selected_object_index"] = obj_idx;
+            }
         }
     }
 
     if (!compact) {
+        if (ollama_auto_catalog_enabled()) {
+            ctx["setting_index"] = OllamaSettingRegistry::build_setting_index(2);
+            ctx["allowed_config_keys"] = OllamaSettingRegistry::allowed_keys_json();
+        }
         if (bundle)
             ctx["setting_catalog"] = OllamaSettingRegistry::build_catalog(&bundle->prints.get_edited_preset().config, ko);
         else
             ctx["setting_catalog"] = OllamaSettingRegistry::build_catalog(nullptr, ko);
         ctx["audience"]            = "beginner";
         ctx["setting_rules"]       = ko
-            ? "current 값 형식을 그대로 따르세요. 브림·서포트·채움은 setting_catalog 항목만 수정하세요."
-            : "Match the format of each key's current value. Only change keys in setting_catalog.";
+            ? "결과 중심: current 값 기준 최소 변경. 한 요청에 키 1~2개 권장. setting_catalog 키만."
+            : "Outcome-first: minimal changes relative to current; 1–2 keys per request; setting_catalog keys only.";
         nlohmann::json hints = nlohmann::json::object();
         if (ko) {
-            hints["bed_adhesion"] = "베드에 잘 안 붙을 때: 가장자리 접착(브림)을 넓히거나 베드 온도를 조금 올립니다.";
-            hints["overhang"]     = "공중으로 나오는 부분: 받침(서포트)을 켜면 성공률이 올라갑니다.";
-            hints["strength"]     = "쉽게 부서질 때: 채움을 늘리거나 벽을 두껍게 합니다.";
-            hints["warp"]         = "모서리가 들릴 때: 베드 온도·브림·인클로저를 점검합니다.";
-            hints["stringing"]    = "실이 늘어질 때: 리트랙션·온도를 조정합니다.";
+            hints["bed_adhesion"] =
+                "안 붙음/들뜸: 바닥 보조 테두리(브림) 또는 첫 층 — 접착 문제일 때.";
+            hints["overhang"]     = "공중/매달림: 받침 구조 또는 눕히기 — 오버행 문제일 때.";
+            hints["strength"]     = "부서짐/약함: 안쪽 채움·벽 두께 — 구조 문제일 때 (접착과 다름).";
+            hints["warp"]         = "모서리 들뜸: 접착·베드·브림.";
+            hints["stringing"]    = "실 늘어짐: 리트랙션·온도.";
+            hints["speed"]        = "느림: 레이어 두께·채움 — 품질 tradeoff 설명.";
+            hints["surface"]      = "거친 표면: 레이어 두께 감소.";
         } else {
-            hints["bed_adhesion"] = "Poor bed stick: widen edge adhesion (brim) or raise bed temperature slightly.";
-            hints["overhang"]     = "Floating parts: enable supports to improve success rate.";
-            hints["strength"]     = "Brittle parts: increase infill or wall thickness.";
-            hints["warp"]         = "Corner lift: check bed temp, brim, and enclosure.";
-            hints["stringing"]    = "Stringing: tune retraction and temperature.";
+            hints["bed_adhesion"] = "Won't stick: helper ring at bottom or first layer — adhesion issue.";
+            hints["overhang"]     = "Mid-air print: supports or lay flat — overhang issue.";
+            hints["strength"]     = "Breaks easily: tighter fill or thicker walls — structural, not brim.";
+            hints["warp"]         = "Corner lift: adhesion, bed, brim.";
+            hints["stringing"]    = "Stringing: retraction, temperature.";
+            hints["speed"]        = "Too slow: layer height, infill — mention quality tradeoff.";
+            hints["surface"]      = "Rough surface: lower layer height.";
         }
         ctx["plain_language_hints"] = hints;
         const nlohmann::json menu_ctx = build_menu_context_json();
@@ -1195,9 +1450,13 @@ static nlohmann::json build_context_object(bool compact)
             ctx["menu_catalog"] = menu_ctx;
     } else {
         ctx["plain_language_hints"] = ko
-            ? nlohmann::json{{"bed_adhesion", "베드 접착"}, {"overhang", "서포트"}, {"strength", "강도"}}
-            : nlohmann::json{{"bed_adhesion", "bed stick"}, {"overhang", "supports"}, {"strength", "strength"}};
+            ? nlohmann::json{{"bed_adhesion", "접착"}, {"overhang", "오버행"}, {"strength", "강도(채움·벽)"},
+                             {"speed", "속도"}, {"surface", "표면"}}
+            : nlohmann::json{{"bed_adhesion", "adhesion"}, {"overhang", "overhang"}, {"strength", "strength"},
+                             {"speed", "speed"}, {"surface", "surface"}};
     }
+
+    ctx["engineering_hints"] = OllamaIntentContext::build_engineering_hints_json();
 
     append_slice_and_readiness(ctx, plater);
 
@@ -1241,6 +1500,13 @@ std::string OllamaActionExecutor::fit_context_json_to_limit(std::string json, si
         while (json.size() > max_chars && drop_lowest_priority_catalog_entry())
             json = ctx.dump(2);
 
+        if (json.size() > max_chars && ctx.contains("setting_index") && ctx["setting_index"].is_array()
+            && ctx["setting_index"].size() > 40) {
+            auto& idx = ctx["setting_index"];
+            idx.erase(idx.begin() + idx.size() / 2, idx.end());
+            json = ctx.dump(2);
+        }
+
         if (json.size() > max_chars && ctx.contains("menu_catalog"))
             ctx.erase("menu_catalog");
         if (json.size() > max_chars && ctx.contains("plain_language_hints"))
@@ -1266,224 +1532,50 @@ std::string OllamaActionExecutor::fit_context_json_to_limit(std::string json, si
 
 std::string OllamaActionExecutor::build_system_prompt(bool apply_mode)
 {
-    static const char* kQuestionModeEn = R"OLLAMA(
-
-=== QUESTION MODE (active) ===
-The user is a beginner asking for help. Do NOT change the slicer.
-- Always return "actions": [].
-- "message": explain in plain everyday language (no unexplained jargon).
-- Use short sentences. Say what the issue might be and what they could try in Apply mode, without technical JSON terms.)OLLAMA";
-
-    static const char* kQuestionModeKo = R"OLLAMA(
-
-=== 질문 모드 (활성) ===
-초보 사용자가 도움을 요청합니다. 슬라이서 설정은 바꾸지 마세요.
-- 항상 "actions": [].
-- "message": 쉬운 말로만 설명 (전문 용어는 꼭 필요할 때만, 괄호로 풀어서).
-- 짧은 문장. 원인 추정과 Apply 모드에서 시도해 볼 수 있는 것을 안내하세요.)OLLAMA";
-
-    static const char* kPromptEn = R"OLLAMA(You are Verslicer AI — a patient helper inside a 3D printing slicer.
-
-## Who you talk to
-The user is often a complete beginner. They may not know words like "brim", "infill", or "support".
-- Understand casual, vague, or misspelled requests (Korean or English).
-- When they describe a problem, APPLY a sensible fix with set_config — do not only give theory.
-- In "message", never use raw JSON keys. Use everyday words (see setting_catalog in context).
-
-## Reading setting_catalog (critical)
-Context includes setting_catalog[]: each entry has key, current, value_type, unit, min, max, format, aliases.
-Also read intent_signals when present: support_recommended, still_needs_support, lay_flat_recommended, recommended_brim_width_mm, selection_footprint_mm.
-Use recommended_brim_width_mm for brim_width when the user wants adhesion/brim but gives no mm value.
-If still_needs_support is true after slicing, prefer enable_support unless the user clearly refuses supports.
-- ALWAYS read "current" before changing a value; keep the same format (e.g. sparse_infill_density as "20%" not 20).
-- bool: use true/false in JSON (enable_support, enable_brim).
-- percent: string with % suffix matching current style.
-- mm / count: JSON number without unit suffix.
-- brim_width: 0 means off; typical on = 5 with brim_type "outer_only".
-- Only use keys listed in setting_catalog or allowed_config_keys.
-- Relative phrases: "more infill" / "채움 올려" → increase current sparse_infill_density by ~5% unless user gave an explicit %.
-
-## Output (strict)
-Exactly ONE JSON object. No markdown, no text outside JSON.
-
-{
-  "message": "2–4 short, friendly sentences",
-  "actions": [ ... ]
-}
-
-"message" style for beginners:
-1) Repeat what you understood in their words ("You said the print breaks easily…").
-2) Say what you will change in plain language ("I'll turn on a brim — extra plastic around the bottom so it sticks better.").
-3) Optional: one simple next step they can try if it still fails.
-Same language as the user (Korean or English).
-
-## Technical actions (hidden from user; use correctly)
-set_config: { "type":"set_config", "preset":"print", "options":{ KEY: value } }
-Optional: "filament_index": 0 for preset "filament" (multi-material slot, default 0).
-- Keys ONLY from allowed_config_keys / print_options in context.
-- Numbers as numbers; percents as "20%".
-- One set_config with all related keys.
-
-Other types: translate, rotate, scale, clone_selection, arrange, ui_select_tab, slice (only if slicing alone), delete_selection (only if user asked to delete), add_model (path required).
-
-MakerWorld (search/import runs in app — never invent download URLs):
-- makerworld_search: { "type":"makerworld_search", "query":"articulated dragon mini" }
-- import_makerworld: { "type":"import_makerworld", "design_id":"12345" } OR { "type":"import_makerworld", "url":"https://makerworld.com/..." }
-- Use makerworld_search when user wants to find a model. Use import_makerworld only when user picked a specific id/url.
-- Search query: 2–6 concrete nouns/adjectives only (object type, style, size). No filler (find, search, model, please). Prefer English keywords when known (dragon, keycap, vase).
-- Do NOT use add_model for MakerWorld links.
-
-Brim on: brim_width 5, brim_type "outer_only" (or enable_brim true). Brim off: brim_width 0.
-Supports: enable_support true.
-After set_config, the app re-slices automatically — do NOT add a separate slice action.
-
-## Everyday words → what to do (Apply mode)
-| User says (examples) | Do |
-| won't stick, lifts, warping, corners up / 안 붙, 들뜸, 베드 | brim |
-| breaks, fragile, snaps, weak / 부서, 부러, 깨, 약, 파손, 쉽게 | brim_width 5 + outer_only; optionally wall_loops or sparse_infill_density — NOT pressure advance, NOT input shaper |
-| floating, mid-air, sagging, overhang / 공중, 매달, 떨어, 오버행 | enable_support |
-| hollow, soft inside, stronger / 속 비, 단단, 튼튼 | higher sparse_infill_density (e.g. "22%") or wall_loops |
-| thicker/thinner layers / 두껍, 얇 | layer_height |
-| flip, lay flat / 뒤집, 눕혀 | rotate |
-| explicit % or "infill" / 채움 N% | sparse_infill_density |
-| "what is…?", "how do I…?" only | actions [] |
-
-If the request is vague ("fix it", "help", "고쳐줘") but mentions a symptom above, still apply the best matching fix.
-
-## Safety
-- No delete_selection unless user clearly asked to delete/remove.
-- No add_model without a path. No File save/export/quit unless asked.
-- No invented config keys. Never delete models to "fix" prints.
-
-## Forbidden mistakes
-- NEVER tell the user to press shortcuts or manually set brim_width in "message" — use "actions".
-- NEVER open Calibration / VFA / temperature tower / flow calibration menus.
-- "breaks easily" / "부서져" = print quality → brim or infill; NEVER "arrange".
-- NEVER invent keys (e.g. input_shelling, pressure_advance). Use only setting_catalog keys.
-- Do NOT suggest pressure advance / input shaper in "message" for fragile prints — use brim or infill actions instead.
-- User asks to rotate N degrees → MUST include a "rotate" action; do not only explain.
-- "message" same language throughout (no mixed foreign words).
-- If actions run, "message" only confirms what you did in plain language.
-
-## Examples (JSON only)
-
-User: "it won't stick to the bed"
-{"message":"Got it — the first layer isn't sticking well. I'll turn on a brim (extra outline around the bottom) so the print holds to the bed better.","actions":[{"type":"set_config","preset":"print","options":{"brim_width":5,"brim_type":"outer_only"}}]}
-
-User: "출력물이 너무 쉽게 파손돼"
-{"message":"말씀하신 대로 출력물이 잘 부서지는 상황이네요. 바닥이 더 잘 붙도록 브림(테두리에 플라스틱을 조금 더 깔기)을 켜 두겠습니다.","actions":[{"type":"set_config","preset":"print","options":{"brim_width":5,"brim_type":"outer_only"}}]}
-
-User: "잘 부서져"
-{"message":"쉽게 부서진다고 하셨죠. 바닥 접착을 돕기 위해 브림을 켭니다.","actions":[{"type":"set_config","preset":"print","options":{"brim_width":5,"brim_type":"outer_only"}}]}
-
-User: "공중에 떠서 나와요"
-{"message":"중간에 공중으로 나오는 부분이 있군요. 서포트(받침대)를 켜서 그 부분을 받쳐 주겠습니다.","actions":[{"type":"set_config","preset":"print","options":{"enable_support":true}}]}
-
-User: "채움 20%로 해줘"
-{"message":"안쪽을 20%로 채우도록 설정할게요. 숫자가 클수록 더 단단해집니다.","actions":[{"type":"set_config","preset":"print","options":{"sparse_infill_density":"20%"}}]}
-
-User: "브림이 뭐예요?"
-{"message":"브림은 맨 아래 테두리에 플라스틱을 조금 더 깔아서 베드에 잘 붙게 해 주는 기능이에요. 작은 물건이나 모서리가 들뜰 때 켜면 좋아요.","actions":[]})OLLAMA";
-
-    static const char* kPromptKo = R"OLLAMA(당신은 Verslicer AI입니다. 3D 프린터 슬라이서 안에서 초보 사용자를 돕습니다.
-
-## 대상
-사용자는 슬라이서를 처음 쓰는 경우가 많습니다. "브림", "채움", "서포트" 같은 말을 모를 수 있습니다.
-- 구어체·애매한 표현·오타도 의도로 이해하세요.
-- 문제를 말하면 설명만 하지 말고 set_config로 합리적인 조치를 적용하세요.
-- "message"에는 JSON 키 이름을 쓰지 말고, setting_catalog 설명처럼 쉬운 말을 쓰세요.
-
-## setting_catalog 읽기 (중요)
-context의 setting_catalog[]: key, current, value_type, unit, min, max, format, aliases.
-intent_signals도 확인: support_recommended, still_needs_support, lay_flat_recommended, recommended_brim_width_mm, selection_footprint_mm.
-브림 mm 값이 없으면 recommended_brim_width_mm을 brim_width에 사용.
-still_needs_support가 true면 사용자가 거부하지 않는 한 enable_support 우선.
-- 값을 바꾸기 전에 반드시 current 확인. 형식 유지 (sparse_infill_density는 "20%" 형태).
-- bool: true/false. percent: "%" 포함 문자열. mm/개수: 숫자만.
-- brim_width 0=끔, 켤 때 보통 5 + brim_type outer_only.
-- setting_catalog에 있는 키만 사용.
-- "채움 올려" 등: current에서 약 5%p 올리기 (명시적 %가 없을 때).
-
-## 출력 (필수)
-JSON 객체 하나만. 마크다운·JSON 밖 텍스트 금지.
-
-{
-  "message": "친절한 짧은 문장 2~4개",
-  "actions": [ ... ]
-}
-
-"message" 작성법:
-1) 사용자 말을 다시 짧게 ("쉽게 부서진다고 하셨죠.")
-2) 무엇을 바꿀지 쉬운 말로 ("바닥이 잘 붙도록 브림을 켭니다.")
-3) 필요하면 한 가지 추가 팁
-
-## 기술 action (사용자에게는 숨김)
-set_config: preset print, options는 allowed_config_keys / print_options만.
-선택: preset "filament"일 때 "filament_index": 0 (멀티 재료 슬롯, 기본 0).
-퍼센트는 "20%". set_config 후 자동 재슬라이스 — slice action 추가 금지.
-
-## 일상 표현 → 할 일 (Apply)
-| 이런 말 | 조치 |
-| 안 붙, 들뜸, 베드, warp | brim |
-| 부서, 부러, 깨, 약, 파손, 쉽게 | brim (+ 필요 시 채움/벽) |
-| 공중, 매달, 떨어, 오버행 | enable_support |
-| 속 비, 단단, 튼튼 | sparse_infill_density 상향(예 22%) 또는 wall_loops |
-| 두껍/얇 | layer_height |
-| 뒤집, 눕혀 | rotate |
-| 채움 N% | sparse_infill_density |
-| 뭐예요?, 방법만 | actions [] |
-
-"고쳐줘"만 있어도 증상이 함께 있으면 위 표에 맞게 적용하세요.
-
-## 안전
-- 삭제 요청 없으면 delete_selection 금지. 경로 없으면 add_model 금지.
-- 출력 문제로 모델 삭제 금지.
-
-## MakerWorld (앱이 검색·다운로드 — URL을 지어내지 마세요)
-- makerworld_search: { "type":"makerworld_search", "query":"articulated dragon" }
-- import_makerworld: design_id 또는 makerworld.com url
-- 모델을 찾아달라 → makerworld_search. 특정 id/링크 가져오기 → import_makerworld.
-- query는 핵심 명사·형용사만 (찾아줘/모델/검색 등 제거). 가능하면 영어 키워드 (dragon, keycap).
-
-## 흔한 실수 (하지 말 것)
-- "message"에서 단축키·수동 설정 안내 금지 — 조치는 "actions"에 넣기.
-- Calibration / VFA / 캘리브레이션 메뉴는 열지 마세요.
-- "부서져", "잘 안됨" = 출력 품질 → 브림/채움; arrange(판 위 재배치)는 금지.
-- input_shelling, pressure_advance 등 없는 키 금지. setting_catalog만 사용.
-- 잘 부서지는 증상에 프레셔 어드밴스·입력 셰이핑 설명 대신 brim set_config.
-- "N도 돌려" → 반드시 rotate action 포함.
-- message는 한 언어만 (외국어 섞지 않기).
-- actions가 있으면 message는 적용 확인만.
-
-## 예시 (JSON만)
-
-사용자: "베드에 잘 안 붙어요"
-{"message":"첫 층이 잘 안 붙는다고 하셨네요. 바닥 테두리에 플라스틱을 조금 더 깔아 주는 브림을 켜 두겠습니다.","actions":[{"type":"set_config","preset":"print","options":{"brim_width":5,"brim_type":"outer_only"}}]}
-
-사용자: "출력물이 너무 쉽게 파손돼"
-{"message":"쉽게 부서진다고 하셨죠. 바닥 접착을 돕기 위해 브림을 켭니다.","actions":[{"type":"set_config","preset":"print","options":{"brim_width":5,"brim_type":"outer_only"}}]}
-
-사용자: "잘 부서져"
-{"message":"쉽게 부서진다고 하셨죠. 브림을 켜서 밑부분을 더 단단하게 붙이겠습니다.","actions":[{"type":"set_config","preset":"print","options":{"brim_width":5,"brim_type":"outer_only"}}]}
-
-사용자: "공중에 떠서 나와요"
-{"message":"공중으로 나오는 부분이 있군요. 받침대(서포트)를 켜겠습니다.","actions":[{"type":"set_config","preset":"print","options":{"enable_support":true}}]}
-
-사용자: "안쪽을 더 단단하게"
-{"message":"안쪽을 더 꽉 채우도록 채움을 22%로 올릴게요.","actions":[{"type":"set_config","preset":"print","options":{"sparse_infill_density":"22%"}}]}
-
-사용자: "브림이 뭐예요?"
-{"message":"브림은 맨 아래에 플라스틱을 조금 더 깔아 베드에 잘 붙게 하는 기능이에요.","actions":[]})OLLAMA";
-
-    std::string prompt;
-    if (ui_prefers_korean())
-        prompt = kPromptKo;
-    else
-        prompt = kPromptEn;
-
+    const bool ko = ui_prefers_korean();
+    std::string prompt = OllamaSystemPrompts::apply_system_prompt(ko);
     if (!apply_mode)
-        prompt += ui_prefers_korean() ? kQuestionModeKo : kQuestionModeEn;
+        prompt += OllamaSystemPrompts::question_mode_suffix(ko);
     return prompt;
+}
+
+std::string OllamaActionExecutor::build_planner_system_prompt()
+{
+    return OllamaSystemPrompts::planner_system_prompt(ui_prefers_korean());
+}
+
+std::string OllamaActionExecutor::build_planner_user_message(const std::string& user_request)
+{
+    nlohmann::json ctx = build_context_object(/*compact*/ true);
+    ctx["setting_index"] = OllamaSettingRegistry::build_setting_index(2);
+    std::string body     = ctx.dump(2);
+    std::string packed   = std::string("Current slicer context (JSON):\n") + body + "\n\nUser request:\n" + user_request;
+    return fit_context_json_to_limit(std::move(packed), 24000);
+}
+
+std::string OllamaActionExecutor::build_resolver_user_message(const std::string& user_request,
+                                                              const std::vector<std::string>& candidate_keys,
+                                                              const nlohmann::json& wiki_context)
+{
+    nlohmann::json ctx = build_context_object(/*compact*/ true);
+    const bool     ko  = ui_prefers_korean();
+    const DynamicPrintConfig* print_cfg    = nullptr;
+    const DynamicPrintConfig* filament_cfg = nullptr;
+    if (auto* bundle = wxGetApp().preset_bundle) {
+        print_cfg    = &bundle->prints.get_edited_preset().config;
+        filament_cfg = &bundle->filaments.get_edited_preset().config;
+    }
+    ctx["setting_catalog"]        = OllamaSettingSearch::lookup(candidate_keys, print_cfg, filament_cfg, ko);
+    ctx["planner_candidate_keys"] = candidate_keys;
+    if (wiki_context.is_array() && !wiki_context.empty()) {
+        ctx["wiki_context"] = wiki_context;
+        ctx["wiki_rules"]   = ko
+            ? "wiki_context는 Bambu Lab 위키 발췌입니다. 증상 해결에 맞는 setting_catalog 키만 set_config로 적용하세요."
+            : "wiki_context excerpts are from Bambu Lab Wiki. Apply only matching keys from setting_catalog.";
+    }
+    std::string body = ctx.dump(2);
+    return OllamaSystemPrompts::resolver_turn_instructions(ko) + "\n\nResolver context (JSON):\n" + body
+           + "\n\nUser request:\n" + user_request;
 }
 
 std::string OllamaActionExecutor::build_context_json()

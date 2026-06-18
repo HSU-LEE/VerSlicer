@@ -27,7 +27,8 @@ const AICoachTriggerPolicy kPolicies[] = {
     // PrintSuccessFinishing
     { AICoachImportance::Normal, 120000, 0, AICoachSuppression::None, AICoachSuppression::BeginnerJourney },
     // AppliedUndo
-    { AICoachImportance::Normal, 120000, 15000, AICoachSuppression::None, AICoachSuppression::None },
+    { AICoachImportance::Normal, 120000, 15000, AICoachSuppression::None,
+      AICoachSuppression::GcodeWindow },
     // PrintMonitor
     { AICoachImportance::Low, 300000, 8000, AICoachSuppression::None, AICoachSuppression::BeginnerJourney },
     // FailureDoctor

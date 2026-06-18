@@ -313,6 +313,8 @@ void AICoachController::apply_card_actions(Plater* plater, const AICoachCard& ca
 
 void AICoachController::show_undo_card()
 {
+    wxGetApp().set_show_gcode_window(false);
+
     AICoachCard c;
     c.trigger         = AICoachTriggerId::AppliedUndo;
     c.kind            = AICoachCardKind::AppliedUndo;

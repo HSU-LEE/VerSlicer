@@ -48,16 +48,12 @@ set(SLIC3R_GUI_SOURCES
     GUI/BBLTopbar.hpp
     GUI/BambuSmartPrint/BambuSmartPrintCompareDialog.cpp
     GUI/BambuSmartPrint/BambuSmartPrintCompareDialog.hpp
-    GUI/BambuSmartPrint/BambuSmartPrintDialog.cpp
-    GUI/BambuSmartPrint/BambuSmartPrintDialog.hpp
     GUI/BambuSmartPrint/BambuSmartPrintDeviceSummary.cpp
     GUI/BambuSmartPrint/BambuSmartPrintDeviceSummary.hpp
     GUI/BambuSmartPrint/BambuSmartPrintHistoryDialog.cpp
     GUI/BambuSmartPrint/BambuSmartPrintHistoryDialog.hpp
     GUI/BambuSmartPrint/BambuSmartPrintPanel.cpp
     GUI/BambuSmartPrint/BambuSmartPrintPanel.hpp
-    GUI/BambuSmartPrint/BambuSmartPrintPrepareBar.cpp
-    GUI/BambuSmartPrint/BambuSmartPrintPrepareBar.hpp
     GUI/BambuSmartPrint/FirstPrintExperience.cpp
     GUI/BambuSmartPrint/FirstPrintExperience.hpp
     GUI/BambuSmartPrint/PrintReadinessGate.cpp
@@ -106,6 +102,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaIntentRules.hpp
     GUI/OllamaAssistant/OllamaActionExecutor.cpp
     GUI/OllamaAssistant/OllamaActionExecutor.hpp
+    GUI/OllamaAssistant/OllamaSystemPrompts.cpp
+    GUI/OllamaAssistant/OllamaSystemPrompts.hpp
     GUI/OllamaAssistant/OllamaActionRegistry.cpp
     GUI/OllamaAssistant/OllamaActionRegistry.hpp
     GUI/OllamaAssistant/OllamaActionValidator.cpp
@@ -132,6 +130,22 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaServerManager.hpp
     GUI/OllamaAssistant/OllamaSettingRegistry.cpp
     GUI/OllamaAssistant/OllamaSettingRegistry.hpp
+    GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
+    GUI/OllamaAssistant/OllamaSettingCatalogBuilder.hpp
+    GUI/OllamaAssistant/OllamaSettingSearch.cpp
+    GUI/OllamaAssistant/OllamaSettingSearch.hpp
+    GUI/OllamaAssistant/OllamaSettingAliases.cpp
+    GUI/OllamaAssistant/OllamaSettingAliases.hpp
+    GUI/OllamaAssistant/OllamaRequestRouter.cpp
+    GUI/OllamaAssistant/OllamaRequestRouter.hpp
+    GUI/OllamaAssistant/BambuLabWikiSearch.cpp
+    GUI/OllamaAssistant/BambuLabWikiSearch.hpp
+    GUI/OllamaAssistant/BambuLabWikiSearchCore.cpp
+    GUI/OllamaAssistant/BambuLabWikiSearchCore.hpp
+    GUI/OllamaAssistant/OllamaActionCritic.cpp
+    GUI/OllamaAssistant/OllamaActionCritic.hpp
+    GUI/OllamaAssistant/OllamaBenchmarkScenarios.cpp
+    GUI/OllamaAssistant/OllamaBenchmarkScenarios.hpp
     GUI/OllamaAssistant/OllamaTelemetry.cpp
     GUI/OllamaAssistant/OllamaTelemetry.hpp
     GUI/OllamaAssistant/OllamaVoiceInput.cpp

@@ -19,7 +19,6 @@ namespace GUI {
 
 class Plater;
 class BambuSmartPrintPanel;
-class BambuSmartPrintPrepareBar;
 struct SmartPrintWorkflowContent;
 
 class BambuSmartPrintService
@@ -99,8 +98,6 @@ public:
     void unregister_preferences_panel(BambuSmartPrintPanel* panel);
     void register_main_panel(BambuSmartPrintPanel* panel);
     void unregister_main_panel(BambuSmartPrintPanel* panel);
-    void register_prepare_bar(BambuSmartPrintPrepareBar* bar);
-    void unregister_prepare_bar(BambuSmartPrintPrepareBar* bar);
     void refresh_all_panels();
     void on_app_preset_context_changed();
 
@@ -180,7 +177,6 @@ private:
     int64_t     m_last_finish_ms{ 0 };
     wxWeakRef<BambuSmartPrintPanel> m_preferences_panel;
     wxWeakRef<BambuSmartPrintPanel> m_main_panel;
-    wxWeakRef<BambuSmartPrintPrepareBar> m_prepare_bar;
 
     struct PendingFailureDialog {
         BambuSmartPrint::PrintFailureRecord record;

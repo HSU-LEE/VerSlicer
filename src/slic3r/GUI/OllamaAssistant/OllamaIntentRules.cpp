@@ -107,14 +107,6 @@ bool contains_durability_intent(const std::string& s)
            s.find("snaps") != std::string::npos;
 }
 
-bool contains_file_intent(const std::string& s)
-{
-    return s.find("저장") != std::string::npos || s.find("열어") != std::string::npos ||
-           s.find("불러") != std::string::npos || s.find("내보내") != std::string::npos ||
-           s.find("export") != std::string::npos || s.find("save") != std::string::npos ||
-           s.find("open") != std::string::npos || s.find("import") != std::string::npos;
-}
-
 bool describes_print_quality_symptom(const std::string& s)
 {
     return contains_durability_intent(s) || contains_adhesion_intent(s) ||

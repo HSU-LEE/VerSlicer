@@ -58,6 +58,8 @@ public:
     static bool user_wants_lay_flat(const std::string& user);
 
     static nlohmann::json build_intent_signals_json();
+    /** Outcome-first guidance from live preset (compact JSON for LLM context). */
+    static nlohmann::json build_engineering_hints_json();
     static void           refresh_cached_intent_signals();
     static nlohmann::json cached_intent_signals_json();
 

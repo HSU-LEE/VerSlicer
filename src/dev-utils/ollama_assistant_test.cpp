@@ -4,6 +4,7 @@
 #include "../slic3r/GUI/OllamaAssistant/OllamaIntentRules.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaModelPick.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.hpp"
+#include "../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -34,15 +35,17 @@ static void expect_eq(const std::string& got, const std::string& want, const cha
 
 int main()
 {
+    setenv("OLLAMA_AUTO_CATALOG", "1", 1);
+
     expect_true(OllamaSettingRegistry::is_allowed_key("brim_width"), "allowed brim_width");
     expect_true(OllamaSettingRegistry::is_allowed_key("enable_support"), "allowed enable_support");
-    expect_true(!OllamaSettingRegistry::is_allowed_key("pressure_advance"), "block pressure_advance");
+    expect_true(!OllamaSettingRegistry::is_allowed_key("machine_start_gcode"), "block tier3 gcode");
     expect_true(OllamaSettingRegistry::is_allowed_key("brim_width", "print"), "brim_width print scope");
     expect_true(!OllamaSettingRegistry::is_allowed_key("brim_width", "filament"), "brim_width not filament");
     expect_true(OllamaSettingRegistry::is_allowed_key("retraction_length", "filament"), "retraction filament");
     expect_true(!OllamaSettingRegistry::is_allowed_key("retraction_length", "print"), "retraction not print");
     expect_true(OllamaSettingRegistry::is_virtual_key("enable_brim"), "enable_brim virtual");
-    expect_true(OllamaSettingRegistry::all().size() >= 23, "catalog size");
+    expect_true(OllamaSettingCatalogBuilder::all().size() >= 80, "auto catalog size");
 
     nlohmann::json layer = 0.8;
     expect_true(OllamaSettingRegistry::clamp_json_value("layer_height", layer), "clamp layer_height high");

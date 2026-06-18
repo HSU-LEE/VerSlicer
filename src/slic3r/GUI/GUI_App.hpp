@@ -330,7 +330,7 @@ private:
     bool             m_show_error_msgdlg{false};
     wxString         m_info_dialog_content;
     HttpServer       m_http_server;
-    bool             m_show_gcode_window{true};
+    bool             m_show_gcode_window{false};
     boost::thread    m_check_network_thread;
 public:
     //try again when subscription fails
@@ -370,6 +370,7 @@ public:
     
     // Verslicer
     bool show_gcode_window() const { return m_show_gcode_window; }
+    void set_show_gcode_window(bool show, bool persist = true);
     void toggle_show_gcode_window();
 
     bool show_3d_navigator() const { return app_config->get_bool("show_3d_navigator"); }

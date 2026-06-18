@@ -1,6 +1,8 @@
 #include "../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaActionPipelineCore.hpp"
+#include "../slic3r/GUI/OllamaAssistant/OllamaBenchmarkScenarios.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaIntentRules.hpp"
+#include "../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -42,6 +44,8 @@ static bool action_has_type(const nlohmann::json& root, const char* type)
 
 int main()
 {
+    setenv("OLLAMA_AUTO_CATALOG", "1", 1);
+
     {
         nlohmann::json root = {
             {"actions",
@@ -86,6 +90,32 @@ int main()
     {
         const auto z = parse_z_rotation_degrees("왼쪽으로 45도 회전");
         expect_true(z.has_value() && *z == -45.0, "parse_z_rotation left turn");
+    }
+
+    {
+        const auto& scenarios = ollama_benchmark_scenarios();
+        expect_true(scenarios.size() >= 50, "benchmark scenarios wired");
+        for (const auto& sc : scenarios) {
+            if (!sc.check(sc.user_request))
+                std::cerr << "FAIL scenario: " << sc.id << '\n';
+            expect_true(sc.check(sc.user_request), sc.id);
+        }
+    }
+
+    {
+        const auto keys = OllamaSettingSearch::keys_from_planner_json(
+            R"({"intent":"x","candidate_keys":["layer_height"],"message":"ok"})");
+        expect_true(keys.size() == 1 && keys[0] == "layer_height", "planner keys parse");
+    }
+
+    {
+        const std::string repaired = repair_ollama_json_text(R"({"a":1,})");
+        expect_true(repaired.find(",}") == std::string::npos, "repair strips trailing comma");
+    }
+
+    {
+        const auto keys = OllamaSettingSearch::candidate_keys_for_request("채움 올려", 2, 5);
+        expect_true(!keys.empty(), "ko infill candidate keys");
     }
 
     if (g_failures == 0) {

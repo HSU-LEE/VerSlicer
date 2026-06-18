@@ -13,6 +13,8 @@
 #include "libslic3r/Geometry/ConvexHull.hpp"
 
 #include "GUI_App.hpp"
+#include "AICoach/AIGuiOrchestrator.hpp"
+#include "AICoach/AICoachTriggerPolicy.hpp"
 #include "MainFrame.hpp"
 #include "Plater.hpp"
 #include "Camera.hpp"
@@ -783,7 +785,9 @@ void GCodeViewer::SequentialView::GCodeWindow::render(float top, float bottom, f
     static const ImVec4 PARAMETERS_COLOR     = { 1.0f, 1.0f, 1.0f, 1.0f };
     static const ImVec4 COMMENT_COLOR        = { 0.7f, 0.7f, 0.7f, 1.0f };
 
-    if (!wxGetApp().show_gcode_window() || m_filename.empty() || m_lines_ends.empty() || curr_line_id == 0)
+    if (!wxGetApp().show_gcode_window()
+        || AIGuiOrchestrator::instance().active_suppression(AICoachSuppression::GcodeWindow)
+        || m_filename.empty() || m_lines_ends.empty() || curr_line_id == 0)
         return;
 
     // window height

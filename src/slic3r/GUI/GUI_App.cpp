@@ -86,7 +86,6 @@
 #include "MainFrame.hpp"
 #include "Plater.hpp"
 #include "BambuSmartPrint/BambuSmartPrintService.hpp"
-#include "BambuSmartPrint/BambuSmartPrintDialog.hpp"
 #include "OllamaAssistant/OllamaChatDialog.hpp"
 #include "libslic3r/SlicePilot/SlicePilotRestrictions.hpp"
 #include "GLCanvas3D.hpp"
@@ -716,10 +715,16 @@ static void generic_exception_handle()
 //#endif
 }
 
+void GUI_App::set_show_gcode_window(bool show, bool persist)
+{
+    m_show_gcode_window = show;
+    if (persist)
+        app_config->set_bool("show_gcode_window", m_show_gcode_window);
+}
+
 void GUI_App::toggle_show_gcode_window()
 {
-    m_show_gcode_window = !m_show_gcode_window;
-    app_config->set_bool("show_gcode_window", m_show_gcode_window);
+    set_show_gcode_window(!m_show_gcode_window);
 }
 
 std::vector<std::string> GUI_App::split_str(std::string src, std::string separator)
@@ -1697,10 +1702,9 @@ bool GUI_App::hot_reload_network_plugin()
     wxWindowDisabler disabler;
 
     if (mainframe) {
-        int current_tab = mainframe->m_tabpanel->GetSelection();
-        if (current_tab == MainFrame::TabPosition::tpMonitor) {
+        if (mainframe->is_tab_selected(MainFrame::TabPosition::tpMonitor)) {
             BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << ": navigating away from Monitor tab before unload";
-            mainframe->m_tabpanel->SetSelection(MainFrame::TabPosition::tp3DEditor);
+            mainframe->select_tab(MainFrame::TabPosition::tp3DEditor);
         }
     }
 

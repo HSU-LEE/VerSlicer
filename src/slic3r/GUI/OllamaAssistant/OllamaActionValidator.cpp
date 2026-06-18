@@ -4,6 +4,7 @@
 #include "OllamaIntentContext.hpp"
 #include "OllamaIntentRules.hpp"
 #include "OllamaSettingRegistry.hpp"
+#include "OllamaSettingCatalogBuilder.hpp"
 #include "OllamaTelemetry.hpp"
 #include "../MakerWorld/MakerWorldUrl.hpp"
 #include "../GUI_App.hpp"
@@ -124,6 +125,11 @@ bool sanitize_set_config(nlohmann::json& action, OllamaActionSanitizeResult& out
         if (!OllamaSettingRegistry::is_allowed_key(key, preset)) {
             block_action(out, "Blocked config key for preset " + preset + ": " + it.key(), /*quiet*/ true);
             OllamaTelemetry::action_blocked("set_config", "preset_scope:" + key);
+            continue;
+        }
+        if (OllamaSettingCatalogBuilder::is_restricted_key(key)) {
+            block_action(out, "Blocked restricted config key: " + key);
+            OllamaTelemetry::action_blocked("set_config", "tier3:" + key);
             continue;
         }
 

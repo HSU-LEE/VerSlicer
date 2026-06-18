@@ -1,12 +1,16 @@
 #include "OllamaChatPanel.hpp"
+#include "OllamaActionCritic.hpp"
 #include "OllamaActionExecutor.hpp"
 #include "OllamaActionPipeline.hpp"
+#include "BambuLabWikiSearch.hpp"
 #include "OllamaConfig.hpp"
 #include "OllamaIntentRules.hpp"
 #include "OllamaModelPick.hpp"
 #include "OllamaServerManager.hpp"
 #include "OllamaActionWorkflow.hpp"
 #include "OllamaProcessingNotice.hpp"
+#include "OllamaSettingSearch.hpp"
+#include "OllamaRequestRouter.hpp"
 #include "OllamaTelemetry.hpp"
 #include "../MakerWorld/MakerWorldImportFlow.hpp"
 #include "../MakerWorld/MakerWorldSearchService.hpp"
@@ -35,6 +39,8 @@
 #include <cmath>
 #include <optional>
 #include <regex>
+#include <thread>
+#include <unordered_set>
 
 namespace Slic3r { namespace GUI {
 
@@ -91,6 +97,9 @@ static bool message_looks_like_manual_instruction(const std::string& msg)
 static wxString summarize_applied_changes(const std::string& user_req,
                                           const std::vector<OllamaActionResult>& results)
 {
+    const bool mentioned_rotate = contains_rotate_intent(user_req);
+    const bool mentioned_place  = contains_placement_intent(user_req);
+
     auto had_effective_change = [&]() {
         for (const auto& r : results) {
             if (r.success && r.effective_change)
@@ -112,6 +121,8 @@ static wxString summarize_applied_changes(const std::string& user_req,
     if (!had_effective_change()) {
         if (had_noop_only())
             return _L("Settings were already at the requested values — nothing changed.");
+        if (mentioned_rotate || mentioned_place)
+            return _L("I couldn't rotate or arrange the model. Make sure there is at least one model on the plate, or name which one you mean.");
         return _L("I couldn't apply that change. Select a model on the plate and try again.");
     }
 
@@ -127,8 +138,6 @@ static wxString summarize_applied_changes(const std::string& user_req,
                                 contains_adhesion_intent(user_req);
     const bool mentioned_support = contains_support_intent(user_req) || contains_midair_or_failure_intent(user_req);
     const bool mentioned_strength = contains_strength_intent(user_req);
-    const bool mentioned_rotate = contains_rotate_intent(user_req);
-    const bool mentioned_place = contains_placement_intent(user_req);
 
     bool saw_config = false;
     bool saw_slice = false;
@@ -149,7 +158,7 @@ static wxString summarize_applied_changes(const std::string& user_req,
         }
         if (m.find("Rotated") != std::string::npos)
             add_once(_L("Rotated the selected model."));
-        if (m.find("Auto-arrange") != std::string::npos)
+        if (m.find("Auto-arrange") != std::string::npos || m.find("Arranged models") != std::string::npos)
             add_once(_L("Re-arranged models on the build plate."));
         if (m.find("slicing") != std::string::npos || m.find("Slicing") != std::string::npos)
             saw_slice = true;
@@ -760,6 +769,37 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
     const auto alive = m_alive;
     const uint64_t gen = ++m_request_gen;
     wxWeakRef<wxWindow> weak_panel(this);
+
+    if (ollama_two_hop_enabled() && m_apply_mode) {
+        OllamaRequestRoute route = OllamaRequestRoute::Deep;
+        if (ollama_adaptive_routing_enabled())
+            route = OllamaRequestRouter::classify(user_utf8);
+
+        if (route == OllamaRequestRoute::Fast)
+            ; // fall through to single chat below
+        else if (route == OllamaRequestRoute::Standard) {
+            start_standard_turn(user_utf8);
+            return;
+        } else {
+            std::vector<OllamaMessage> planner_msgs;
+            planner_msgs.push_back({"system", OllamaActionExecutor::build_planner_system_prompt()});
+            planner_msgs.push_back({"user", OllamaActionExecutor::build_planner_user_message(user_utf8)});
+            m_client.chat(model, planner_msgs,
+                          [alive, gen, weak_panel, user_utf8](const std::string& text, const std::string& error) {
+                              wxGetApp().CallAfter([alive, gen, weak_panel, user_utf8, text, error]() {
+                                  if (!alive->load() || wxGetApp().is_closing())
+                                      return;
+                                  auto* panel = dynamic_cast<OllamaChatPanel*>(weak_panel.get());
+                                  if (!panel || panel->m_request_gen != gen)
+                                      return;
+                                  panel->on_planner_response(text, user_utf8, error);
+                              });
+                          },
+                          OllamaRequestKind::Planner);
+            return;
+        }
+    }
+
     m_client.chat(model, m_messages, [alive, gen, weak_panel](const std::string& text, const std::string& error) {
         wxGetApp().CallAfter([alive, gen, weak_panel, text, error]() {
             if (!alive->load() || wxGetApp().is_closing())
@@ -770,6 +810,125 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
             panel->on_chat_response(text, error);
         });
     });
+}
+
+void OllamaChatPanel::on_planner_response(const std::string& planner_text, const std::string& user_utf8,
+                                          const std::string& error)
+{
+    if (!error.empty()) {
+        set_busy(false);
+        append_chat(_L("Error"), wxString::FromUTF8(error));
+        set_status_text(wxString::FromUTF8(error));
+        return;
+    }
+    start_resolver_turn(planner_text, user_utf8);
+}
+
+void OllamaChatPanel::start_resolver_turn(const std::string& planner_text, const std::string& user_utf8)
+{
+    std::vector<std::string> keys = OllamaSettingSearch::keys_from_planner_json(planner_text);
+    if (keys.empty())
+        keys = OllamaSettingSearch::candidate_keys_for_request(user_utf8, 2, 8);
+    std::unordered_set<std::string> seen;
+    std::vector<std::string>        deduped;
+    for (const std::string& k : keys) {
+        if (seen.insert(k).second)
+            deduped.push_back(k);
+    }
+    fetch_wiki_and_launch_resolver(user_utf8, std::move(deduped), 0);
+}
+
+void OllamaChatPanel::start_standard_turn(const std::string& user_utf8)
+{
+    const std::vector<std::string> keys = OllamaSettingSearch::candidate_keys_for_request(user_utf8, 2, 8);
+    fetch_wiki_and_launch_resolver(user_utf8, keys, 0);
+}
+
+void OllamaChatPanel::fetch_wiki_and_launch_resolver(const std::string& user_utf8, std::vector<std::string> keys,
+                                                     int critic_attempt)
+{
+    const bool     ko            = wxGetApp().current_language_code().StartsWith("ko");
+    const bool     want_wiki     = ollama_wiki_search_enabled() && OllamaRequestRouter::benefits_from_wiki(user_utf8);
+    const auto     alive         = m_alive;
+    const uint64_t gen           = m_request_gen;
+    wxWeakRef<wxWindow> weak_panel(this);
+
+    if (!want_wiki) {
+        launch_resolver_llm(user_utf8, keys, nlohmann::json::array(), critic_attempt);
+        return;
+    }
+
+    set_status_text(_L("Searching Bambu Lab Wiki…"));
+    std::thread([alive, gen, weak_panel, user_utf8, keys = std::move(keys), ko, critic_attempt]() {
+        nlohmann::json wiki = BambuLabWikiSearch::build_wiki_context(user_utf8, ko, 2, 1600);
+        wxGetApp().CallAfter([alive, gen, weak_panel, user_utf8, keys, wiki, critic_attempt]() {
+            if (!alive->load() || wxGetApp().is_closing())
+                return;
+            auto* panel = dynamic_cast<OllamaChatPanel*>(weak_panel.get());
+            if (!panel || panel->m_request_gen != gen)
+                return;
+            panel->launch_resolver_llm(user_utf8, keys, wiki, critic_attempt);
+        });
+    }).detach();
+}
+
+void OllamaChatPanel::launch_resolver_llm(const std::string& user_utf8, std::vector<std::string> keys,
+                                          const nlohmann::json& wiki_context, int critic_attempt)
+{
+    std::vector<OllamaMessage> resolver_msgs;
+    resolver_msgs.push_back({"system", OllamaActionExecutor::build_system_prompt(true)});
+    resolver_msgs.push_back(
+        {"user", OllamaActionExecutor::build_resolver_user_message(user_utf8, keys, wiki_context)});
+
+    const std::string   model = m_model.empty() ? std::string(kOllamaDefaultModel) : normalize_ollama_model_tag(m_model);
+    const auto          alive = m_alive;
+    const uint64_t      gen   = m_request_gen;
+    wxWeakRef<wxWindow> weak_panel(this);
+    m_client.chat(model, resolver_msgs,
+                  [alive, gen, weak_panel, user_utf8, keys, wiki_context, critic_attempt](const std::string& text,
+                                                                                            const std::string& error) {
+                      wxGetApp().CallAfter([alive, gen, weak_panel, user_utf8, keys, wiki_context, critic_attempt, text,
+                                            error]() {
+                          if (!alive->load() || wxGetApp().is_closing())
+                              return;
+                          auto* panel = dynamic_cast<OllamaChatPanel*>(weak_panel.get());
+                          if (!panel || panel->m_request_gen != gen)
+                              return;
+                          panel->on_resolver_llm_response(text, error, user_utf8, keys, wiki_context, critic_attempt);
+                      });
+                  },
+                  OllamaRequestKind::Resolver);
+}
+
+void OllamaChatPanel::on_resolver_llm_response(const std::string& assistant_text, const std::string& error,
+                                               const std::string& user_utf8, std::vector<std::string> keys,
+                                               const nlohmann::json& wiki_context, int critic_attempt)
+{
+    if (!error.empty()) {
+        set_busy(false);
+        append_chat(_L("Error"), wxString::FromUTF8(error));
+        set_status_text(wxString::FromUTF8(error));
+        return;
+    }
+
+    if (ollama_critic_enabled() && critic_attempt < 1) {
+        try {
+            nlohmann::json root = OllamaActionPipeline::extract_from_assistant_text(assistant_text);
+            const OllamaCriticResult critic =
+                OllamaActionCritic::review(root, user_utf8, wiki_context);
+            if (critic.verdict == OllamaCriticVerdict::Revise && !critic.suggested_keys.empty()) {
+                std::unordered_set<std::string> merged(keys.begin(), keys.end());
+                for (const std::string& k : critic.suggested_keys)
+                    merged.insert(k);
+                keys.assign(merged.begin(), merged.end());
+                launch_resolver_llm(user_utf8, std::move(keys), wiki_context, critic_attempt + 1);
+                return;
+            }
+        } catch (...) {
+        }
+    }
+
+    on_chat_response(assistant_text, error);
 }
 
 void OllamaChatPanel::retry_last_chat_simple()
@@ -977,7 +1136,7 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
         }
     } catch (const std::exception& e) {
         const std::string user_req = last_user_request_text(m_messages);
-        if (m_apply_mode) {
+        if (m_apply_mode && ollama_rule_only_fallback_enabled()) {
             try {
                 nlohmann::json root = OllamaActionPipeline::build_rule_only_root(user_req, true);
                 if (root.contains("actions") && root["actions"].is_array() && !root["actions"].empty()) {

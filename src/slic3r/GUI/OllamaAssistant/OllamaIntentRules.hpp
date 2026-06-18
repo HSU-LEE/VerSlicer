@@ -20,7 +20,6 @@ bool contains_placement_intent(const std::string& s);
 bool contains_disable_brim_intent(const std::string& s);
 bool contains_brim_intent(const std::string& s);
 bool contains_durability_intent(const std::string& s);
-bool contains_file_intent(const std::string& s);
 
 bool user_wants_delete(const std::string& user);
 bool user_wants_plate_arrange(const std::string& user);

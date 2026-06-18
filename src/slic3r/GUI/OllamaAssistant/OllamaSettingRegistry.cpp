@@ -1,6 +1,14 @@
 #include "OllamaSettingRegistry.hpp"
 
+#include "OllamaSettingCatalogBuilder.hpp"
+#include "OllamaConfig.hpp"
+#include "OllamaSettingSearch.hpp"
+
+#include "../GUI_App.hpp"
+
 #include "libslic3r/PrintConfig.hpp"
+
+#include <wx/app.h>
 
 #include <nlohmann/json.hpp>
 
@@ -131,10 +139,22 @@ static const std::unordered_map<std::string, const OllamaSettingSpec*>& spec_ind
     return index;
 }
 
+static bool auto_allows_key(const std::string& key, const std::string& preset)
+{
+    const OllamaAutoSettingSpec* sp = OllamaSettingCatalogBuilder::find(key);
+    if (!sp || sp->virtual_key || sp->tier == OllamaSettingTier::Restricted)
+        return false;
+    if (preset.empty())
+        return true;
+    return preset == sp->preset_scope;
+}
+
 const OllamaSettingSpec* OllamaSettingRegistry::find_spec(const std::string& key)
 {
     const auto it = spec_index().find(key);
-    return it == spec_index().end() ? nullptr : it->second;
+    if (it != spec_index().end())
+        return it->second;
+    return nullptr;
 }
 
 bool OllamaSettingRegistry::is_virtual_key(const std::string& key)
@@ -145,50 +165,91 @@ bool OllamaSettingRegistry::is_virtual_key(const std::string& key)
 
 bool OllamaSettingRegistry::is_allowed_key(const std::string& key)
 {
-    return find_spec(key) != nullptr;
+    if (find_spec(key))
+        return true;
+    if (ollama_auto_catalog_enabled())
+        return auto_allows_key(key, {});
+    return false;
 }
 
 bool OllamaSettingRegistry::is_allowed_key(const std::string& key, const std::string& preset)
 {
     const OllamaSettingSpec* sp = find_spec(key);
-    if (!sp)
-        return false;
-    return preset == sp->preset_scope;
+    if (sp)
+        return preset == sp->preset_scope;
+    if (ollama_auto_catalog_enabled())
+        return auto_allows_key(key, preset);
+    return false;
 }
 
 bool OllamaSettingRegistry::clamp_json_value(const std::string& key, nlohmann::json& value)
 {
     const OllamaSettingSpec* sp = find_spec(key);
-    if (!sp || sp->virtual_key)
+    if (sp) {
+        if (sp->virtual_key)
+            return false;
+        const std::string vt = sp->value_type;
+        if (vt == "mm" || vt == "speed") {
+            if (!value.is_number())
+                return false;
+            const double clamped = clamp_double(value.get<double>(), sp->min_v, sp->max_v);
+            if (clamped != value.get<double>()) {
+                value = clamped;
+                return true;
+            }
+            return false;
+        }
+        if (vt == "percent" && value.is_number()) {
+            const double clamped = clamp_double(value.get<double>(), sp->min_v, sp->max_v);
+            value              = std::to_string(static_cast<int>(std::lround(clamped))) + "%";
+            return true;
+        }
+        if (vt == "count" && value.is_number_integer()) {
+            const int clamped = static_cast<int>(clamp_double(value.get<int>(), sp->min_v, sp->max_v));
+            if (clamped != value.get<int>()) {
+                value = clamped;
+                return true;
+            }
+            return false;
+        }
+        if (vt == "temp" && value.is_number()) {
+            const int clamped = static_cast<int>(clamp_double(value.get<double>(), sp->min_v, sp->max_v));
+            value             = clamped;
+            return true;
+        }
+        if (vt == "bool" && value.is_number()) {
+            value = value.get<double>() != 0.0;
+            return true;
+        }
         return false;
+    }
 
-    const std::string vt = sp->value_type;
-    if (vt == "mm" || vt == "speed") {
+    if (!ollama_auto_catalog_enabled())
+        return false;
+    const OllamaAutoSettingSpec* asp = OllamaSettingCatalogBuilder::find(key);
+    if (!asp || asp->virtual_key)
+        return false;
+    const std::string vt = asp->value_type;
+    if ((vt == "mm" || vt == "speed" || vt == "temp" || vt == "count") && asp->max_v > asp->min_v) {
         if (!value.is_number())
             return false;
-        const double clamped = clamp_double(value.get<double>(), sp->min_v, sp->max_v);
+        const double clamped = clamp_double(value.get<double>(), asp->min_v, asp->max_v);
+        if (vt == "count" || vt == "temp") {
+            const int as_int = static_cast<int>(std::lround(clamped));
+            if (value.get<double>() != as_int) {
+                value = as_int;
+                return true;
+            }
+            return false;
+        }
         if (clamped != value.get<double>()) {
             value = clamped;
             return true;
         }
-        return false;
     }
-    if (vt == "percent" && value.is_number()) {
-        const double clamped = clamp_double(value.get<double>(), sp->min_v, sp->max_v);
-        value              = std::to_string(static_cast<int>(std::lround(clamped))) + "%";
-        return true;
-    }
-    if (vt == "count" && value.is_number_integer()) {
-        const int clamped = static_cast<int>(clamp_double(value.get<int>(), sp->min_v, sp->max_v));
-        if (clamped != value.get<int>()) {
-            value = clamped;
-            return true;
-        }
-        return false;
-    }
-    if (vt == "temp" && value.is_number()) {
-        const int clamped = static_cast<int>(clamp_double(value.get<double>(), sp->min_v, sp->max_v));
-        value             = clamped;
+    if (vt == "percent" && value.is_number() && asp->max_v >= asp->min_v) {
+        const double clamped = clamp_double(value.get<double>(), asp->min_v, asp->max_v);
+        value                = std::to_string(static_cast<int>(std::lround(clamped))) + "%";
         return true;
     }
     if (vt == "bool" && value.is_number()) {
@@ -200,6 +261,8 @@ bool OllamaSettingRegistry::clamp_json_value(const std::string& key, nlohmann::j
 
 nlohmann::json OllamaSettingRegistry::build_catalog(const DynamicPrintConfig* cfg, bool ko_ui)
 {
+    if (ollama_auto_catalog_enabled())
+        return OllamaSettingCatalogBuilder::build_catalog(cfg, ko_ui, 2);
     nlohmann::json arr = nlohmann::json::array();
     for (const OllamaSettingSpec& sp : all()) {
         if (sp.virtual_key)
@@ -225,6 +288,40 @@ nlohmann::json OllamaSettingRegistry::build_catalog(const DynamicPrintConfig* cf
 
 nlohmann::json OllamaSettingRegistry::build_priority_catalog(const DynamicPrintConfig* cfg, bool ko_ui, size_t max_entries)
 {
+    if (ollama_auto_catalog_enabled()) {
+        std::vector<const OllamaAutoSettingSpec*> ordered;
+        for (const OllamaAutoSettingSpec& sp : OllamaSettingCatalogBuilder::all()) {
+            if (sp.virtual_key || sp.tier == OllamaSettingTier::Restricted)
+                continue;
+            ordered.push_back(&sp);
+        }
+        std::sort(ordered.begin(), ordered.end(), [](const OllamaAutoSettingSpec* a, const OllamaAutoSettingSpec* b) {
+            if (a->context_priority != b->context_priority)
+                return a->context_priority > b->context_priority;
+            return a->key < b->key;
+        });
+        nlohmann::json arr = nlohmann::json::array();
+        for (const OllamaAutoSettingSpec* sp : ordered) {
+            if (max_entries > 0 && arr.size() >= max_entries)
+                break;
+            nlohmann::json e;
+            e["key"]         = sp->key;
+            e["value_type"]  = sp->value_type;
+            e["unit"]        = sp->unit;
+            e["min"]         = sp->min_v;
+            e["max"]         = sp->max_v;
+            e["description"] = sp->tooltip.empty() ? sp->label : sp->tooltip;
+            e["format"]      = sp->format;
+            e["preset_scope"] = sp->preset_scope;
+            if (cfg && cfg->has(sp->key))
+                e["current"] = cfg->opt_serialize(sp->key);
+            else
+                e["current"] = nullptr;
+            (void) ko_ui;
+            arr.push_back(std::move(e));
+        }
+        return arr;
+    }
     std::vector<const OllamaSettingSpec*> ordered;
     ordered.reserve(all().size());
     for (const OllamaSettingSpec& sp : all()) {
@@ -259,9 +356,63 @@ nlohmann::json OllamaSettingRegistry::build_priority_catalog(const DynamicPrintC
     return arr;
 }
 
+nlohmann::json OllamaSettingRegistry::build_setting_index(int max_tier)
+{
+    if (ollama_auto_catalog_enabled())
+        return OllamaSettingCatalogBuilder::build_index(max_tier);
+    nlohmann::json arr = nlohmann::json::array();
+    for (const OllamaSettingSpec& sp : all()) {
+        if (sp.virtual_key)
+            continue;
+        arr.push_back({{"key", sp.key}, {"label", sp.desc_en}, {"category", "legacy"}, {"ai_tier", 1}});
+    }
+    return arr;
+}
+
+nlohmann::json OllamaSettingRegistry::lookup_catalog_keys(const DynamicPrintConfig* cfg, bool ko_ui,
+                                                          const std::vector<std::string>& keys)
+{
+    if (ollama_auto_catalog_enabled()) {
+        const DynamicPrintConfig* filament_cfg = nullptr;
+        if (wxTheApp) {
+            if (auto* bundle = wxGetApp().preset_bundle)
+                filament_cfg = &bundle->filaments.get_edited_preset().config;
+        }
+        return OllamaSettingSearch::lookup(keys, cfg, filament_cfg, ko_ui);
+    }
+    nlohmann::json arr = nlohmann::json::array();
+    for (const std::string& key : keys) {
+        const OllamaSettingSpec* sp = find_spec(key);
+        if (!sp || sp->virtual_key)
+            continue;
+        nlohmann::json e;
+        e["key"]         = sp->key;
+        e["value_type"]  = sp->value_type;
+        e["unit"]        = sp->unit;
+        e["min"]         = sp->min_v;
+        e["max"]         = sp->max_v;
+        e["description"] = ko_ui ? sp->desc_ko : sp->desc_en;
+        e["format"]      = sp->format;
+        e["preset_scope"] = sp->preset_scope;
+        if (cfg && cfg->has(sp->key))
+            e["current"] = cfg->opt_serialize(sp->key);
+        else
+            e["current"] = nullptr;
+        arr.push_back(std::move(e));
+    }
+    return arr;
+}
+
 nlohmann::json OllamaSettingRegistry::allowed_keys_json()
 {
     nlohmann::json arr = nlohmann::json::array();
+    if (ollama_auto_catalog_enabled()) {
+        for (const OllamaAutoSettingSpec& sp : OllamaSettingCatalogBuilder::all()) {
+            if (!sp.virtual_key && sp.tier != OllamaSettingTier::Restricted)
+                arr.push_back(sp.key);
+        }
+        return arr;
+    }
     for (const OllamaSettingSpec& sp : all()) {
         if (!sp.virtual_key)
             arr.push_back(sp.key);

@@ -43,9 +43,12 @@ OllamaSelectionFootprint OllamaIntentContext::current_selection_footprint()
 {
     OllamaSelectionFootprint fp;
     Plater*                  plater = wxGetApp().plater();
-    if (!plater || !plater->canvas3D())
+    if (!plater)
         return fp;
-    const Selection& sel = plater->canvas3D()->get_selection();
+    GLCanvas3D* canvas = plater->get_view3D_canvas3D();
+    if (!canvas)
+        return fp;
+    const Selection& sel = canvas->get_selection();
     if (sel.is_empty())
         return fp;
     const BoundingBoxf3 bb = sel.get_bounding_box();
@@ -169,6 +172,39 @@ nlohmann::json OllamaIntentContext::build_intent_signals_json()
     return signals;
 }
 
+nlohmann::json OllamaIntentContext::build_engineering_hints_json()
+{
+    nlohmann::json hints = nlohmann::json::object();
+    hints["minimal_change_max_keys"] = 2;
+    hints["principle"] =
+        "Infer the user's desired outcome and root cause before changing settings; prefer relative changes from current.";
+
+    nlohmann::json priority = nlohmann::json::object();
+    priority["adhesion"]  = nlohmann::json::array({"brim_width", "initial_layer_print_height"});
+    priority["strength"]  = nlohmann::json::array({"sparse_infill_density", "wall_loops"});
+    priority["overhang"]  = nlohmann::json::array({"enable_support"});
+    priority["speed"]     = nlohmann::json::array({"layer_height", "sparse_infill_density"});
+    priority["surface"]   = nlohmann::json::array({"layer_height", "top_shell_layers"});
+    priority["stringing"] = nlohmann::json::array({"retraction_length"});
+    hints["symptom_key_priority"] = priority;
+
+    if (auto* bundle = wxGetApp().preset_bundle) {
+        const DynamicPrintConfig& cfg = bundle->prints.get_edited_preset().config;
+        if (cfg.has("sparse_infill_density"))
+            hints["current_sparse_infill"] = cfg.opt_serialize("sparse_infill_density");
+        if (cfg.has("wall_loops"))
+            hints["current_wall_loops"] = cfg.opt_serialize("wall_loops");
+        if (cfg.has("brim_width"))
+            hints["current_brim_width_mm"] = cfg.opt_serialize("brim_width");
+        if (cfg.has("layer_height"))
+            hints["current_layer_height_mm"] = cfg.opt_serialize("layer_height");
+        if (cfg.has("enable_support"))
+            hints["supports_enabled"] = cfg.opt_serialize("enable_support") == "1";
+    }
+
+    return hints;
+}
+
 void OllamaIntentContext::refresh_cached_intent_signals()
 {
     nlohmann::json built = build_intent_signals_json();
@@ -229,8 +265,12 @@ void OllamaIntentContext::refine_set_config_options(nlohmann::json& options, con
         }
     }
 
-    if (user_describes_durability(user_request) && has_brim_key && !options.contains("wall_loops"))
-        options["wall_loops"] = 3;
+    if (user_describes_durability(user_request)) {
+        if (!options.contains("wall_loops") && !options.contains("sparse_infill_density"))
+            options["wall_loops"] = 3;
+        else if (has_brim_key && !options.contains("wall_loops"))
+            options["wall_loops"] = 3;
+    }
 
     if (user_wants_warp_relief(user_request) && !options.contains("elefant_foot_compensation"))
         options["elefant_foot_compensation"] = 0.1;
