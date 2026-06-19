@@ -4,6 +4,8 @@
 #include "AICoachController.hpp"
 #include "AICoachRulesEngine.hpp"
 
+#include "../BambuSmartPrint/PrintPlannerGui.hpp"
+
 #include "../GLCanvas3D.hpp"
 #include "../DailyTips.hpp"
 #include "../NotificationManager.hpp"
@@ -72,7 +74,7 @@ bool AIGuiOrchestrator::should_enqueue_beginner_tour() const
 
 void AIGuiOrchestrator::on_model_loaded(Plater* plater)
 {
-    AICoachController::instance().on_model_loaded(plater);
+    PrintPlannerGui::dispatch_model_loaded(plater);
 }
 
 void AIGuiOrchestrator::on_slice_completed(Plater* plater, const Print* print, bool success)

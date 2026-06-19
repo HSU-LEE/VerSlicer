@@ -120,6 +120,14 @@ set(lisbslic3r_sources
     BambuSmartPrint/SuccessPredictor.hpp
     BambuSmartPrint/PrintReadinessEngine.cpp
     BambuSmartPrint/PrintReadinessEngine.hpp
+    BambuSmartPrint/PrintPlanner.cpp
+    BambuSmartPrint/PrintPlanner.hpp
+    BambuSmartPrint/PrintPlannerTypes.cpp
+    BambuSmartPrint/PrintPlannerTypes.hpp
+    BambuSmartPrint/PrintGoalParser.cpp
+    BambuSmartPrint/PrintGoalParser.hpp
+    BambuSmartPrint/PrintGoalSession.cpp
+    BambuSmartPrint/PrintGoalSession.hpp
     BambuSmartPrint/MaterialAdvisor.cpp
     BambuSmartPrint/MaterialAdvisor.hpp
     BambuSmartPrint/PlateBatchPlanner.cpp

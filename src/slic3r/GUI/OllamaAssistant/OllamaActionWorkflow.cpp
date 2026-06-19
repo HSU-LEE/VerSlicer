@@ -7,6 +7,7 @@
 #include "../BambuSmartPrint/BambuSmartPrintService.hpp"
 #include "../BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "../BambuSmartPrint/BambuSmartPrintWorkflowDialog.hpp"
+#include "../BambuSmartPrint/PrintPlannerGui.hpp"
 #include "../AICoach/AIGuiOrchestrator.hpp"
 #include "../I18N.hpp"
 #include "../GUI_App.hpp"
@@ -14,6 +15,7 @@
 
 #include "libslic3r/BambuSmartPrint/ConfigSnapshot.hpp"
 #include "libslic3r/BambuSmartPrint/ConfigVersionStack.hpp"
+#include "libslic3r/BambuSmartPrint/PrintGoalSession.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/libslic3r.h"
 
@@ -376,7 +378,12 @@ OllamaWorkflowRun OllamaActionWorkflow::confirm_and_execute(const nlohmann::json
     if (plater)
         BambuSmartPrintService::instance().update_plate_assessment_data(plater);
 
-    const SmartPrintWorkflowContent content = build_workflow_content(root);
+    SmartPrintWorkflowContent content;
+    if (BambuSmartPrint::PrintGoalSession::instance().has_last_plan())
+        content = PrintPlannerGui::workflow_content_from_plan(
+            BambuSmartPrint::PrintGoalSession::instance().last_plan());
+    else
+        content = build_workflow_content(root);
     const DynamicPrintConfig before = capture_current_config();
     const DynamicPrintConfig after  = simulate_proposed_config_inner(before, root);
     const std::vector<BambuSmartPrint::SettingChange> change_reasons = diff_with_ai_reasons(before, after);

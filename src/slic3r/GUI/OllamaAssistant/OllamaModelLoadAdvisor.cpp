@@ -15,6 +15,7 @@
 #include "../I18N.hpp"
 #include "../NotificationManager.hpp"
 #include "../Plater.hpp"
+#include "../BambuSmartPrint/PrintPlannerGui.hpp"
 #include "libslic3r/BoundingBox.hpp"
 #include "libslic3r/Model.hpp"
 
@@ -202,6 +203,10 @@ void run_model_load_chat(Plater* plater)
 
                 try {
                     nlohmann::json root = OllamaActionPipeline::extract_from_assistant_text(text);
+                    const BambuSmartPrint::PrintPlan merged =
+                        PrintPlannerGui::plan_from_assistant(p, kModelLoadUserPrompt, root);
+                    root = merged.root;
+                    PrintPlannerGui::apply_plan_to_service(merged);
                     OllamaPipelineOptions opt;
                     opt.apply_mode         = true;
                     opt.include_makerworld = false;

@@ -71,6 +71,11 @@ if (ORCA_TOOLS)
     target_link_libraries(ollama_pipeline_test libslic3r boost_headeronly)
     target_compile_definitions(ollama_pipeline_test PRIVATE -DBOOST_ALL_NO_LIB)
 
+    add_executable(print_planner_test print_planner_test.cpp)
+    target_include_directories(print_planner_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+    target_link_libraries(print_planner_test libslic3r boost_headeronly)
+    target_compile_definitions(print_planner_test PRIVATE -DBOOST_ALL_NO_LIB)
+
     add_executable(ollama_apply_golden_test
         ollama_apply_golden_test.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
@@ -126,6 +131,7 @@ if (ORCA_TOOLS)
 
     add_test(NAME ollama_assistant_test COMMAND ollama_assistant_test)
     add_test(NAME ollama_pipeline_test COMMAND ollama_pipeline_test)
+    add_test(NAME print_planner_test COMMAND print_planner_test)
     add_test(NAME ollama_benchmark_test COMMAND ollama_benchmark_test)
     add_test(NAME ollama_apply_golden_test COMMAND ollama_apply_golden_test)
     add_test(NAME bambu_wiki_search_test COMMAND bambu_wiki_search_test)

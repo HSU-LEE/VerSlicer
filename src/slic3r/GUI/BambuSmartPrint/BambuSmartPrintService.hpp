@@ -7,6 +7,7 @@
 #include <wx/string.h>
 #include <wx/weakref.h>
 #include "libslic3r/BambuSmartPrint/BambuSmartPrintTypes.hpp"
+#include "libslic3r/BambuSmartPrint/PrintPlannerTypes.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
 namespace Slic3r {
@@ -133,6 +134,8 @@ public:
     void update_plate_assessment_data(Plater* plater);
     void refresh_plate_snapshot(Plater* plater);
     void refresh_post_slice_assessment(Plater* plater);
+    /** Sync cached mesh/readiness/config from a PrintPlanner result. */
+    void sync_from_plan(const BambuSmartPrint::PrintPlan& plan);
 
 private:
     BambuSmartPrintService() = default;

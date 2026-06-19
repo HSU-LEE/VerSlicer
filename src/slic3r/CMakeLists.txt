@@ -74,6 +74,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/BambuSmartPrint/BambuSmartPrintPrivacyDialog.hpp
     GUI/BambuSmartPrint/BambuSmartPrintService.cpp
     GUI/BambuSmartPrint/BambuSmartPrintService.hpp
+    GUI/BambuSmartPrint/PrintPlannerGui.cpp
+    GUI/BambuSmartPrint/PrintPlannerGui.hpp
     GUI/BambuSmartPrint/SmartPrintOrchestrator.cpp
     GUI/BambuSmartPrint/SmartPrintOrchestrator.hpp
     GUI/BambuSmartPrint/BambuSmartPrintUi.cpp

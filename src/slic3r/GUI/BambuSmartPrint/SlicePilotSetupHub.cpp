@@ -6,6 +6,8 @@
 #include "FirstPrintExperience.hpp"
 #include "PrintReadinessGate.hpp"
 
+#include "libslic3r/BambuSmartPrint/PrintGoalSession.hpp"
+
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
 #include "../MainFrame.hpp"
@@ -16,6 +18,8 @@
 #include <wx/msgdlg.h>
 #include <wx/sizer.h>
 #include <wx/statline.h>
+
+#include <cmath>
 
 namespace Slic3r { namespace GUI {
 
@@ -273,6 +277,22 @@ void SlicePilotSetupHub::update_step_buttons(Plater* /*plater*/)
 void SlicePilotSetupHub::refresh(Plater* plater)
 {
     update_step_buttons(plater);
+    if (m_summary) {
+        if (BambuSmartPrint::PrintGoalSession::instance().has_last_plan()) {
+            const auto& plan = BambuSmartPrint::PrintGoalSession::instance().last_plan();
+            m_summary->SetLabel(format_prepare_bar_status(
+                int(std::round(plan.readiness.score)), plan.readiness.headline, plan.mesh.height_mm > 0));
+        } else if (BambuSmartPrintService::is_enabled()) {
+            const auto& ready = BambuSmartPrintService::instance().last_readiness_report();
+            m_summary->SetLabel(format_prepare_bar_status(ready, plater && !plater->model().objects.empty()));
+        } else {
+            const int done = completed_count();
+            if (done >= int(SetupHubStep::Count))
+                m_summary->SetLabel(_L("Ready to Print"));
+            else
+                m_summary->SetLabel(wxString::Format(_L("%d/4 setup steps"), done));
+        }
+    }
     Show(is_enabled() && completed_count() < int(SetupHubStep::Count));
     GetParent()->Layout();
 }

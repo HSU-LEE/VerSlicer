@@ -3,9 +3,11 @@
 #include "AICoachTriggerPolicy.hpp"
 
 #include "../BambuSmartPrint/BambuSmartPrintService.hpp"
+#include "../BambuSmartPrint/PrintPlannerGui.hpp"
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
 #include "../Plater.hpp"
+#include "libslic3r/BambuSmartPrint/PrintGoalSession.hpp"
 #include "libslic3r/BambuSmartPrint/BambuSmartPrintTypes.hpp"
 #include "libslic3r/SlicePilot/SlicePilotRestrictions.hpp"
 #include "libslic3r/BoundingBox.hpp"
@@ -134,6 +136,12 @@ void enrich_apply_cards(std::vector<AICoachCard>& cards, Plater* plater)
 
 std::vector<AICoachCard> AICoachRulesEngine::evaluate_after_model_load(Plater* plater)
 {
+    if (plater && BambuSmartPrintService::is_enabled()
+        && BambuSmartPrint::PrintGoalSession::instance().has_last_plan()) {
+        return PrintPlannerGui::coach_cards_from_plan(
+            plater, BambuSmartPrint::PrintGoalSession::instance().last_plan());
+    }
+
     std::vector<AICoachCard> out;
     if (!plater || plater->model().objects.empty())
         return out;

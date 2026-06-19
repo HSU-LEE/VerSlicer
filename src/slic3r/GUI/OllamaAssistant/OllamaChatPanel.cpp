@@ -19,6 +19,7 @@
 #include "../MakerWorld/MakerWorldUrl.hpp"
 
 #include "../BambuSmartPrint/BambuSmartPrintUi.hpp"
+#include "../BambuSmartPrint/PrintPlannerGui.hpp"
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
 #include "../Widgets/Button.hpp"
@@ -1108,6 +1109,11 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
             root = OllamaActionPipeline::extract_from_assistant_text(assistant_text);
         }
         const std::string user_req = last_user_request_text(m_messages);
+        if (m_apply_mode && wxGetApp().plater()) {
+            const BambuSmartPrint::PrintPlan merged =
+                PrintPlannerGui::plan_from_assistant(wxGetApp().plater(), user_req, root);
+            root = merged.root;
+        }
         OllamaPipelineOptions opt;
         opt.apply_mode          = m_apply_mode;
         opt.include_makerworld  = true;
@@ -1170,7 +1176,14 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
         const std::string user_req = last_user_request_text(m_messages);
         if (m_apply_mode) {
             try {
-                nlohmann::json root = OllamaActionPipeline::build_recovery_root(assistant_text, user_req, true);
+                nlohmann::json root;
+                if (wxGetApp().plater()) {
+                    const BambuSmartPrint::PrintPlan recovered =
+                        PrintPlannerGui::plan_for_user_text(wxGetApp().plater(), user_req);
+                    root = recovered.root;
+                } else {
+                    root = OllamaActionPipeline::build_recovery_root(assistant_text, user_req, true);
+                }
                 if (root.contains("actions") && root["actions"].is_array() && !root["actions"].empty()) {
                     const std::string stub = root.value("message", std::string("Applied fixes from your request."));
                     m_messages.push_back({"assistant", stub});

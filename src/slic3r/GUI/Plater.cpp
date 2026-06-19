@@ -7249,19 +7249,6 @@ std::vector<size_t> Plater::priv::load_model_objects(const ModelObjectPtrs& mode
     GUI::AIGuiOrchestrator::instance().on_model_loaded(this->q);
     GUI::BeginnerJourney::on_model_on_bed();
 
-    const auto load_mode = GUI::BambuSmartPrintService::auto_load_mode();
-    if (load_mode == GUI::BambuSmartPrintService::AutoLoadMode::FullDialog
-        && !GUI::AICoachController::is_enabled_for_current_mode()) {
-        GUI::OllamaModelLoadAdvisor::schedule_after_model_load(this->q);
-    } else if (wxGetApp().preset_bundle && Slic3r::SlicePilot::is_active_printer_bbl(*wxGetApp().preset_bundle)
-        && GUI::BambuSmartPrintService::is_enabled()) {
-        wxGetApp().CallAfter([]() {
-            GUI::BambuSmartPrintService::instance().refresh_all_panels();
-        });
-        if (load_mode != GUI::BambuSmartPrintService::AutoLoadMode::Off)
-            GUI::BambuSmartPrintService::instance().schedule_auto_workflow_after_load(this->q);
-    }
-
     return obj_idxs;
 }
 
