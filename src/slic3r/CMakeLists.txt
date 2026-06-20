@@ -156,6 +156,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaTelemetry.hpp
     GUI/OllamaAssistant/OllamaVoiceInput.cpp
     GUI/OllamaAssistant/OllamaVoiceInput.hpp
+    GUI/OllamaAssistant/OllamaVoiceTranscript.cpp
+    GUI/OllamaAssistant/OllamaVoiceTranscript.hpp
     GUI/MakerWorld/MakerWorldImportFlow.cpp
     GUI/MakerWorld/MakerWorldImportFlow.hpp
     GUI/MakerWorld/MakerWorldPickDialog.cpp

@@ -208,7 +208,7 @@ Install
 AI assistant (Ollama) — required for chat/voice
   VerSlicer uses Ollama running locally on your Mac.
   1. Download and install Ollama: https://ollama.com/download
-  2. Open Terminal and run:  ollama pull llama3.2
+  2. Open Terminal and run:  ollama pull qwen2.5:3b
   3. Leave Ollama running, then use the chat button on the 3D toolbar.
 
 System requirements

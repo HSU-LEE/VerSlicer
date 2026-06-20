@@ -113,8 +113,23 @@ bool OllamaIntentContext::user_wants_warp_relief(const std::string& user)
 bool OllamaIntentContext::user_wants_stringing_relief(const std::string& user)
 {
     return user.find("stringing") != std::string::npos || user.find("string") != std::string::npos ||
-           user.find("실") != std::string::npos || user.find("거미") != std::string::npos ||
+           user.find("실") != std::string::npos || user.find("실같") != std::string::npos ||
+           user.find("거미") != std::string::npos ||
            user.find("spider") != std::string::npos || user.find("ooze") != std::string::npos;
+}
+
+double OllamaIntentContext::recommended_retraction_for_stringing()
+{
+    constexpr double kBaseline = 0.8;
+    if (!wxTheApp || !wxGetApp().preset_bundle)
+        return kBaseline;
+    const DynamicPrintConfig& cfg = wxGetApp().preset_bundle->filaments.get_edited_preset().config;
+    if (!cfg.has("retraction_length"))
+        return kBaseline;
+    const double cur = cfg.opt_float("retraction_length");
+    if (cur < kBaseline)
+        return kBaseline;
+    return std::min(2.0, cur + 0.2);
 }
 
 bool OllamaIntentContext::user_wants_top_surface_quality(const std::string& user)
@@ -276,7 +291,7 @@ void OllamaIntentContext::refine_set_config_options(nlohmann::json& options, con
         options["elefant_foot_compensation"] = 0.1;
 
     if (user_wants_stringing_relief(user_request) && !options.contains("retraction_length"))
-        options["retraction_length"] = 0.8;
+        options["retraction_length"] = recommended_retraction_for_stringing();
 
     if (user_wants_top_surface_quality(user_request)) {
         if (!options.contains("ironing_type"))

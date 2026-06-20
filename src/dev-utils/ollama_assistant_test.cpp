@@ -66,9 +66,10 @@ int main()
     expect_true(OllamaActionRegistry::is_allowed_in_advisor("set_config"), "advisor set_config");
     expect_true(!OllamaActionRegistry::is_allowed_in_advisor("scale"), "advisor blocks scale");
 
-    const std::vector<std::string> models = {"llama3.2:latest", "mistral:latest"};
-    expect_eq(pick_installed_ollama_model(models, "unknown"), "llama3.2:latest", "pick fallback first");
-    expect_eq(normalize_ollama_model_tag("llama3.2"), "llama3.2:latest", "normalize model tag");
+    const std::vector<std::string> models = {"qwen2.5:3b", "mistral:latest"};
+    expect_eq(pick_installed_ollama_model(models, "unknown"), "qwen2.5:3b", "pick fallback first");
+    expect_eq(normalize_ollama_model_tag("qwen2.5"), "qwen2.5:3b", "normalize model tag");
+    expect_eq(normalize_ollama_model_tag("qwen2.5:7b"), "qwen2.5:3b", "migrate 7b to 3b");
 
     expect_true(ollama_recommended_brim_width_mm(15.0, 15.0) == 8.0, "small footprint wide brim");
     expect_true(ollama_recommended_brim_width_mm(50.0, 50.0) == 5.0, "medium footprint default brim");

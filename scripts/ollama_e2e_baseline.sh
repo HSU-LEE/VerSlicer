@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Optional E2E baseline against local Ollama (llama3.2). Skips when OLLAMA_E2E != 1.
+# Optional E2E baseline against local Ollama (qwen2.5:3b). Skips when OLLAMA_E2E != 1.
 set -euo pipefail
 
 if [[ "${OLLAMA_E2E:-0}" != "1" ]]; then
@@ -8,7 +8,7 @@ if [[ "${OLLAMA_E2E:-0}" != "1" ]]; then
 fi
 
 HOST="${OLLAMA_HOST:-http://127.0.0.1:11434}"
-MODEL="${OLLAMA_MODEL:-llama3.2:latest}"
+MODEL="${OLLAMA_MODEL:-qwen2.5:3b}"
 
 curl -sf "${HOST}/api/tags" >/dev/null || { echo "Ollama not reachable at ${HOST}"; exit 1; }
 

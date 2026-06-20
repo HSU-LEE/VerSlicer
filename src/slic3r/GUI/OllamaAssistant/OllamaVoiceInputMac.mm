@@ -1,6 +1,7 @@
 #ifdef __APPLE__
 
 #include "OllamaVoiceInput.hpp"
+#include "OllamaVoiceTranscript.hpp"
 #include "../GUI_App.hpp"
 
 #import <Foundation/Foundation.h>
@@ -93,6 +94,8 @@ struct VoiceSession
     std::atomic<bool>                  task_cancel_sent{false};
     std::atomic<bool>                  deliver_delay_pending{false};
     std::string                        last_partial_text;
+    std::string                        locale_id;
+    float                              last_confidence{-1.f};
     OllamaVoiceInput::FinalTextCallback on_final;
     OllamaVoiceInput::ErrorCallback     on_error;
 
@@ -260,6 +263,15 @@ static bool try_deliver_recognized_text(const std::shared_ptr<MacVoiceShared>& s
 
     session->awaiting_final.store(false);
     session->deliver_delay_pending.store(false);
+
+    const bool ko_ui = Slic3r::GUI::wxGetApp().current_language_code().StartsWith("ko");
+    if (!ollama_voice_transcript_acceptable(text, session->locale_id, session->last_confidence)) {
+        finish_session(sh, session, /*cancel_task*/ false);
+        deliver_voice_error(session->on_error,
+                            ollama_voice_transcript_reject_message(session->locale_id, ko_ui));
+        return true;
+    }
+
     OllamaVoiceInput::FinalTextCallback on_final = session->on_final;
     // Do not cancel the task here — this path is reached from resultHandler; cancel reenters the handler.
     finish_session(sh, session, /*cancel_task*/ false);
@@ -398,12 +410,7 @@ static NSLocale* speech_locale()
 {
     NSSet<NSLocale*>* supported = [SFSpeechRecognizer supportedLocales];
 
-    // Verslicer UI language (user may set Korean in app even when macOS list is English-first).
-    const wxString app_lang = Slic3r::GUI::wxGetApp().current_language_code();
-    if (NSLocale* loc = try_wx_language_code(supported, app_lang.ToUTF8().data()))
-        return loc;
-
-    // macOS preferred languages; Korean/Japanese in the list wins over English-first ordering.
+    // Prefer macOS spoken languages before UI language (English UI + Korean speech is common).
     if (NSLocale* loc = first_supported_preferred(supported, @"ko"))
         return loc;
     if (NSLocale* loc = first_supported_preferred(supported, @"ja"))
@@ -413,6 +420,10 @@ static NSLocale* speech_locale()
         if (NSLocale* loc = resolve_supported_locale(supported, [NSLocale localeWithLocaleIdentifier:pref]))
             return loc;
     }
+
+    const wxString app_lang = Slic3r::GUI::wxGetApp().current_language_code();
+    if (NSLocale* loc = try_wx_language_code(supported, app_lang.ToUTF8().data()))
+        return loc;
 
     if (NSLocale* loc = resolve_supported_locale(supported, [NSLocale currentLocale]))
         return loc;
@@ -569,8 +580,13 @@ static void begin_session(const std::shared_ptr<MacVoiceShared>& sh, uint64_t ge
     session->request.shouldReportPartialResults = YES;
     if (@available(macOS 10.15, *))
         session->request.taskHint = SFSpeechRecognitionTaskHintDictation;
+    session->request.contextualStrings = @[
+        @"슬라이스", @"리트랙션", @"실", @"배치", @"회전", @"눕혀", @"서포트", @"베드", @"노즐",
+        @"layer", @"slice", @"retraction", @"stringing", @"arrange", @"rotate", @"support", @"brim",
+    ];
 
     NSLocale* locale = speech_locale();
+    session->locale_id = ns_to_std(locale.localeIdentifier);
     NSLog(@"OllamaVoice: app_lang=%s preferred=%@ recognizer locale=%@",
           Slic3r::GUI::wxGetApp().current_language_code().utf8_str().data(),
           [NSLocale preferredLanguages],
@@ -634,6 +650,14 @@ static void begin_session(const std::shared_ptr<MacVoiceShared>& sh, uint64_t ge
                 const std::string text = s_text ? std::string([s_text UTF8String]) : std::string();
                 if (!text.empty())
                     s2->last_partial_text = text;
+
+                float conf_sum = 0.f;
+                NSUInteger conf_n = 0;
+                for (SFTranscriptionSegment* seg in result.bestTranscription.segments) {
+                    conf_sum += seg.confidence;
+                    ++conf_n;
+                }
+                s2->last_confidence = conf_n > 0 ? (conf_sum / conf_n) : -1.f;
 
                 if (result.isFinal || finishing) {
                     schedule_deliver_recognized_text(

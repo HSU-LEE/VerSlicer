@@ -36,26 +36,70 @@ Works in English or Korean for many requests:
 
 | You might say | |
 | --- | --- |
-| *Rotate this to use less support* | moves / rotates the selection |
-| *Lay it flat* / *Flip it* | flip & rotate (flip defaults to 180° on X) |
-| *Layer height 0.12* | print preset |
-| *Make it stronger* | walls, infill, etc. |
-| *Supports on* | `enable_support` |
-| *Arrange the plate* | auto-arrange |
-| *Slice* | slice current plate |
+| *Rotate this to use less support* / *34도 돌려서 배치해줘* | rotate & arrange the selection |
+| *Lay it flat* / *Flip it* / *눕혀* | flip & rotate (flip defaults to 180° on X) |
+| *Layer height 0.12* / *층 높이 0.12* | print preset |
+| *Make it stronger* / *더 튼튼하게* | walls, infill, etc. |
+| *Supports on* / *서포트 켜* | `enable_support` |
+| *Stringing / 실 많이* / *실같은 게 생겨* | retraction (filament preset) |
+| *Arrange the plate* / *배치해줘* | auto-arrange |
+| *Slice* / *슬라이스* | slice current plate |
 | *Preview* | switch tab |
 
-Voice on macOS: hit the mic on the toolbar, speak, send.
+Voice on macOS: tap the **mic** on the 3D toolbar, speak, then tap again to finish. Speech uses your Mac’s preferred language (Korean is preferred when listed in **System Settings → General → Language & Region**), even if the VerSlicer UI is English.
 
 Implementation lives in [`src/slic3r/GUI/OllamaAssistant/`](src/slic3r/GUI/OllamaAssistant/) — chat UI, HTTP to Ollama, JSON `actions` (`set_config`, `slice`, `rotate`, `arrange`, …).
 
 ## Setup
 
+### 1. Install Ollama and pull the default model
+
 ```bash
-ollama pull llama3.2
+ollama pull qwen2.5:3b
 ```
 
-Install [Ollama](https://ollama.com/), leave it running, open VerSlicer, then **Ollama chat** on the 3D toolbar. Change host or model in the panel if you use something other than the default.
+Install [Ollama](https://ollama.com/), leave it running (`ollama serve` or the menu-bar app), then open VerSlicer and **Ollama chat** on the 3D toolbar.
+
+**Default model:** `qwen2.5:3b` — tuned for fast replies on Apple Silicon. For higher quality (slower), use `qwen2.5:7b` in the chat panel or in config (see below).
+
+### 2. First launch
+
+1. Open VerSlicer → 3D view → **Ollama chat**
+2. Set **Mode** to **Apply** to change slicer settings from chat
+3. Confirm the model label shows `qwen2.5:3b`
+
+### 3. Voice (macOS)
+
+- Grant **Microphone** and **Speech Recognition** when prompted
+- For Korean voice, add Korean in **System Settings → General → Language & Region** (above English if you speak Korean)
+- Speak clearly; garbled transcripts are rejected instead of being sent to the model
+
+## AI assistant defaults
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| Model | `qwen2.5:3b` | `qwen2.5:7b` still works if installed |
+| Context window | 8192 tokens | Smaller = faster |
+| Max reply tokens | 768 | Enough for JSON actions |
+| Keep-alive | 30 min | Avoids reload delay between messages |
+| Two-hop planner | off | Single LLM call = faster |
+| Keyword inject | on | Reliable fixes for stringing, brim, support, etc. |
+| Wiki search / critic | off | Enable for harder troubleshooting |
+
+Stored in `~/Library/Application Support/verslicer/verslicer.conf` under `"ollama"`:
+
+```json
+"ollama": {
+  "model": "qwen2.5:3b",
+  "assistant_mode": true,
+  "keyword_inject": "true",
+  "two_hop": "false",
+  "wiki_search": "false",
+  "critic": "false"
+}
+```
+
+Environment overrides: `OLLAMA_TWO_HOP`, `OLLAMA_KEYWORD_INJECT`, `OLLAMA_WIKI_SEARCH`, `OLLAMA_CRITIC` (`1` / `true` / `on`).
 
 ## Build
 
@@ -64,21 +108,43 @@ macOS 11.3+, Xcode or CLT, CMake 3.13+.
 ```bash
 ./build_release_macos.sh       # deps + app
 ./build_release_macos.sh -x    # Ninja, nicer for dev
-./build_release_macos.sh -s    # app only
+./build_release_macos.sh -s    # app only (after deps are built)
 ```
 
-Output under `build/<arch>/`.
+Output: `build/<arch>/src/Release/verslicer.app`  
+Symlink: `build/<arch>/OrcaSlicer/Verslicer.app`
 
-**Installer for another Mac (no dev tools):**
+Quick rebuild after code changes:
+
+```bash
+cd build/arm64
+cmake --build . --config Release --target OrcaSlicer -j$(sysctl -n hw.ncpu)
+open src/Release/verslicer.app
+```
+
+## Installer (DMG)
+
+Package an existing Release build for another Mac (no dev tools required):
 
 ```bash
 ./scripts/make_macos_installer.sh          # package existing build
-./scripts/make_macos_installer.sh --build  # rebuild + .dmg
+./scripts/make_macos_installer.sh --build  # rebuild app, then package
 ./build_release_macos.sh -s -x -M          # same as --build + .dmg
 ```
 
-DMG output: `build/<arch>/dist/VerSlicer-macOS-<arch>-<version>.dmg`  
-On the other Mac: open the DMG → drag **VerSlicer** to Applications → install [Ollama](https://ollama.com/download) and run `ollama pull llama3.2` for AI chat.
+**Output:** `build/<arch>/dist/VerSlicer-macOS-<arch>-<version>.dmg`  
+Example: `build/arm64/dist/VerSlicer-macOS-arm64-3.0.0.dmg`
+
+**On another Mac:**
+
+1. Open the DMG → drag **VerSlicer** to **Applications**
+2. Install [Ollama](https://ollama.com/download) and run `ollama pull qwen2.5:3b`
+3. If macOS blocks the app (unsigned build): **Right-click → Open** once, or:
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/VerSlicer.app
+   ```
+
+Optional signing & notarization: set `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD` before running `make_macos_installer.sh` (see `scripts/package_macos_dmg.sh`).
 
 ## Where this is going
 

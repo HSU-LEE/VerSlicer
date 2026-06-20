@@ -48,8 +48,11 @@ std::string normalize_ollama_model_tag(std::string model)
     boost::trim(model);
     if (model.empty())
         model = kOllamaDefaultModel;
-    if (model == "llama3.2")
-        model = "llama3.2:latest";
+    if (model == "qwen2.5")
+        model = "qwen2.5:3b";
+    // Prefer the faster default when an older 7b tag is still saved in config.
+    if (model == "qwen2.5:7b")
+        model = "qwen2.5:3b";
     return model;
 }
 
@@ -80,12 +83,12 @@ bool ollama_auto_catalog_enabled()
 
 bool ollama_two_hop_enabled()
 {
-    return pipeline_flag(kOllamaTwoHopKey, "OLLAMA_TWO_HOP", true);
+    return pipeline_flag(kOllamaTwoHopKey, "OLLAMA_TWO_HOP", false);
 }
 
 bool ollama_keyword_inject_enabled()
 {
-    return pipeline_flag(kOllamaKeywordInjectKey, "OLLAMA_KEYWORD_INJECT", false);
+    return pipeline_flag(kOllamaKeywordInjectKey, "OLLAMA_KEYWORD_INJECT", true);
 }
 
 bool ollama_rule_only_fallback_enabled()
@@ -100,12 +103,12 @@ bool ollama_adaptive_routing_enabled()
 
 bool ollama_wiki_search_enabled()
 {
-    return pipeline_flag(kOllamaWikiSearchKey, "OLLAMA_WIKI_SEARCH", true);
+    return pipeline_flag(kOllamaWikiSearchKey, "OLLAMA_WIKI_SEARCH", false);
 }
 
 bool ollama_critic_enabled()
 {
-    return pipeline_flag(kOllamaCriticKey, "OLLAMA_CRITIC", true);
+    return pipeline_flag(kOllamaCriticKey, "OLLAMA_CRITIC", false);
 }
 
 }} // namespace

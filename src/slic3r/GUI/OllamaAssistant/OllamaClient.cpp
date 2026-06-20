@@ -1,5 +1,6 @@
 #include "OllamaClient.hpp"
 #include "OllamaActionExecutor.hpp"
+#include "OllamaConfig.hpp"
 #include "OllamaIntentContext.hpp"
 #include "OllamaModelPick.hpp"
 #include "OllamaSettingRegistry.hpp"
@@ -101,9 +102,11 @@ std::string normalize_model_tag(std::string model)
 {
     boost::trim(model);
     if (model.empty())
-        model = "llama3.2:latest";
-    if (model == "llama3.2")
-        model = "llama3.2:latest";
+        model = kOllamaDefaultModel;
+    if (model == "qwen2.5")
+        model = "qwen2.5:3b";
+    if (model == "qwen2.5:7b")
+        model = "qwen2.5:3b";
     return model;
 }
 
@@ -169,7 +172,7 @@ static std::string inject_priority_catalog_slice(std::string user_content)
     std::string request = user_content.substr(pos + marker.size());
     try {
         nlohmann::json ctx = nlohmann::json::parse(context);
-        ctx["setting_catalog"] = OllamaSettingRegistry::build_priority_catalog(nullptr, false, 8);
+        ctx["setting_catalog"] = OllamaSettingRegistry::build_priority_catalog(nullptr, false, 5);
         const nlohmann::json cached = OllamaIntentContext::cached_intent_signals_json();
         if (!cached.empty())
             ctx["intent_signals"] = cached;
@@ -313,8 +316,12 @@ ChatAttemptResult run_chat_http(const std::string& url, const std::string& model
 
     nlohmann::json body;
     body["model"]    = model;
-    body["stream"]   = false;
-    body["options"]  = {{"temperature", 0.2}, {"top_p", 0.9}, {"num_predict", 2048}};
+    body["stream"]     = false;
+    body["keep_alive"] = kOllamaKeepAlive;
+    body["options"]    = {{"temperature", 0.2},
+                          {"top_p", 0.9},
+                          {"num_predict", kOllamaNumPredict},
+                          {"num_ctx", kOllamaNumCtx}};
     body["messages"] = nlohmann::json::array();
     for (const OllamaMessage& msg : messages)
         body["messages"].push_back({{"role", msg.role}, {"content", msg.content}});

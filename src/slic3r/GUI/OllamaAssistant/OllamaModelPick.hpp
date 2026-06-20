@@ -1,6 +1,8 @@
 #ifndef slic3r_OllamaModelPick_hpp_
 #define slic3r_OllamaModelPick_hpp_
 
+#include "OllamaConfig.hpp"
+
 #include <boost/algorithm/string.hpp>
 
 #include <string>
@@ -12,9 +14,11 @@ inline std::string pick_installed_ollama_model(const std::vector<std::string>& m
 {
     boost::trim(want);
     if (want.empty())
-        want = "llama3.2:latest";
-    if (want == "llama3.2")
-        want = "llama3.2:latest";
+        want = kOllamaDefaultModel;
+    if (want == "qwen2.5")
+        want = "qwen2.5:3b";
+    if (want == "qwen2.5:7b")
+        want = "qwen2.5:3b";
 
     auto exact = [&](const std::string& n) { return n == want; };
     auto prefix = [&](const std::string& n) { return n.rfind(want + ":", 0) == 0; };
@@ -28,11 +32,11 @@ inline std::string pick_installed_ollama_model(const std::vector<std::string>& m
             return n;
     }
     for (const auto& n : models) {
-        if (n.rfind("llama3.2", 0) == 0)
+        if (n.rfind("qwen2.5", 0) == 0)
             return n;
     }
     for (const auto& n : models) {
-        if (n.find("llama") != std::string::npos)
+        if (n.find("qwen") != std::string::npos)
             return n;
     }
     if (!models.empty())

@@ -1554,7 +1554,7 @@ std::string OllamaActionExecutor::build_planner_user_message(const std::string& 
     ctx["setting_index"] = OllamaSettingRegistry::build_setting_index(2);
     std::string body     = ctx.dump(2);
     std::string packed   = std::string("Current slicer context (JSON):\n") + body + "\n\nUser request:\n" + user_request;
-    return fit_context_json_to_limit(std::move(packed), 24000);
+    return fit_context_json_to_limit(std::move(packed), 8000);
 }
 
 std::string OllamaActionExecutor::build_resolver_user_message(const std::string& user_request,

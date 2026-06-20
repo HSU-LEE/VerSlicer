@@ -9,7 +9,11 @@ constexpr const char* kOllamaConfigSection = "ollama";
 constexpr const char* kOllamaHostKey       = "host";
 constexpr const char* kOllamaModelKey      = "model";
 constexpr const char* kOllamaDefaultHost   = "http://127.0.0.1:11434";
-constexpr const char* kOllamaDefaultModel  = "llama3.2:latest";
+constexpr const char* kOllamaDefaultModel  = "qwen2.5:3b";
+/** Inference tuning — smaller ctx/predict = faster replies on Apple Silicon. */
+constexpr int         kOllamaNumCtx        = 8192;
+constexpr int         kOllamaNumPredict    = 768;
+constexpr const char* kOllamaKeepAlive     = "30m";
 
 constexpr const char* kOllamaAutoCatalogKey    = "auto_catalog";
 constexpr const char* kOllamaTwoHopKey         = "two_hop";

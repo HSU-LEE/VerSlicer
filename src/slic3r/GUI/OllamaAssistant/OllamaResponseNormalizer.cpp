@@ -455,10 +455,11 @@ OllamaNormalizeResult OllamaResponseNormalizer::normalize(nlohmann::json& root, 
     }
 
     if (wants_stringing && !scan.has_retraction) {
+        const double retraction = OllamaIntentContext::recommended_retraction_for_stringing();
         root["actions"].push_back({{"type", "set_config"},
                                      {"preset", "filament"},
                                      {"filament_index", OllamaIntentContext::clamp_filament_index(0, 16)},
-                                     {"options", {{"retraction_length", 0.8}}}});
+                                     {"options", {{"retraction_length", retraction}}}});
         scan.has_retraction = true;
         scan.has_set_config = true;
         OllamaTelemetry::intent_signal_injected("retraction_length", "stringing");

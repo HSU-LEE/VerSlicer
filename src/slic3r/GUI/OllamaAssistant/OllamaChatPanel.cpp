@@ -4,6 +4,7 @@
 #include "OllamaActionPipeline.hpp"
 #include "BambuLabWikiSearch.hpp"
 #include "OllamaConfig.hpp"
+#include "OllamaIntentContext.hpp"
 #include "OllamaIntentRules.hpp"
 #include "OllamaModelPick.hpp"
 #include "OllamaServerManager.hpp"
@@ -13,6 +14,7 @@
 #include "OllamaRequestRouter.hpp"
 #include "OllamaResponseNormalizer.hpp"
 #include "OllamaTelemetry.hpp"
+#include "OllamaVoiceTranscript.hpp"
 #include "../MakerWorld/MakerWorldImportFlow.hpp"
 #include "../MakerWorld/MakerWorldSearchService.hpp"
 #include "../MakerWorld/MakerWorldTypes.hpp"
@@ -55,7 +57,7 @@ constexpr const char* kModeApply         = "apply";
 constexpr const char* kModeQuestion      = "question";
 constexpr int         kMaxModelPollFailures = 12;
 constexpr size_t      kMaxHistoryChars      = 48000;
-constexpr size_t      kMaxContextChars      = 24000;
+constexpr size_t      kMaxContextChars      = 8000;
 
 std::string extract_first_url_from_text(const std::string& text)
 {
@@ -125,6 +127,14 @@ static wxString format_assistant_failure(const std::string& what, const std::str
     if (parse_error)
         return wxString::Format(_L("Could not parse the model reply (%s). Try again."), wxString::FromUTF8(what));
     return wxString::Format(_L("Something went wrong (%s). Try again."), wxString::FromUTF8(what));
+}
+
+static bool is_stringing_only_request(const std::string& user)
+{
+    using namespace OllamaIntentRules;
+    return OllamaIntentContext::user_wants_stringing_relief(user) && !contains_rotate_intent(user) &&
+           !contains_placement_intent(user) && !contains_flip_intent(user) && !user_wants_delete(user) &&
+           !contains_support_intent(user);
 }
 
 static wxString summarize_applied_changes(const std::string& user_req,
@@ -764,6 +774,15 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
 
     const std::string user_utf8 = user_text.utf8_string();
 
+    if (ollama_voice_looks_like_garbled_chat(user_utf8)) {
+        const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+        append_chat(_L("Assistant"),
+                    ko ? wxString::FromUTF8("음성/문장을 이해하지 못했습니다. 다시 말씀하시거나 직접 입력해 주세요.")
+                       : _L("I couldn't understand that. Try again or type your request."));
+        set_status_text(_L("Ready"));
+        return;
+    }
+
     if (MakerWorldSearchService::is_pure_makerworld_request(user_utf8)) {
         m_messages.push_back({"user", user_utf8});
         trim_message_history();
@@ -795,6 +814,18 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
 
     if (!m_available_models.empty())
         m_model = resolve_installed_model(m_available_models, m_model);
+
+    if (m_apply_mode && is_stringing_only_request(user_utf8)) {
+        nlohmann::json root = OllamaActionPipeline::build_rule_only_root(user_utf8, true);
+        if (root.contains("actions") && root["actions"].is_array() && !root["actions"].empty()) {
+            const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+            root["message"] = ko ? "실(stringing)을 줄이기 위해 리트랙션을 조정하겠습니다."
+                                 : "I'll adjust retraction to reduce stringing.";
+            set_busy(true);
+            on_chat_response(root.dump(), "");
+            return;
+        }
+    }
 
     set_busy(true);
     const std::string model = normalize_ollama_model_tag(m_model);
@@ -1022,7 +1053,7 @@ void OllamaChatPanel::on_models_loaded(const std::vector<std::string>& models, c
 
 void OllamaChatPanel::ensure_default_model_ready(const std::vector<std::string>& models)
 {
-    // If user didn't install a model yet, auto-pull the default Llama.
+    // If user didn't install a model yet, auto-pull the default model.
     bool has_default = false;
     const std::string& want = m_model.empty() ? std::string(kOllamaDefaultModel) : m_model;
     for (const auto& m : models) {
@@ -1160,6 +1191,21 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
                 display += "\n\n" + _L("Preview only — close the compare dialog, then apply from Smart Print if needed.");
             } else if (workflow_had_effective_change()) {
                 display = summarize_applied_changes(user_req, workflow.results);
+            } else if (OllamaIntentContext::user_wants_stringing_relief(user_req)) {
+                nlohmann::json recovered =
+                    OllamaActionPipeline::build_recovery_root(assistant_text, user_req, true);
+                if (recovered.contains("actions") && recovered["actions"].is_array()
+                    && !recovered["actions"].empty()) {
+                    const OllamaWorkflowRun recovery_workflow =
+                        OllamaActionWorkflow::confirm_and_execute(recovered, this);
+                    display = summarize_applied_changes(
+                        user_req,
+                        !recovery_workflow.results.empty() ? recovery_workflow.results : workflow.results);
+                    if (recovery_workflow.cancelled)
+                        display += "\n\n" + _L("Cancelled — no changes applied.");
+                } else {
+                    display = summarize_applied_changes(user_req, workflow.results);
+                }
             } else if (!workflow.results.empty()) {
                 display = summarize_applied_changes(user_req, workflow.results);
             } else if (root.contains("actions") && root["actions"].is_array() && !root["actions"].empty()) {
@@ -1167,7 +1213,22 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
             } else if (message_looks_like_manual_instruction(into_u8(display))) {
                 display = _L("I couldn't apply that automatically. Select a model on the plate, or try Apply mode with a clearer request.");
             } else if (sanitized.blocked_count > 0) {
-                display = _L("That change wasn't applied. Try rephrasing, or select the object on the plate first.");
+                nlohmann::json recovered =
+                    OllamaActionPipeline::build_recovery_root(assistant_text, user_req, true);
+                if (recovered.contains("actions") && recovered["actions"].is_array()
+                    && !recovered["actions"].empty()) {
+                    const OllamaWorkflowRun recovery_workflow =
+                        OllamaActionWorkflow::confirm_and_execute(recovered, this);
+                    if (!recovery_workflow.results.empty()) {
+                        display = summarize_applied_changes(user_req, recovery_workflow.results);
+                        if (recovery_workflow.cancelled)
+                            display += "\n\n" + _L("Cancelled — no changes applied.");
+                    } else {
+                        display = _L("That change wasn't applied. Try rephrasing, or select the object on the plate first.");
+                    }
+                } else {
+                    display = _L("That change wasn't applied. Try rephrasing, or select the object on the plate first.");
+                }
             }
         } else if (root.contains("actions") && root["actions"].is_array() && !root["actions"].empty()) {
             display += "\n\n" + _L("(Question mode — suggested actions were not applied.)");
