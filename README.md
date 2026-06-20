@@ -30,26 +30,6 @@ Type what you want, or use the mic on macOS. Ollama runs locally; the app turns 
 
 Bambu network plugin, cloud, Device tab, and Smart Print are still there. Builds are **macOS-only** right now.
 
-## Examples
-
-Works in English or Korean for many requests:
-
-| You might say | |
-| --- | --- |
-| *Rotate this to use less support* / *34도 돌려서 배치해줘* | rotate & arrange the selection |
-| *Lay it flat* / *Flip it* / *눕혀* | flip & rotate (flip defaults to 180° on X) |
-| *Layer height 0.12* / *층 높이 0.12* | print preset |
-| *Make it stronger* / *더 튼튼하게* | walls, infill, etc. |
-| *Supports on* / *서포트 켜* | `enable_support` |
-| *Stringing / 실 많이* / *실같은 게 생겨* | retraction (filament preset) |
-| *Arrange the plate* / *배치해줘* | auto-arrange |
-| *Slice* / *슬라이스* | slice current plate |
-| *Preview* | switch tab |
-
-Voice on macOS: tap the **mic** on the 3D toolbar, speak, then tap again to finish. Speech uses your Mac’s preferred language (Korean is preferred when listed in **System Settings → General → Language & Region**), even if the VerSlicer UI is English.
-
-Implementation lives in [`src/slic3r/GUI/OllamaAssistant/`](src/slic3r/GUI/OllamaAssistant/) — chat UI, HTTP to Ollama, JSON `actions` (`set_config`, `slice`, `rotate`, `arrange`, …).
-
 ## Setup
 
 ### 1. Install Ollama and pull the default model
