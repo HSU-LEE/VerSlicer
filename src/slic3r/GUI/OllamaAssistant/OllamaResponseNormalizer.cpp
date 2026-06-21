@@ -138,6 +138,59 @@ bool OllamaResponseNormalizer::has_viable_set_config(const nlohmann::json& root)
     return false;
 }
 
+void OllamaResponseNormalizer::reconcile_speed_intent_actions(nlohmann::json& root, const std::string& user_req)
+{
+    if (!OllamaIntentContext::user_wants_faster_print(user_req))
+        return;
+    if (!root.contains("actions") || !root["actions"].is_array())
+        root["actions"] = nlohmann::json::array();
+
+    nlohmann::json kept = nlohmann::json::array();
+    for (auto& a : root["actions"]) {
+        if (!a.is_object() || a.value("type", "") != "set_config") {
+            kept.push_back(std::move(a));
+            continue;
+        }
+        const std::string preset = a.value("preset", "print");
+        if (preset == "filament")
+            continue;
+        if (a.contains("options") && a["options"].is_object() && !a["options"].empty()) {
+            bool only_retraction = true;
+            for (auto it = a["options"].begin(); it != a["options"].end(); ++it) {
+                const std::string key = OllamaActionExecutor::normalize_config_key(it.key());
+                if (key != "retraction_length" && key != "retraction_speed")
+                    only_retraction = false;
+            }
+            if (only_retraction)
+                continue;
+        }
+        kept.push_back(std::move(a));
+    }
+    root["actions"] = std::move(kept);
+
+    nlohmann::json speed_opts = nlohmann::json::object();
+    OllamaIntentContext::refine_set_config_options(speed_opts, user_req);
+    if (speed_opts.empty())
+        return;
+
+    for (auto& a : root["actions"]) {
+        if (!a.is_object() || a.value("type", "") != "set_config")
+            continue;
+        if (a.value("preset", "print") != "print")
+            continue;
+        if (!a.contains("options") || !a["options"].is_object())
+            a["options"] = nlohmann::json::object();
+        for (auto it = speed_opts.begin(); it != speed_opts.end(); ++it) {
+            if (!a["options"].contains(it.key()))
+                a["options"][it.key()] = it.value();
+        }
+        return;
+    }
+
+    root["actions"].push_back(
+        {{"type", "set_config"}, {"preset", "print"}, {"options", std::move(speed_opts)}});
+}
+
 void OllamaResponseNormalizer::drop_redundant_slice_actions(nlohmann::json& root)
 {
     if (!root.contains("actions") || !root["actions"].is_array())
@@ -217,6 +270,8 @@ OllamaNormalizeResult OllamaResponseNormalizer::normalize(nlohmann::json& root, 
     }
 
     patch_rotation_from_user_text(root, user_req);
+    reconcile_speed_intent_actions(root, user_req);
+
     OllamaActionExecutor::augment_geometry_object_targets(root, user_req);
     drop_redundant_slice_actions(root);
 

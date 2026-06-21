@@ -79,6 +79,7 @@ if (ORCA_TOOLS)
     add_executable(ollama_apply_golden_test
         ollama_apply_golden_test.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
@@ -91,7 +92,7 @@ if (ORCA_TOOLS)
         ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
     )
     target_link_libraries(ollama_apply_golden_test libslic3r boost_headeronly)
-    target_compile_definitions(ollama_apply_golden_test PRIVATE -DBOOST_ALL_NO_LIB)
+    target_compile_definitions(ollama_apply_golden_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST)
 
     add_executable(bambu_wiki_search_test
         bambu_wiki_search_test.cpp

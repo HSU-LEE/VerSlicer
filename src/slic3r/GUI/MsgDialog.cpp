@@ -608,7 +608,7 @@ wxBoxSizer *Newer3mfVersionDialog::get_msg_sizer()
         text1 = new wxStaticText(this, wxID_ANY, _L("The 3MF file version is in Beta and it is newer than the current Verslicer version."));
         wxStaticText *   text2       = new wxStaticText(this, wxID_ANY, _L("If you would like to try Verslicer Beta, you may click to"));
         // ORCA standardized HyperLink
-        HyperLink *      github_link = new HyperLink(this, _L("Download Beta Version"), "https://github.com/Verslicer/Verslicer/releases");
+        HyperLink *      github_link = new HyperLink(this, _L("Download Beta Version"), "https://github.com/HSU-LEE/VerSlicer/releases");
         horizontal_sizer->Add(text2, 0, wxEXPAND, 0);
         horizontal_sizer->Add(github_link, 0, wxEXPAND | wxLEFT, 5);
         

@@ -32,7 +32,7 @@ Settings are means, not goals.
 | Outcome | Try first (read current!) | Then if needed |
 | Adhesion / won't stick | brim_width + brim_type | initial_layer_print_height, elefant_foot_compensation |
 | Strength / brittle | sparse_infill_density (relative +5–10%) | wall_loops, sparse_infill_pattern (gyroid/cubic) |
-| Overhang / floating | enable_support + support_type normal(auto) | rotate (lay flat), overhang_speed |
+| Overhang / floating | enable_support + support_type tree(auto) | rotate (lay flat), overhang_speed |
 | Speed | layer_height (if low) | sparse_infill_density down |
 | Surface quality | layer_height down | top_shell_layers, ironing_type |
 | Stringing | retraction_length (filament) | retraction_when_crossing_perimeters, nozzle temp |
@@ -55,7 +55,7 @@ Always read setting_catalog[].current and engineering_hints in context. Never us
 
 Use recommended_brim_width_mm when enabling brim without user mm value.
 If still_needs_support is true, prefer enable_support unless user refuses supports.
-When enabling supports, ALWAYS set support_type to normal(auto) — never manual or tree-only without auto.
+When enabling supports, ALWAYS set support_type to tree(auto).
 
 ## Output (strict)
 Exactly ONE JSON object. No markdown outside JSON.
@@ -114,7 +114,7 @@ User: "출력물이 너무 쉽게 파손돼"
 {"message":"You want a tougher print — I'll fill the inside a bit more and add one extra wall so it doesn't snap as easily.","actions":[{"type":"set_config","preset":"print","options":{"sparse_infill_density":"22%","wall_loops":3}}]}
 
 User: "공중에 떠서 나와요"
-{"message":"Parts are printing in mid-air. I'll turn on supports to hold those sections while printing.","actions":[{"type":"set_config","preset":"print","options":{"enable_support":true,"support_type":"normal(auto)"}}]}
+{"message":"Parts are printing in mid-air. I'll turn on tree supports to hold those sections while printing.","actions":[{"type":"set_config","preset":"print","options":{"enable_support":true,"support_type":"tree(auto)"}}]}
 
 User: "야외에서 쓸 거라 튼튼한데 너무 오래 걸리면 안 돼"
 {"message":"You need outdoor strength without a long print. I'll add one wall and bump infill slightly — a balanced fix without slowing down too much.","actions":[{"type":"set_config","preset":"print","options":{"wall_loops":4,"sparse_infill_density":"22%"}}]}
@@ -152,7 +152,7 @@ static const char* kApplyKo = R"OLLAMA(당신은 Verslicer AI입니다. 단순�
 | 원하는 결과 | 먼저 | 그다음 |
 | 접착/안 붙음 | brim_width, brim_type | initial_layer_print_height |
 | 강도/파손 | sparse_infill_density (+5~10%p) | wall_loops (+1) |
-| 오버행/공중 | enable_support + support_type normal(auto) | rotate(눕히기) |
+| 오버행/공중 | enable_support + support_type tree(auto) | rotate(눕히기) |
 | 속도 | layer_height | 채움 소폭 감소 |
 | 표면 | layer_height 감소 | top_shell_layers |
 | 실(stringing) | retraction_length (filament) | retraction_when_crossing_perimeters |
@@ -169,7 +169,7 @@ engineering_hints·setting_catalog[].current를 반드시 읽고 **상대적으�
 
 브림 mm 없으면 recommended_brim_width_mm 사용.
 still_needs_support면 enable_support 우선(사용자가 거부하지 않는 한).
-서포트를 켤 때는 반드시 support_type을 normal(auto)로 — manual/tree(manual) 금지.
+서포트를 켤 때는 반드시 support_type을 tree(auto)로.
 
 ## 출력
 JSON 객체 하나. 마크다운·JSON 밖 텍스트 금지.
@@ -211,7 +211,7 @@ MakerWorld: 검색 makerworld_search, id/url import_makerworld. URL 지어내기
 {"message":"쉽게 부서진다고 하셨죠. 안쪽을 조금 더 꽉 채우고 벽을 한 겹 더 두껍게 해서 힘을 받을 수 있게 하겠습니다.","actions":[{"type":"set_config","preset":"print","options":{"sparse_infill_density":"22%","wall_loops":3}}]}
 
 사용자: "공중에 떠서 나와요"
-{"message":"공중으로 나오는 부분이 있군요. 출력 중에 받쳐 줄 구조를 켜겠습니다.","actions":[{"type":"set_config","preset":"print","options":{"enable_support":true,"support_type":"normal(auto)"}}]}
+{"message":"공중으로 나오는 부분이 있군요. 트리 서포트를 켜서 출력 중에 받쳐 주겠습니다.","actions":[{"type":"set_config","preset":"print","options":{"enable_support":true,"support_type":"tree(auto)"}}]}
 
 사용자: "야외에서 쓸 거라 튼튼한데 너무 오래 걸리면 안 돼"
 {"message":"야외에서 쓰실 만큼 단단하게, 시간은 너무 늘리지 않도록 벽을 조금 두껍게 하고 안쪽 채움만 적당히 올리겠습니다.","actions":[{"type":"set_config","preset":"print","options":{"wall_loops":4,"sparse_infill_density":"22%"}}]}

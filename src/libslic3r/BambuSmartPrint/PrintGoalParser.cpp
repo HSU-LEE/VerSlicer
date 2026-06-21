@@ -50,8 +50,9 @@ PrintGoal PrintGoalParser::parse(const std::string& user_text)
     }
 
     if (contains(s, "빨리") || contains(s, "빠르") || contains(s, "오늘") || contains(s, "급")
-        || contains(s, "fast") || contains(s, "quick") || contains(s, "speed") || contains(s, "today")
-        || contains(s, "asap") || contains(s, "hurry")) {
+        || contains(s, "느려") || contains(s, "느리") || contains(s, "속도가") || contains(s, "속도를")
+        || contains(s, "too slow") || contains(s, "fast") || contains(s, "quick") || contains(s, "speed")
+        || contains(s, "today") || contains(s, "asap") || contains(s, "hurry") || contains(s, "faster")) {
         add_intent(goal, PrintGoalIntent::Fast);
         bump_weight(goal.weight_fast, 0.85f);
     }
@@ -71,7 +72,7 @@ PrintGoal PrintGoalParser::parse(const std::string& user_text)
     }
 
     if (contains(s, "오버행") || contains(s, "overhang") || contains(s, "서포트") || contains(s, "support")
-        || contains(s, "공중") || contains(s, "floating")) {
+        || contains(s, "공중") || contains(s, "floating") || contains(s, "받침")) {
         add_intent(goal, PrintGoalIntent::Overhang);
     }
 

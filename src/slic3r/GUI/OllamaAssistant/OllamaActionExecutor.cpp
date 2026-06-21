@@ -5,9 +5,12 @@
 #include "OllamaIntentContext.hpp"
 #include "OllamaSettingRegistry.hpp"
 #include "OllamaSettingSearch.hpp"
+#include "OllamaSettingAliases.hpp"
 #include "OllamaSystemPrompts.hpp"
 #include "OllamaPrintingTips.hpp"
+#include "OllamaResponseNormalizer.hpp"
 #include "OllamaUserFlow.hpp"
+#include "OllamaAgentStateService.hpp"
 #include "BambuLabWikiSearch.hpp"
 #include "OllamaTelemetry.hpp"
 
@@ -27,6 +30,7 @@
 #include "slic3r/GUI/Event.hpp"
 #include "slic3r/GUI/GLToolbar.hpp"
 
+#include "libslic3r/Preset.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/PrintConfig.hpp"
 #include "libslic3r/Model.hpp"
@@ -42,6 +46,7 @@
 #include <unordered_set>
 #include <unordered_set>
 #include <wx/filefn.h>
+#include <wx/glcanvas.h>
 #include <wx/filename.h>
 #include <wx/menu.h>
 
@@ -359,29 +364,21 @@ static void expand_brim_options(nlohmann::json& options)
         options["brim_type"] = "outer_only";
 }
 
-/** Maps enable_support to support_type normal(auto) — manual/tree-only must not be left implicit. */
+/** Default support mode for assistant-applied settings (Bambu tree supports). */
+static constexpr const char* kAssistantDefaultSupportType = "tree(auto)";
+
+/** Maps support_type aliases; normal/hybrid modes become tree(auto) for assistant applies. */
 static std::string normalize_support_type_value(std::string v)
 {
     boost::algorithm::to_lower(v);
     boost::algorithm::trim(v);
     boost::algorithm::replace_all(v, " ", "");
 
-    if (v == "auto" || v == "normal" || v == "normalauto" || v == "hybrid(auto)" || v == "hybridauto")
-        return "normal(auto)";
-    if (v == "tree" || v == "treeauto")
-        return "tree(auto)";
-    if (v == "normalmanual" || v == "manual")
-        return "normal(manual)";
-    if (v == "treemanual")
-        return "tree(manual)";
-    if (v == "normal(auto)")
-        return "normal(auto)";
-    if (v == "tree(auto)")
-        return "tree(auto)";
-    if (v == "normal(manual)")
-        return "normal(manual)";
-    if (v == "tree(manual)")
-        return "tree(manual)";
+    if (v == "auto" || v == "normal" || v == "normalauto" || v == "hybrid(auto)" || v == "hybridauto"
+        || v == "normal(auto)" || v == "normal(manual)" || v == "normalmanual" || v == "manual")
+        return kAssistantDefaultSupportType;
+    if (v == "tree" || v == "treeauto" || v == "tree(auto)" || v == "tree(manual)" || v == "treemanual")
+        return kAssistantDefaultSupportType;
     return v;
 }
 
@@ -389,6 +386,11 @@ static void expand_support_options(nlohmann::json& options)
 {
     if (!options.is_object())
         return;
+
+    if (options.contains("enable_support") && !json_truthy(options["enable_support"])) {
+        options.erase("support_type");
+        return;
+    }
 
     if (options.contains("support_type") && options["support_type"].is_string())
         options["support_type"] = normalize_support_type_value(options["support_type"].get<std::string>());
@@ -398,8 +400,8 @@ static void expand_support_options(nlohmann::json& options)
     if (!json_truthy(options["enable_support"]))
         return;
 
-    // Bambu/Orca: Normal (auto) generates supports from geometry; manual modes need enforcers only.
-    options["support_type"] = "normal(auto)";
+    // Bambu/Orca: tree(auto) generates tree supports from geometry.
+    options["support_type"] = kAssistantDefaultSupportType;
 }
 
 static void strip_disallowed_config_keys(nlohmann::json& options)
@@ -912,6 +914,17 @@ OllamaActionResult apply_ui_select_tab(const nlohmann::json& action)
     }
     else if (tab == "home")
         pos = MainFrame::tpHome;
+    else if (tab == "calibration") {
+        if (mf->page_index_for(MainFrame::tpCalibration) == wxNOT_FOUND) {
+            result.message = "Calibration tab not available";
+            return result;
+        }
+        mf->select_tab(MainFrame::tpCalibration);
+        result.success          = true;
+        result.effective_change = true;
+        result.message          = "Switched tab to calibration";
+        return result;
+    }
     else {
         result.message = "Unknown tab: " + tab;
         return result;
@@ -971,12 +984,194 @@ OllamaActionResult apply_arrange()
     return apply_plater_event(EVT_GLTOOLBAR_ARRANGE, "Arranged models on the plate");
 }
 
+OllamaActionResult apply_get_state(const nlohmann::json& action)
+{
+    (void) action;
+    OllamaActionResult result;
+    result.success          = true;
+    result.effective_change = false;
+    result.message          = OllamaAgentStateService::snapshot_json();
+    return result;
+}
+
+OllamaActionResult apply_list_objects(const nlohmann::json& action)
+{
+    (void) action;
+    OllamaActionResult result;
+    Plater* plater = wxGetApp().plater();
+    if (!plater) {
+        result.message = "Plater not available";
+        return result;
+    }
+    nlohmann::json arr = nlohmann::json::array();
+    const Model&   model = plater->model();
+    for (size_t i = 0; i < model.objects.size(); ++i) {
+        arr.push_back(nlohmann::json::object({
+            {"id", i},
+            {"name", model.objects[i]->name},
+        }));
+    }
+    result.success          = true;
+    result.effective_change = false;
+    result.message          = arr.dump(2);
+    return result;
+}
+
+OllamaActionResult apply_select_object(const nlohmann::json& action)
+{
+    OllamaActionResult result;
+    Plater* plater = wxGetApp().plater();
+    if (!plater) {
+        result.message = "Plater not available";
+        return result;
+    }
+    if (!select_objects_for_action(plater, action)) {
+        result.message = "Could not select object — check object_id or object_name";
+        return result;
+    }
+    result.success          = true;
+    result.effective_change = true;
+    result.message          = "Selection updated";
+    return result;
+}
+
+OllamaActionResult apply_add_plate()
+{
+    OllamaActionResult result;
+    Plater* plater = wxGetApp().plater();
+    if (!plater) {
+        result.message = "Plater not available";
+        return result;
+    }
+    if (!plater->can_add_plate()) {
+        result.message = "Cannot add plate right now";
+        return result;
+    }
+    GLCanvas3D* canvas = view3d_canvas_for_object_ops(plater);
+    wxGLCanvas* wx_canvas = canvas ? canvas->get_wxglcanvas() : nullptr;
+    if (!wx_canvas) {
+        result.message = "3D view not available";
+        return result;
+    }
+    wxPostEvent(wx_canvas, SimpleEvent(EVT_GLTOOLBAR_ADD_PLATE));
+    result.success          = true;
+    result.effective_change = true;
+    result.message          = "Added plate";
+    return result;
+}
+
+OllamaActionResult apply_delete_plate()
+{
+    OllamaActionResult result;
+    Plater* plater = wxGetApp().plater();
+    if (!plater) {
+        result.message = "Plater not available";
+        return result;
+    }
+    if (!plater->can_delete_plate()) {
+        result.message = "Cannot delete plate right now";
+        return result;
+    }
+    GLCanvas3D* canvas = view3d_canvas_for_object_ops(plater);
+    wxGLCanvas* wx_canvas = canvas ? canvas->get_wxglcanvas() : nullptr;
+    if (!wx_canvas) {
+        result.message = "3D view not available";
+        return result;
+    }
+    wxPostEvent(wx_canvas, SimpleEvent(EVT_GLTOOLBAR_DEL_PLATE));
+    result.success          = true;
+    result.effective_change = true;
+    result.message          = "Deleted plate";
+    return result;
+}
+
+OllamaActionResult apply_select_plate(const nlohmann::json& action)
+{
+    OllamaActionResult result;
+    Plater* plater = wxGetApp().plater();
+    if (!plater) {
+        result.message = "Plater not available";
+        return result;
+    }
+    if (!action.contains("plate_index") || !action["plate_index"].is_number_integer()) {
+        result.message = "select_plate: missing plate_index";
+        return result;
+    }
+    const int idx = action["plate_index"].get<int>();
+    if (plater->select_plate(idx) != 0) {
+        result.message = "select_plate failed";
+        return result;
+    }
+    result.success          = true;
+    result.effective_change = true;
+    result.message          = "Selected plate " + std::to_string(idx);
+    return result;
+}
+
+OllamaActionResult apply_open_calibration()
+{
+    OllamaActionResult result;
+    MainFrame* mf = wxGetApp().mainframe;
+    if (!mf) {
+        result.message = "Main window not available";
+        return result;
+    }
+    if (mf->page_index_for(MainFrame::tpCalibration) == wxNOT_FOUND) {
+        result.message = "Calibration tab not available";
+        return result;
+    }
+    mf->select_tab(MainFrame::tpCalibration);
+    result.success          = true;
+    result.effective_change = true;
+    result.message          = "Opened calibration tab";
+    return result;
+}
+
+OllamaActionResult apply_select_preset(const nlohmann::json& action)
+{
+    OllamaActionResult result;
+    const std::string name = action.value("name", "");
+    if (name.empty()) {
+        result.message = "select_preset: missing name";
+        return result;
+    }
+    std::string preset_kind = action.value("preset", "print");
+    Preset::Type type       = Preset::TYPE_PRINT;
+    if (preset_kind == "filament")
+        type = Preset::TYPE_FILAMENT;
+    else if (preset_kind == "printer")
+        type = Preset::TYPE_PRINTER;
+    Tab* tab = wxGetApp().get_tab(type);
+    if (!tab) {
+        result.message = "Preset tab not available";
+        return result;
+    }
+    if (!tab->select_preset(name)) {
+        result.message = "Preset not found: " + name;
+        return result;
+    }
+    result.success          = true;
+    result.effective_change = true;
+    result.message          = "Selected " + preset_kind + " preset: " + name;
+    return result;
+}
+
 OllamaActionResult apply_save_project(const nlohmann::json& action)
 {
     OllamaActionResult result;
-    (void)action;
-    result.success = false;
-    result.message = "Blocked: file saving is disabled for AI control";
+    Plater* plater = wxGetApp().plater();
+    if (!plater) {
+        result.message = "Plater not available";
+        return result;
+    }
+    const bool save_as = action.value("save_as", false);
+    if (plater->save_project(save_as) != 0) {
+        result.message = "Save project failed or was cancelled";
+        return result;
+    }
+    result.success          = true;
+    result.effective_change = true;
+    result.message          = save_as ? "Saved project (Save As)" : "Saved project";
     return result;
 }
 
@@ -1157,6 +1352,23 @@ static void coerce_option_json(nlohmann::json& val, const std::string& key)
 static void augment_actions_from_user_text_impl(nlohmann::json& root, const std::string& user)
 {
     if (!root.contains("actions") || !root["actions"].is_array())
+        root["actions"] = nlohmann::json::array();
+
+    if (OllamaIntentContext::user_wants_faster_print(user)) {
+        bool has_set_config = false;
+        for (const auto& action : root["actions"]) {
+            if (action.is_object() && action.value("type", "") == "set_config") {
+                has_set_config = true;
+                break;
+            }
+        }
+        if (!has_set_config) {
+            root["actions"].push_back(
+                nlohmann::json{{"type", "set_config"}, {"preset", "print"}, {"options", nlohmann::json::object()}});
+        }
+    }
+
+    if (!root.contains("actions") || !root["actions"].is_array())
         return;
 
     DynamicPrintConfig* cfg = edited_config(Preset::TYPE_PRINT);
@@ -1233,7 +1445,35 @@ void OllamaActionExecutor::augment_actions_from_user_text(nlohmann::json& root, 
 {
     if (!ollama_keyword_inject_enabled())
         return;
+    boost_actions_from_user_text(root, user_request);
+}
+
+void OllamaActionExecutor::boost_actions_from_user_text(nlohmann::json& root, const std::string& user_request)
+{
     augment_actions_from_user_text_impl(root, user_request);
+    if (OllamaResponseNormalizer::has_viable_set_config(root))
+        return;
+
+    nlohmann::json opts = nlohmann::json::object();
+    OllamaIntentContext::refine_set_config_options(opts, user_request);
+    for (const std::string& key : OllamaSettingAliases::keys_from_symptoms(user_request)) {
+        if (opts.contains(key))
+            continue;
+        if (key == "enable_support") {
+            opts[key] = true;
+            opts["support_type"] = "tree(auto)";
+        } else if (key == "ironing_type")
+            opts[key] = "top";
+        else if (key == "brim_type")
+            opts[key] = "outer_only";
+    }
+    if (opts.empty())
+        return;
+
+    if (!root.contains("actions") || !root["actions"].is_array())
+        root["actions"] = nlohmann::json::array();
+    root["actions"].push_back(
+        {{"type", "set_config"}, {"preset", "print"}, {"options", std::move(opts)}});
 }
 
 void OllamaActionExecutor::augment_geometry_object_targets(nlohmann::json& root, const std::string& user_request)
@@ -1634,6 +1874,8 @@ std::string OllamaActionExecutor::build_diagnostic_user_message(const std::strin
     nlohmann::json ctx = build_context_object(/*compact*/ true);
     ctx["setting_index"] = OllamaSettingRegistry::build_setting_index(3);
     ctx["pro_tips"]      = OllamaPrintingTips::tips_for_request(user_request, ko);
+    ctx["suggested_candidate_keys"] =
+        OllamaSettingSearch::candidate_keys_for_request(user_request, 2, 10);
     std::string body     = ctx.dump(2);
     std::string packed =
         std::string("Pipeline step 1 — problem diagnosis.\n\nCurrent slicer context (JSON):\n") + body
@@ -1800,10 +2042,18 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
         }
 
         OllamaActionResult result;
-        if (type == "set_config")
+        if (type == "get_state")
+            result = apply_get_state(action);
+        else if (type == "list_objects")
+            result = apply_list_objects(action);
+        else if (type == "select_object")
+            result = apply_select_object(action);
+        else if (type == "set_config")
             result = apply_set_config(action);
         else if (type == "ui_select_tab")
             result = apply_ui_select_tab(action);
+        else if (type == "open_calibration")
+            result = apply_open_calibration();
         else if (type == "delete_selection")
             result = apply_delete_selection();
         else if (type == "clone_selection")
@@ -1812,13 +2062,21 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
             result = apply_arrange();
         else if (type == "save_project")
             result = apply_save_project(action);
+        else if (type == "add_plate")
+            result = apply_add_plate();
+        else if (type == "delete_plate")
+            result = apply_delete_plate();
+        else if (type == "select_plate")
+            result = apply_select_plate(action);
+        else if (type == "select_preset")
+            result = apply_select_preset(action);
         else if (type == "add_model")
             result = apply_add_model(action);
         else if (type == "menu_item")
             result = apply_menu_item(action);
         else if (type == "translate" || type == "rotate" || type == "scale")
             result = apply_transform(action, type.c_str());
-        else if (type == "open_smart_print" || type == "open_setup" || type == "send_print"
+        else if (type == "open_smart_print" || type == "run_smart_print" || type == "open_setup" || type == "send_print"
                  || type == "export_gcode" || type == "rollback_apply")
             result = OllamaUserFlow::apply_flow_action(action, wxGetApp().plater());
         else

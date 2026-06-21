@@ -2,7 +2,12 @@
 #define slic3r_OllamaActionPipeline_hpp_
 
 #include "OllamaActionValidator.hpp"
+#include "OllamaExecutionPolicy.hpp"
 #include "OllamaResponseNormalizer.hpp"
+
+#include "OllamaActionExecutor.hpp"
+
+#include <wx/window.h>
 
 #include <nlohmann/json.hpp>
 
@@ -35,6 +40,10 @@ public:
     /** Rule-only recovery when LLM JSON parse fails. */
     static nlohmann::json build_rule_only_root(const std::string& user_request, bool include_makerworld = true);
 
+    /** Symptom/heuristic fallback (always runs planner + normalize; not gated by OLLAMA_RULE_ONLY). */
+    static nlohmann::json build_symptom_fallback_root(const std::string& user_request,
+                                                      bool include_makerworld = true);
+
     /** Salvage plain-text settings and/or infer actions from user intent after parse failure. */
     static nlohmann::json build_recovery_root(const std::string& assistant_text, const std::string& user_request,
                                               bool include_makerworld = true);
@@ -48,6 +57,11 @@ public:
     /** Same normalize/sanitize/dedupe path as apply; returns false if no executable actions remain. */
     static bool prepare_apply_root(nlohmann::json& root, const std::string& user_request,
                                    bool include_makerworld = false);
+
+    /** Rule/symptom fallback apply (no LLM). Returns true when at least one action succeeded. */
+    static bool try_symptom_fallback_apply(const std::string& user_request, wxWindow* parent,
+                                           OllamaExecutionPolicy policy,
+                                           std::vector<OllamaActionResult>* results = nullptr);
 };
 
 }} // namespace

@@ -61,6 +61,9 @@ public:
     /** Fill/coerce set_config values using live preset + relative phrases in user text. */
     static void augment_actions_from_user_text(nlohmann::json& root, const std::string& user_request);
 
+    /** Always-on apply pipeline boost (symptom rules + relative infill/layer phrases). */
+    static void boost_actions_from_user_text(nlohmann::json& root, const std::string& user_request);
+
     /** Attach object_id to geometry actions when the target object is unambiguous. */
     static void augment_geometry_object_targets(nlohmann::json& root, const std::string& user_request);
 

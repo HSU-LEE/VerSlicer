@@ -110,12 +110,36 @@ bool OllamaIntentContext::user_wants_warp_relief(const std::string& user)
            user.find("코너") != std::string::npos || user.find("corner") != std::string::npos;
 }
 
+bool OllamaIntentContext::user_complains_print_too_slow(const std::string& user)
+{
+    return user.find("느려") != std::string::npos || user.find("느리") != std::string::npos ||
+           user.find("too slow") != std::string::npos || user.find("속도가") != std::string::npos ||
+           user.find("속도가 너무") != std::string::npos ||
+           (user.find("slow") != std::string::npos && user.find("print") != std::string::npos);
+}
+
+bool OllamaIntentContext::user_wants_faster_print(const std::string& user)
+{
+    if (user_complains_print_too_slow(user))
+        return true;
+    return user.find("빨리") != std::string::npos || user.find("빠르") != std::string::npos ||
+           user.find("속도를") != std::string::npos || user.find("속도 좀") != std::string::npos ||
+           (user.find("올려") != std::string::npos && user.find("속도") != std::string::npos) ||
+           user.find("speed up") != std::string::npos || user.find("faster") != std::string::npos ||
+           user.find("print faster") != std::string::npos;
+}
+
 bool OllamaIntentContext::user_wants_stringing_relief(const std::string& user)
 {
+    if (user_complains_print_too_slow(user) || user_wants_faster_print(user))
+        return false;
     return user.find("stringing") != std::string::npos || user.find("string") != std::string::npos ||
-           user.find("실") != std::string::npos || user.find("실같") != std::string::npos ||
-           user.find("거미") != std::string::npos ||
-           user.find("spider") != std::string::npos || user.find("ooze") != std::string::npos;
+           user.find("실같") != std::string::npos || user.find("거미") != std::string::npos ||
+           user.find("실이") != std::string::npos ||
+           user.find("spider") != std::string::npos || user.find("ooze") != std::string::npos ||
+           (user.find("실") != std::string::npos &&
+            (user.find("질질") != std::string::npos || user.find("끈") != std::string::npos ||
+             user.find("늘어") != std::string::npos));
 }
 
 double OllamaIntentContext::recommended_retraction_for_stringing()
@@ -316,6 +340,22 @@ void OllamaIntentContext::refine_set_config_options(nlohmann::json& options, con
 
     if (user_wants_stringing_relief(user_request) && !options.contains("retraction_length"))
         options["retraction_length"] = recommended_retraction_for_stringing();
+
+    if (user_wants_faster_print(user_request)) {
+        if (auto* bundle = wxGetApp().preset_bundle) {
+            const DynamicPrintConfig& cfg = bundle->prints.get_edited_preset().config;
+            auto bump_speed = [&](const char* key) {
+                if (options.contains(key) || !cfg.has(key))
+                    return;
+                const double cur = cfg.opt_float(key);
+                if (cur <= 0.0)
+                    return;
+                options[key] = std::min(500.0, std::round(cur * 1.15 / 5.0) * 5.0);
+            };
+            bump_speed("outer_wall_speed");
+            bump_speed("sparse_infill_speed");
+        }
+    }
 
     if (user_wants_top_surface_quality(user_request)) {
         if (!options.contains("ironing_type"))

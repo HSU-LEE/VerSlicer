@@ -2,7 +2,9 @@
 #include "OllamaActionJsonExtract.hpp"
 #include "OllamaActionPipelineCore.hpp"
 #include "OllamaActionRegistry.hpp"
+#include "OllamaActionExecutor.hpp"
 #include "OllamaActionValidator.hpp"
+#include "OllamaActionWorkflow.hpp"
 #include "OllamaConfig.hpp"
 #include "OllamaResponseNormalizer.hpp"
 
@@ -99,6 +101,8 @@ OllamaPipelineResult OllamaActionPipeline::process_actions(nlohmann::json& root,
 {
     OllamaPipelineResult result;
     if (opt.apply_mode) {
+        OllamaResponseNormalizer::reconcile_speed_intent_actions(root, opt.user_request);
+        OllamaActionExecutor::boost_actions_from_user_text(root, opt.user_request);
         if (!OllamaResponseNormalizer::has_viable_set_config(root))
             merge_planner_if_no_llm_config(root, opt.user_request);
         result.normalized = OllamaResponseNormalizer::normalize(root, opt.user_request, opt.include_makerworld);
@@ -115,10 +119,24 @@ OllamaPipelineResult OllamaActionPipeline::process_actions(nlohmann::json& root,
     return result;
 }
 
+nlohmann::json OllamaActionPipeline::build_symptom_fallback_root(const std::string& user_request,
+                                                                 bool include_makerworld)
+{
+    nlohmann::json root = nlohmann::json::object();
+    root["message"]     = "Applying suggested fixes from your request.";
+    root["actions"]     = nlohmann::json::array();
+    OllamaPipelineOptions opt;
+    opt.apply_mode         = true;
+    opt.include_makerworld = include_makerworld;
+    opt.user_request       = user_request;
+    process_actions(root, opt);
+    return root;
+}
+
 nlohmann::json OllamaActionPipeline::build_rule_only_root(const std::string& user_request, bool include_makerworld)
 {
     if (!ollama_rule_only_fallback_enabled())
-        return nlohmann::json{{"message", "Could not parse model reply."}, {"actions", nlohmann::json::array()}};
+        return build_symptom_fallback_root(user_request, include_makerworld);
     nlohmann::json root = nlohmann::json::object();
     root["message"]     = "Applying suggested fixes from your request.";
     root["actions"]     = nlohmann::json::array();
@@ -159,6 +177,26 @@ bool OllamaActionPipeline::prepare_apply_root(nlohmann::json& root, const std::s
     opt.user_request       = user_request;
     process_actions(root, opt);
     return root.contains("actions") && root["actions"].is_array() && !root["actions"].empty();
+}
+
+bool OllamaActionPipeline::try_symptom_fallback_apply(const std::string& user_request, wxWindow* parent,
+                                                      OllamaExecutionPolicy policy,
+                                                      std::vector<OllamaActionResult>* results)
+{
+    nlohmann::json root = build_symptom_fallback_root(user_request, true);
+    if (!root.contains("actions") || !root["actions"].is_array() || root["actions"].empty())
+        return false;
+
+    const OllamaWorkflowRun workflow = OllamaActionWorkflow::execute_with_policy(root, parent, policy);
+    if (results)
+        *results = workflow.results;
+    if (workflow.cancelled || workflow.preview_only)
+        return false;
+    for (const auto& r : workflow.results) {
+        if (r.success && r.effective_change)
+            return true;
+    }
+    return false;
 }
 
 }} // namespace

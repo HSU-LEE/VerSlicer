@@ -24,6 +24,9 @@ public:
 
     /** True when actions contain set_config with at least one allowed option key. */
     static bool has_viable_set_config(const nlohmann::json& root);
+
+    /** Drop stringing misreads and ensure print-speed options when the user wants faster printing. */
+    static void reconcile_speed_intent_actions(nlohmann::json& root, const std::string& user_request);
 };
 
 }} // namespace

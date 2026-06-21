@@ -20,7 +20,7 @@ static nlohmann::json set_config_action(const std::string& key, const nlohmann::
 {
     nlohmann::json options = nlohmann::json::object({{key, value}});
     if (key == "enable_support" && value.is_boolean() && value.get<bool>())
-        options["support_type"] = "normal(auto)";
+        options["support_type"] = "tree(auto)";
     return nlohmann::json{
         {"type", "set_config"},
         {"preset", "print"},
@@ -79,6 +79,16 @@ static void apply_goal_patches(DynamicPrintConfig& cfg, const PrintGoal& goal, c
             if (infill.empty() || infill == "25%" || infill == "30%" || infill == "35%" || infill == "40%")
                 set_opt(cfg, "sparse_infill_density", "15%");
         }
+        if (cfg.has("outer_wall_speed")) {
+            const double cur = cfg.opt_float("outer_wall_speed");
+            if (cur > 0.0)
+                set_opt(cfg, "outer_wall_speed", std::min(500.0, std::round(cur * 1.15 / 5.0) * 5.0));
+        }
+        if (cfg.has("sparse_infill_speed")) {
+            const double cur = cfg.opt_float("sparse_infill_speed");
+            if (cur > 0.0)
+                set_opt(cfg, "sparse_infill_speed", std::min(500.0, std::round(cur * 1.15 / 5.0) * 5.0));
+        }
     }
 
     if (wants_cosmetic && !wants_fast) {
@@ -102,8 +112,11 @@ static void apply_goal_patches(DynamicPrintConfig& cfg, const PrintGoal& goal, c
     }
 
     const double oh = mesh.overhang_face_ratio > 0 ? mesh.overhang_face_ratio : mesh.overhang_ratio;
-    if ((wants_overhang || oh >= 0.15) && cfg.has("enable_support"))
+    if ((wants_overhang || oh >= 0.15) && cfg.has("enable_support")) {
         set_opt(cfg, "enable_support", true);
+        if (cfg.has("support_type"))
+            set_opt(cfg, "support_type", std::string("tree(auto)"));
+    }
 }
 
 static std::string action_key(const nlohmann::json& action)

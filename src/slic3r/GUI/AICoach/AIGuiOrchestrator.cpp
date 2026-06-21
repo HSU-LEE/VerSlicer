@@ -4,6 +4,10 @@
 #include "AICoachController.hpp"
 #include "AICoachRulesEngine.hpp"
 
+#include "../OllamaAssistant/OllamaAgentEventBus.hpp"
+
+#include "../OllamaAssistant/OllamaActionPipeline.hpp"
+
 #include "../BambuSmartPrint/PrintPlannerGui.hpp"
 
 #include "../GLCanvas3D.hpp"
@@ -12,7 +16,20 @@
 #include "../GUI_App.hpp"
 #include "../Plater.hpp"
 
+#include <wx/app.h>
+
 namespace Slic3r { namespace GUI {
+
+namespace {
+
+bool can_publish_agent_events()
+{
+    if (!wxTheApp)
+        return false;
+    return wxGetApp().initialized() && !wxGetApp().is_closing();
+}
+
+} // namespace
 
 AIGuiOrchestrator& AIGuiOrchestrator::instance()
 {
@@ -74,11 +91,27 @@ bool AIGuiOrchestrator::should_enqueue_beginner_tour() const
 
 void AIGuiOrchestrator::on_model_loaded(Plater* plater)
 {
+    if (can_publish_agent_events())
+        OllamaAgentEventBus::instance().publish(OllamaAgentEventKind::ModelLoaded);
     PrintPlannerGui::dispatch_model_loaded(plater);
 }
 
 void AIGuiOrchestrator::on_slice_completed(Plater* plater, const Print* print, bool success)
 {
+    if (can_publish_agent_events()) {
+        nlohmann::json payload = {{"success", success}};
+        if (!success) {
+            const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+            payload["summary"] =
+                ko ? "슬라이싱에 실패했습니다. 모델 배치, 서포트, 벽 두께를 확인해 보세요."
+                   : "Slicing failed. Check model placement, supports, and wall settings.";
+            nlohmann::json apply_root = OllamaActionPipeline::build_symptom_fallback_root(
+                ko ? "슬라이싱 실패 서포트 브림" : "slicing failed support brim", false);
+            if (apply_root.contains("actions") && apply_root["actions"].is_array() && !apply_root["actions"].empty())
+                payload["apply_root"] = std::move(apply_root);
+        }
+        OllamaAgentEventBus::instance().publish(OllamaAgentEventKind::SliceDone, std::move(payload));
+    }
     if (!plater || !success || !AICoachController::is_enabled_for_current_mode()) {
         AICoachController::instance().on_slice_completed(plater, print, success);
         return;
@@ -121,6 +154,14 @@ void AIGuiOrchestrator::on_chat_apply_end(bool applied, const nlohmann::json& ro
         wxGetApp().set_show_gcode_window(false);
         if (!root.empty() && dedup_source && dedup_source[0] != '\0')
             AICoachApplyDedup::instance().record_applied_root(root, dedup_source);
+        if (root.contains("actions") && root["actions"].is_array()) {
+            for (const auto& a : root["actions"]) {
+                if (can_publish_agent_events() && a.is_object() && a.value("type", "") == "set_config"
+                    && a.contains("options"))
+                    OllamaAgentEventBus::instance().publish(OllamaAgentEventKind::ConfigApplied,
+                                                             {{"options", a["options"]}});
+            }
+        }
     }
     flush_deferred_coach_cards();
 }

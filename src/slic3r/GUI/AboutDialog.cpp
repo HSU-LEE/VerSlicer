@@ -9,6 +9,10 @@
 #include "MainFrame.hpp"
 #include "format.hpp"
 #include "Widgets/Button.hpp"
+#include "Widgets/HyperLink.hpp"
+#include "Widgets/Label.hpp"
+#include "Widgets/StateColor.hpp"
+#include "BambuSmartPrint/BambuSmartPrintUi.hpp"
 
 #include <wx/clipbrd.h>
 
@@ -209,161 +213,148 @@ void CopyrightsDialog::onCloseDialog(wxEvent &)
 }
 
 AboutDialog::AboutDialog()
-    : DPIDialog(static_cast<wxWindow *>(wxGetApp().mainframe),wxID_ANY,from_u8((boost::format(_utf8(L("About %s"))) % (wxGetApp().is_editor() ? SLIC3R_APP_FULL_NAME : GCODEVIEWER_APP_NAME)).str()),wxDefaultPosition,
-        wxDefaultSize, /*wxCAPTION*/wxDEFAULT_DIALOG_STYLE)
+    : DPIDialog(static_cast<wxWindow *>(wxGetApp().mainframe), wxID_ANY,
+                from_u8((boost::format(_utf8(L("About %s")))
+                         % (wxGetApp().is_editor() ? SLIC3R_APP_FULL_NAME : GCODEVIEWER_APP_NAME))
+                            .str()),
+                wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE)
 {
+    using namespace SlicePilotUi;
+
     SetFont(wxGetApp().normal_font());
-	SetBackgroundColour(*wxWHITE);
+    apply_dialog_chrome(this);
 
-    wxPanel* m_panel = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(560), FromDIP(125)), wxTAB_TRAVERSAL);
+    const wxColour header_bg = StateColor::darkModeColorFor(wxColour(38, 46, 48));
+    const wxColour body_bg   = StateColor::darkModeColorFor(wxColour(248, 248, 248));
+    const wxColour title_fg  = StateColor::darkModeColorFor(wxColour(248, 250, 252));
+    const wxColour muted_fg  = Theme::text_muted();
+    const wxColour body_fg   = Theme::text();
 
-    wxBoxSizer *panel_versizer = new wxBoxSizer(wxVERTICAL);
-    wxBoxSizer *vesizer  = new wxBoxSizer(wxVERTICAL);
+    auto* main_sizer = new wxBoxSizer(wxVERTICAL);
 
-    m_panel->SetSizer(panel_versizer);
+    // Hero: logo + product name / version
+    auto* header_panel = new wxPanel(this, wxID_ANY);
+    header_panel->SetBackgroundColour(header_bg);
+    auto* header_row = new wxBoxSizer(wxHORIZONTAL);
 
-    wxBoxSizer *ver_sizer = new wxBoxSizer(wxVERTICAL);
+    const bool is_dark = wxGetApp().app_config->get("dark_color_mode") == "1";
+    m_logo_bitmap     = ScalableBitmap(this, is_dark ? "Verslicer_about_dark" : "Verslicer_about", 108);
+    m_logo            = new wxStaticBitmap(header_panel, wxID_ANY, m_logo_bitmap.bmp());
+    header_row->Add(m_logo, 0, wxALL | wxALIGN_CENTER_VERTICAL, FromDIP(24));
 
-	auto main_sizer = new wxBoxSizer(wxVERTICAL);
-    main_sizer->Add(m_panel, 1, wxEXPAND | wxALL, 0);
-    main_sizer->Add(ver_sizer, 0, wxEXPAND | wxALL, 0);
+    auto* title_col = new wxBoxSizer(wxVERTICAL);
+    title_col->AddStretchSpacer();
 
-	bool is_dark = wxGetApp().app_config->get("dark_color_mode") == "1";
+    auto* app_name = new wxStaticText(header_panel, wxID_ANY, SLIC3R_APP_FULL_NAME);
+    wxFont name_font = Label::Head_24;
+    app_name->SetFont(name_font);
+    app_name->SetForegroundColour(title_fg);
+    app_name->SetBackgroundColour(header_bg);
+    title_col->Add(app_name, 0, wxALIGN_RIGHT);
 
-    // logo
-    m_logo_bitmap = ScalableBitmap(this, is_dark ? "Verslicer_about_dark" : "Verslicer_about", 125);
-    m_logo = new wxStaticBitmap(this, wxID_ANY, m_logo_bitmap.bmp(), wxDefaultPosition,wxDefaultSize, 0);
-    m_logo->SetSizer(vesizer);
+    title_col->AddSpacer(FromDIP(4));
 
-    panel_versizer->Add(m_logo, 1, wxALL | wxEXPAND, 0);
+    auto* version = new wxStaticText(header_panel, wxID_ANY, SoftFever_VERSION);
+    version->SetFont(Label::Head_18);
+    version->SetForegroundColour(Theme::primary());
+    version->SetBackgroundColour(header_bg);
+    title_col->Add(version, 0, wxALIGN_RIGHT);
 
-    // version
-    {
+    title_col->AddSpacer(FromDIP(2));
 
-        auto _build_string_font = Label::Body_12;
-        // _build_string_font.SetStyle(wxFONTSTYLE_ITALIC);
+    auto* build_label = new wxStaticText(
+        header_panel, wxID_ANY,
+        wxString::Format(_L("Build %s"), wxString::FromUTF8(GIT_COMMIT_HASH)));
+    build_label->SetFont(Label::Body_11);
+    build_label->SetForegroundColour(muted_fg);
+    build_label->SetBackgroundColour(header_bg);
+    title_col->Add(build_label, 0, wxALIGN_RIGHT);
 
-        vesizer->Add(0, 0, 1, wxEXPAND, FromDIP(5));
-        wxStaticText* app_name = new wxStaticText(this, wxID_ANY, SLIC3R_APP_FULL_NAME, wxDefaultPosition, wxDefaultSize);
-        wxFont app_name_font = GetFont();
-        app_name_font = app_name_font.Scaled(2.2f);
-        app_name->SetFont(app_name_font);
-        app_name->SetForegroundColour(wxColour(38, 46, 48));
-        app_name->SetBackgroundColour(wxColour("#FFFFFF"));
+    title_col->AddStretchSpacer();
+    header_row->Add(title_col, 1, wxEXPAND | wxRIGHT | wxTOP | wxBOTTOM, FromDIP(24));
+    header_panel->SetSizer(header_row);
+    header_panel->SetMinSize(wxSize(FromDIP(560), FromDIP(148)));
+    main_sizer->Add(header_panel, 0, wxEXPAND);
 
-        auto          version_string = std::string(SoftFever_VERSION);
-        wxStaticText* version = new wxStaticText(this, wxID_ANY, version_string.c_str(), wxDefaultPosition, wxDefaultSize);
-        wxStaticText* credits_string = new wxStaticText(this, wxID_ANY, wxString::Format("Build %s", std::string(GIT_COMMIT_HASH)), wxDefaultPosition, wxDefaultSize);
-        credits_string->SetFont(_build_string_font);
-        wxFont version_font = GetFont();
-        version_font = version_font.Scaled(1.85f); // SetPointSize(20) not works on macOS because it uses a 72 PPI reference
-        version->SetFont(version_font);
-        version->SetForegroundColour(wxColour("#949494"));
-        credits_string->SetForegroundColour(wxColour("#949494"));
-        version->SetBackgroundColour(wxColour("#FFFFFF"));
-        credits_string->SetBackgroundColour(wxColour("#FFFFFF"));
+    auto* divider = new wxStaticLine(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_HORIZONTAL);
+    divider->SetBackgroundColour(Theme::border());
+    main_sizer->Add(divider, 0, wxEXPAND);
 
-        vesizer->Add(app_name, 0, wxRIGHT | wxALIGN_RIGHT, FromDIP(20));
-        vesizer->AddSpacer(FromDIP(4));
-        vesizer->Add(version, 0, wxRIGHT | wxALIGN_RIGHT, FromDIP(20));
-        vesizer->AddSpacer(FromDIP(5));
-        vesizer->Add(credits_string, 0, wxRIGHT | wxALIGN_RIGHT, FromDIP(20));
-        vesizer->Add(0, 0, 1, wxEXPAND, FromDIP(5));
-    }
+    // Body copy
+    auto* body_panel = new wxPanel(this, wxID_ANY);
+    body_panel->SetBackgroundColour(body_bg);
+    auto* body_sizer = new wxBoxSizer(wxVERTICAL);
+    body_sizer->AddSpacer(FromDIP(20));
 
-    wxBoxSizer *text_sizer_horiz = new wxBoxSizer(wxHORIZONTAL);
-    wxBoxSizer *text_sizer = new wxBoxSizer(wxVERTICAL);
-    text_sizer_horiz->Add( 0, 0, 0, wxLEFT, FromDIP(20));
+    auto add_body_line = [&](const wxString& text, const wxFont& font, const wxColour& fg) {
+        auto* line = new wxStaticText(body_panel, wxID_ANY, text, wxDefaultPosition,
+                                      wxSize(FromDIP(520), -1), wxALIGN_LEFT);
+        line->SetFont(font);
+        line->SetForegroundColour(fg);
+        line->SetBackgroundColour(body_bg);
+        line->Wrap(FromDIP(520));
+        body_sizer->Add(line, 0, wxLEFT | wxRIGHT | wxBOTTOM, FromDIP(20));
+    };
 
-    std::vector<wxString> text_list;
-    text_list.push_back(wxString::Format(_L("%s: Bambu Lab focused workflow with Smart Print assistance — suggested settings, failure learning, and streamlined slicing."), SLIC3R_APP_FULL_NAME));
-    text_list.push_back(_L("Smart Print keeps data on this PC unless you sign in for printer sync."));
+    add_body_line(
+        wxString::Format(
+            _L("%s is a Bambu Lab–focused slicer with Smart Print assistance — suggested settings, failure learning, and streamlined slicing."),
+            SLIC3R_APP_FULL_NAME),
+        Label::Body_13, body_fg);
+    add_body_line(_L("Smart Print keeps data on this PC unless you sign in for printer sync."),
+                  Label::Body_12, muted_fg);
 
-    text_sizer->Add( 0, 0, 0, wxTOP, FromDIP(33));
-    bool is_zh = wxGetApp().app_config->get("language") == "zh_CN";
-    for (int i = 0; i < text_list.size(); i++)
-    {
-        auto staticText = new wxStaticText( this, wxID_ANY, wxEmptyString,wxDefaultPosition,wxSize(FromDIP(520), -1), wxALIGN_LEFT );
-        staticText->SetForegroundColour(wxColour(100, 116, 139));
-        staticText->SetBackgroundColour(*wxWHITE);
-        staticText->SetMinSize(wxSize(FromDIP(520), -1));
-        staticText->SetFont(Label::Body_12);
-        if (is_zh) {
-            wxString find_txt = "";
-            wxString count_txt = "";
-            for (auto  o = 0; o < text_list[i].length(); o++) {
-                auto size = staticText->GetTextExtent(count_txt);
-                if (size.x < FromDIP(506)) {
-                    find_txt += text_list[i][o];
-                    count_txt += text_list[i][o];
-                } else {
-                    find_txt += "\n";
-                    find_txt += text_list[i][o];
-                    count_txt = text_list[i][o];
-                }
-            }
-            staticText->SetLabel(find_txt);
-        } else {
-            staticText->SetLabel(text_list[i]);
-            staticText->Wrap(FromDIP(520));
-        }
+    body_panel->SetSizer(body_sizer);
+    main_sizer->Add(body_panel, 0, wxEXPAND);
+    main_sizer->AddSpacer(FromDIP(8));
 
-        text_sizer->Add( staticText, 0, wxUP | wxDOWN, FromDIP(3));
-    }
+    // Footer: copyright, links, license
+    auto* footer_panel = new wxPanel(this, wxID_ANY);
+    footer_panel->SetBackgroundColour(body_bg);
+    auto* footer_row = new wxBoxSizer(wxHORIZONTAL);
 
-    text_sizer_horiz->Add(text_sizer, 1, wxALL,0);
-    ver_sizer->Add(text_sizer_horiz, 0, wxALL,0);
-    ver_sizer->Add( 0, 0, 0, wxTOP, FromDIP(43));
+    auto* footer_left = new wxBoxSizer(wxVERTICAL);
+    auto* copyright = new wxStaticText(
+        footer_panel, wxID_ANY,
+        wxString::Format(_L("Copyright © 2026 %s"), SLIC3R_APP_FULL_NAME));
+    copyright->SetFont(Label::Body_11);
+    copyright->SetForegroundColour(muted_fg);
+    copyright->SetBackgroundColour(body_bg);
+    footer_left->Add(copyright, 0, wxBOTTOM, FromDIP(4));
 
-    wxBoxSizer *copyright_ver_sizer = new wxBoxSizer(wxVERTICAL);
-    wxBoxSizer *copyright_hor_sizer = new wxBoxSizer(wxHORIZONTAL);
+    auto* links_row = new wxBoxSizer(wxHORIZONTAL);
+    m_github_link   = new HyperLink(footer_panel, _L("GitHub"), "https://github.com/HSU-LEE/VerSlicer");
+    m_github_link->SetFont(Label::Body_12);
+    m_github_link->SetBackgroundColour(body_bg);
+    links_row->Add(m_github_link, 0, wxALIGN_CENTER_VERTICAL);
 
-    copyright_hor_sizer->Add(copyright_ver_sizer, 0, wxLEFT, FromDIP(20));
+    links_row->AddSpacer(FromDIP(12));
+    auto* sep = new wxStaticText(footer_panel, wxID_ANY, wxS("·"));
+    sep->SetForegroundColour(muted_fg);
+    sep->SetBackgroundColour(body_bg);
+    links_row->Add(sep, 0, wxALIGN_CENTER_VERTICAL);
+    links_row->AddSpacer(FromDIP(12));
 
-    wxStaticText *html_text = new wxStaticText(this, wxID_ANY,
-        wxString::Format("Copyright (C) 2026 %s", SLIC3R_APP_FULL_NAME),
-        wxDefaultPosition, wxDefaultSize);
-    html_text->SetForegroundColour(wxColour(107, 107, 107));
+    auto* site_link = new HyperLink(footer_panel, _L("Releases"), "https://github.com/HSU-LEE/VerSlicer/releases");
+    site_link->SetFont(Label::Body_12);
+    site_link->SetBackgroundColour(body_bg);
+    links_row->Add(site_link, 0, wxALIGN_CENTER_VERTICAL);
 
-    copyright_ver_sizer->Add(html_text, 0, wxALL , 0);
+    footer_left->Add(links_row, 0);
+    footer_row->Add(footer_left, 1, wxLEFT | wxBOTTOM, FromDIP(20));
 
-    m_html = new wxHtmlWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHW_SCROLLBAR_NEVER /*NEVER*/);
-      {
-          wxFont font = get_default_font(this);
-          const int fs = font.GetPointSize()-1;
-          int size[] = {fs,fs,fs,fs,fs,fs,fs};
-          m_html->SetFonts(font.GetFaceName(), font.GetFaceName(), size);
-          m_html->SetMinSize(wxSize(FromDIP(-1), FromDIP(16)));
-          m_html->SetBorders(2);
-          const auto text = from_u8(
-              (boost::format(
-              "<html>"
-              "<body>"
-              "<p style=\"text-align:left\"><a style=\"color:#1A73E8\" href=\"https://\">Verslicer</a></p>"
-              "</body>"
-              "</html>")
-            ).str());
-          m_html->SetPage(text);
-          copyright_ver_sizer->Add(m_html, 0, wxEXPAND, 0);
-          m_html->Bind(wxEVT_HTML_LINK_CLICKED, &AboutDialog::onLinkClicked, this);
-      }
-    //Add "Portions copyright" button
-    Button* button_portions = new Button(this,_L("Portions copyright"));
-    button_portions->SetStyle(ButtonStyle::Regular, ButtonType::Window);
+    auto* license_btn = new Button(footer_panel, _L("License Info"));
+    license_btn->SetStyle(ButtonStyle::Regular, ButtonType::Window);
+    footer_row->Add(license_btn, 0, wxRIGHT | wxALIGN_BOTTOM, FromDIP(20));
 
-    wxBoxSizer *copyright_button_ver = new wxBoxSizer(wxVERTICAL);
-    copyright_button_ver->Add( 0, 0, 0, wxTOP, FromDIP(10));
-    copyright_button_ver->Add(button_portions, 0, wxALL,0);
+    footer_panel->SetSizer(footer_row);
+    main_sizer->Add(footer_panel, 0, wxEXPAND);
+    main_sizer->AddSpacer(FromDIP(20));
 
-    copyright_hor_sizer->AddStretchSpacer();
-    copyright_hor_sizer->Add(copyright_button_ver, 0, wxRIGHT, FromDIP(20));
-
-    ver_sizer->Add(copyright_hor_sizer, 0, wxEXPAND ,0);
-    ver_sizer->Add( 0, 0, 0, wxTOP, FromDIP(30));
-    button_portions->Bind(wxEVT_BUTTON, &AboutDialog::onCopyrightBtn, this);
+    license_btn->Bind(wxEVT_BUTTON, &AboutDialog::onCopyrightBtn, this);
 
     wxGetApp().UpdateDlgDarkUI(this);
-	SetSizer(main_sizer);
+    SetSizer(main_sizer);
     Layout();
     Fit();
     CenterOnParent();
@@ -374,20 +365,13 @@ void AboutDialog::on_dpi_changed(const wxRect &suggested_rect)
     m_logo_bitmap.msw_rescale();
     m_logo->SetBitmap(m_logo_bitmap.bmp());
 
-    const wxFont& font = GetFont();
-    const int fs = font.GetPointSize() - 1;
-    int font_size[] = { fs, fs, fs, fs, fs, fs, fs };
-    m_html->SetFonts(font.GetFaceName(), font.GetFaceName(), font_size);
+    if (m_github_link)
+        m_github_link->SetFont(Label::Body_12);
 
     const int& em = em_unit();
-
     msw_buttons_rescale(this, em, { wxID_CLOSE, m_copy_rights_btn_id });
 
-    m_html->SetMinSize(wxSize(-1, 16 * em));
-    m_html->Refresh();
-
     const wxSize& size = wxSize(65 * em, 30 * em);
-
     SetMinSize(size);
     Fit();
     Refresh();

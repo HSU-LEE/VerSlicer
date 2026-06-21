@@ -3,6 +3,7 @@
 
 #include "OllamaActionExecutor.hpp"
 
+#include "OllamaExecutionPolicy.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
 #include <nlohmann/json.hpp>
@@ -24,6 +25,9 @@ class OllamaActionWorkflow
 public:
     static bool            has_executable_actions(const nlohmann::json& root);
     static OllamaWorkflowRun confirm_and_execute(const nlohmann::json& root, wxWindow* parent);
+    /** Apply with unified execution policy (Assist / Agent / Coach). */
+    static OllamaWorkflowRun execute_with_policy(const nlohmann::json& root, wxWindow* parent,
+                                                 OllamaExecutionPolicy policy);
     /** Apply without modal dialog (AI Coach inline buttons). */
     static OllamaWorkflowRun execute_inline(const nlohmann::json& root, wxWindow* parent);
 

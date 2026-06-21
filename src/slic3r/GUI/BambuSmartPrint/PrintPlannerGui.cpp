@@ -29,7 +29,7 @@ nlohmann::json set_config_action(const std::string& key, const nlohmann::json& v
 {
     nlohmann::json options = nlohmann::json::object({{key, value}});
     if (key == "enable_support" && value.is_boolean() && value.get<bool>())
-        options["support_type"] = "normal(auto)";
+        options["support_type"] = "tree(auto)";
     return nlohmann::json{
         {"type", "set_config"},
         {"preset", "print"},

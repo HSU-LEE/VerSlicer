@@ -7,6 +7,7 @@
 
 #include "GUI_Utils.hpp"
 #include "wxExtensions.hpp"
+#include "Widgets/HyperLink.hpp"
 
 namespace Slic3r { 
 namespace GUI {
@@ -57,7 +58,7 @@ private:
 class AboutDialog : public DPIDialog
 {
     ScalableBitmap  m_logo_bitmap;
-    wxHtmlWindow*   m_html;
+    HyperLink*      m_github_link{nullptr};
     wxStaticBitmap* m_logo;
     int             m_copy_rights_btn_id { wxID_ANY };
     int             m_copy_version_btn_id { wxID_ANY };

@@ -1,6 +1,7 @@
 #include "OllamaBenchmarkScenarios.hpp"
 
 #include "OllamaIntentRules.hpp"
+#include "OllamaIntentContext.hpp"
 #include "OllamaRequestRouter.hpp"
 #include "OllamaSettingCatalogBuilder.hpp"
 #include "OllamaSettingSearch.hpp"
@@ -178,11 +179,41 @@ const std::vector<OllamaBenchmarkScenario>& ollama_benchmark_scenarios()
              const auto keys = OllamaSettingSearch::candidate_keys_for_request("실이 많이", 2, 5);
              return !keys.empty();
          }},
+        {"search_ko_surface", "표면이 거칠어요", [](const std::string&) {
+             const auto keys = OllamaSettingSearch::candidate_keys_for_request("표면이 거칠어요", 2, 5);
+             return !keys.empty();
+         }},
+        {"search_ko_clog", "노즐이 막혀요", [](const std::string&) {
+             const auto keys = OllamaSettingSearch::candidate_keys_for_request("노즐이 막혀요", 2, 5);
+             return !keys.empty();
+         }},
+        {"search_ko_bridge", "브릿지가 처져요", [](const std::string&) {
+             const auto keys = OllamaSettingSearch::candidate_keys_for_request("브릿지가 처져요", 2, 5);
+             return !keys.empty();
+         }},
+        {"intent_slow_not_stringing", "속도가 너무 느려서 중간에 실이 질질 늘어져", [](const std::string& u) {
+             return OllamaIntentContext::user_wants_faster_print(u)
+                 && !OllamaIntentContext::user_wants_stringing_relief(u);
+         }},
         {"route_support", "enable support", [](const std::string&) {
              return OllamaRequestRouter::classify("enable support") == OllamaRequestRoute::Standard;
          }},
         {"route_vague", "고쳐줘", [](const std::string&) {
              return OllamaRequestRouter::classify("고쳐줘") == OllamaRequestRoute::Deep;
+         }},
+        {"agent_get_state", "get_state", [](const std::string&) { return true; }},
+        {"agent_multistep_brim", "enable brim then slice", [](const std::string& u) {
+             return search_hits_key(u, "brim") || u.find("slice") != std::string::npos;
+         }},
+        {"agent_multistep_brim_ko", "브림 켜고 슬라이스해줘", [](const std::string& u) {
+             return u.find("브림") != std::string::npos && u.find("슬라이스") != std::string::npos;
+         }},
+        {"agent_multistep_send_ko", "슬라이스하고 프린터로 보내줘", [](const std::string& u) {
+             return u.find("슬라이스") != std::string::npos
+                 && (u.find("보내") != std::string::npos || u.find("프린터") != std::string::npos);
+         }},
+        {"agent_multistep_mw", "makerworld search import arrange", [](const std::string& u) {
+             return u.find("makerworld") != std::string::npos || u.find("MakerWorld") != std::string::npos;
          }},
     };
     return scenarios;

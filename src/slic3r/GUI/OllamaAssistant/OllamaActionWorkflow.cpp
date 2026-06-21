@@ -1,6 +1,7 @@
 #include "OllamaActionWorkflow.hpp"
 
 #include "OllamaActionExecutor.hpp"
+#include "OllamaExecutionPolicy.hpp"
 #include "OllamaSettingDescriptions.hpp"
 #include "OllamaTelemetry.hpp"
 
@@ -51,11 +52,19 @@ static bool ui_prefers_korean()
     return lang == wxString("ko");
 }
 
+static bool is_readonly_action(const std::string& type)
+{
+    return type == "get_state" || type == "list_objects";
+}
+
 static bool is_workflow_only_action(const std::string& type)
 {
     return type == "slice" || type == "ui_select_tab" || type == "menu_item" || type == "add_model"
         || type == "makerworld_search" || type == "open_smart_print" || type == "open_setup"
-        || type == "send_print" || type == "export_gcode" || type == "rollback_apply";
+        || type == "send_print" || type == "export_gcode" || type == "rollback_apply"
+        || type == "get_state" || type == "list_objects" || type == "select_object"
+        || type == "add_plate" || type == "delete_plate" || type == "select_plate"
+        || type == "open_calibration" || type == "run_smart_print" || type == "select_preset";
 }
 
 static bool is_geometry_action(const std::string& type)
@@ -331,13 +340,36 @@ static bool is_geometry_or_flow_only(const nlohmann::json& root)
 
 static bool is_inline_chat_apply(const nlohmann::json& root)
 {
-    // set_config always goes through the review dialog; inline only for geometry/flow.
     if (root_has_set_config(root))
         return false;
-    return is_geometry_or_flow_only(root);
+    if (!root.contains("actions") || !root["actions"].is_array() || root["actions"].empty())
+        return false;
+    for (const auto& a : root["actions"]) {
+        if (!a.is_object())
+            continue;
+        const std::string type = a.value("type", "");
+        if (!is_readonly_action(type) && !is_geometry_action(type) && !is_workflow_only_action(type))
+            return false;
+    }
+    return true;
 }
 
 } // namespace
+
+OllamaWorkflowRun OllamaActionWorkflow::execute_with_policy(const nlohmann::json& root, wxWindow* parent,
+                                                            OllamaExecutionPolicy policy)
+{
+    if (!has_executable_actions(root)) {
+        OllamaWorkflowRun run;
+        run.results = OllamaActionExecutor::execute(root);
+        return run;
+    }
+    if (policy == OllamaExecutionPolicy::ConfirmAlways)
+        return confirm_and_execute(root, parent);
+    if (is_inline_chat_apply(root))
+        return execute_inline(root, parent);
+    return confirm_and_execute(root, parent);
+}
 
 bool OllamaActionWorkflow::has_executable_actions(const nlohmann::json& root)
 {

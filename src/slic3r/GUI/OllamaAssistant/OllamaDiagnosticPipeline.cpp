@@ -85,6 +85,97 @@ std::string assess_key(const std::string& key, const std::string& current, const
     return korean ? "진단과 대조해 조정 방향 결정" : "Compare with diagnosis to pick direction";
 }
 
+static bool utf8_advance_hangul(const std::string& s, size_t& i, uint32_t& cp)
+{
+    if (i >= s.size())
+        return false;
+    const unsigned char c = static_cast<unsigned char>(s[i]);
+    if (c < 0x80) {
+        cp = c;
+        ++i;
+        return true;
+    }
+    if ((c & 0xE0) == 0xC0 && i + 1 < s.size()) {
+        cp = ((c & 0x1F) << 6) | (static_cast<unsigned char>(s[i + 1]) & 0x3F);
+        i += 2;
+        return true;
+    }
+    if ((c & 0xF0) == 0xE0 && i + 2 < s.size()) {
+        cp = ((c & 0x0F) << 12) | ((static_cast<unsigned char>(s[i + 1]) & 0x3F) << 6)
+            | (static_cast<unsigned char>(s[i + 2]) & 0x3F);
+        i += 3;
+        return true;
+    }
+    if ((c & 0xF8) == 0xF0 && i + 3 < s.size()) {
+        cp = ((c & 0x07) << 18) | ((static_cast<unsigned char>(s[i + 1]) & 0x3F) << 12)
+            | ((static_cast<unsigned char>(s[i + 2]) & 0x3F) << 6)
+            | (static_cast<unsigned char>(s[i + 3]) & 0x3F);
+        i += 4;
+        return true;
+    }
+    cp = c;
+    ++i;
+    return true;
+}
+
+static bool is_hangul_codepoint(uint32_t cp)
+{
+    return (cp >= 0xAC00 && cp <= 0xD7A3) || (cp >= 0x1100 && cp <= 0x11FF) || (cp >= 0x3130 && cp <= 0x318F);
+}
+
+bool contains_hangul(const std::string& s)
+{
+    for (size_t i = 0; i < s.size();) {
+        uint32_t cp = 0;
+        if (!utf8_advance_hangul(s, i, cp))
+            break;
+        if (is_hangul_codepoint(cp))
+            return true;
+    }
+    return false;
+}
+
+std::string ko_snippet_to_en_wiki_query(const std::string& text)
+{
+    static const std::pair<const char*, const char*> kMap[] = {
+        {"들뜸", "warping corner lifting bed adhesion"},
+        {"베드", "bed adhesion first layer not sticking"},
+        {"안 붙", "bed adhesion not sticking"},
+        {"실이", "stringing retraction filament oozing"},
+        {"실", "stringing retraction oozing"},
+        {"거미", "stringing spider web retraction"},
+        {"느려", "print speed too slow outer wall"},
+        {"속도", "print speed acceleration"},
+        {"오버행", "overhang support sagging"},
+        {"서포트", "support overhang enable"},
+        {"브림", "brim adhesion elephant foot"},
+        {"표면", "surface quality layer height ironing"},
+        {"거칠", "rough surface top layer quality"},
+        {"막혀", "nozzle clog temperature retraction"},
+        {"클로그", "nozzle clog heat creep"},
+        {"브릿지", "bridge sagging cooling fan speed"},
+        {"처져", "sagging bridge overhang"},
+        {"부서", "brittle weak infill wall strength"},
+        {"단단", "strong infill wall loops durability"},
+    };
+    for (const auto& [ko, en] : kMap) {
+        if (text.find(ko) != std::string::npos)
+            return en;
+    }
+    return {};
+}
+
+void localize_wiki_queries(std::vector<std::string>& queries)
+{
+    for (std::string& q : queries) {
+        if (!contains_hangul(q))
+            continue;
+        const std::string en = ko_snippet_to_en_wiki_query(q);
+        if (!en.empty())
+            q = en;
+    }
+}
+
 } // namespace
 
 bool OllamaDiagnosticPipeline::needs_pipeline(const std::string& user_request, bool apply_mode)
@@ -131,6 +222,8 @@ nlohmann::json OllamaDiagnosticPipeline::build_wiki_evidence(const OllamaDiagnos
         queries.push_back(diagnosis.symptom);
     if (queries.empty())
         queries.push_back(user_request);
+
+    localize_wiki_queries(queries);
 
     return BambuLabWikiSearch::build_wiki_context_from_queries(queries, korean, 2, 1400);
 }

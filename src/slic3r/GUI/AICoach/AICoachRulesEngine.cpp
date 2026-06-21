@@ -30,10 +30,13 @@ constexpr float  kAdhesionRiskScore = 55.f;
 
 nlohmann::json set_config_action(const std::string& key, const nlohmann::json& value)
 {
+    nlohmann::json options = nlohmann::json::object({{key, value}});
+    if (key == "enable_support" && value.is_boolean() && value.get<bool>())
+        options["support_type"] = "tree(auto)";
     return nlohmann::json{
         {"type", "set_config"},
         {"preset", "print"},
-        {"options", nlohmann::json::object({{key, value}})},
+        {"options", std::move(options)},
     };
 }
 

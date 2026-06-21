@@ -351,7 +351,7 @@ OllamaActionResult OllamaUserFlow::apply_flow_action(const nlohmann::json& actio
     OllamaActionResult result;
     const std::string  type = action.value("type", "");
 
-    if (type == "open_smart_print") {
+    if (type == "open_smart_print" || type == "run_smart_print") {
         wxGetApp().open_smart_print();
         result.success          = true;
         result.effective_change = true;

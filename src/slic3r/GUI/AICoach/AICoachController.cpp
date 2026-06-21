@@ -17,6 +17,7 @@
 #include "../OllamaAssistant/OllamaActionPipeline.hpp"
 #include "../OllamaAssistant/OllamaActionValidator.hpp"
 #include "../OllamaAssistant/OllamaActionWorkflow.hpp"
+#include "../OllamaAssistant/OllamaExecutionPolicy.hpp"
 #include "../OllamaAssistant/OllamaUserFlow.hpp"
 #include "../GLToolbar.hpp"
 #include "../NotificationManager.hpp"
@@ -263,7 +264,8 @@ void AICoachController::apply_card_actions(Plater* plater, const AICoachCard& ca
         return;
 
     AIGuiOrchestrator::instance().on_chat_apply_begin();
-    const OllamaWorkflowRun workflow = OllamaActionWorkflow::execute_inline(root, nullptr);
+    const OllamaWorkflowRun workflow =
+        OllamaActionWorkflow::execute_with_policy(root, nullptr, ollama_execution_policy_for_assist_mode());
     const bool applied               = workflow_had_effective_change(workflow);
     AIGuiOrchestrator::instance().on_chat_apply_end(applied, root, nullptr);
 

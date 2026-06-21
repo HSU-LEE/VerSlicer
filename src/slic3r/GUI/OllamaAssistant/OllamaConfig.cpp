@@ -1,10 +1,11 @@
 #include "OllamaConfig.hpp"
 
+#ifndef OLLAMA_HEADLESS_TEST
 #include "../GUI_App.hpp"
+#include <wx/app.h>
+#endif
 
 #include <boost/algorithm/string.hpp>
-
-#include <wx/app.h>
 
 #include <cstdlib>
 
@@ -23,6 +24,7 @@ bool env_flag(const char* name, bool default_value)
 
 bool config_flag(const char* key, bool default_value)
 {
+#ifndef OLLAMA_HEADLESS_TEST
     if (!wxTheApp)
         return default_value;
     if (wxGetApp().app_config) {
@@ -30,6 +32,8 @@ bool config_flag(const char* key, bool default_value)
         if (!v.empty())
             return v == "1" || v == "true" || v == "yes" || v == "on";
     }
+#endif
+    (void) key;
     return default_value;
 }
 
@@ -58,21 +62,25 @@ std::string normalize_ollama_model_tag(std::string model)
 
 std::string ollama_host_from_config()
 {
+#ifndef OLLAMA_HEADLESS_TEST
     if (wxTheApp && wxGetApp().app_config) {
         const std::string host = wxGetApp().app_config->get(kOllamaConfigSection, kOllamaHostKey);
         if (!host.empty())
             return host;
     }
+#endif
     return kOllamaDefaultHost;
 }
 
 std::string ollama_model_from_config()
 {
+#ifndef OLLAMA_HEADLESS_TEST
     if (wxTheApp && wxGetApp().app_config) {
         const std::string model = wxGetApp().app_config->get(kOllamaConfigSection, kOllamaModelKey);
         if (!model.empty())
             return normalize_ollama_model_tag(model);
     }
+#endif
     return kOllamaDefaultModel;
 }
 

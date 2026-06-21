@@ -1,5 +1,6 @@
 #include "../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.hpp"
+#include "../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.hpp"
 
@@ -116,6 +117,21 @@ sparse_infill_density: 10%)";
 
     {
         expect_true(!OllamaSettingRegistry::is_allowed_key("machine_start_gcode"), "tier3 blocked golden");
+    }
+
+    {
+        const auto keys = OllamaSettingAliases::keys_from_symptoms("표면이 거칠어요");
+        expect_true(!keys.empty(), "rough surface symptom keys");
+    }
+
+    {
+        const auto keys = OllamaSettingSearch::candidate_keys_for_request("노즐이 막혀요", 2, 5);
+        expect_true(!keys.empty(), "nozzle clog symptom keys");
+    }
+
+    {
+        const auto keys = OllamaSettingSearch::candidate_keys_for_request("브릿지가 처져요", 2, 5);
+        expect_true(!keys.empty(), "sagging bridge symptom keys");
     }
 
     if (g_failures == 0) {

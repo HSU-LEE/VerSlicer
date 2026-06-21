@@ -4,11 +4,12 @@
 #include "OllamaConfig.hpp"
 #include "OllamaSettingSearch.hpp"
 
+#ifndef OLLAMA_HEADLESS_TEST
 #include "../GUI_App.hpp"
+#include <wx/app.h>
+#endif
 
 #include "libslic3r/PrintConfig.hpp"
-
-#include <wx/app.h>
 
 #include <nlohmann/json.hpp>
 
@@ -374,10 +375,12 @@ nlohmann::json OllamaSettingRegistry::lookup_catalog_keys(const DynamicPrintConf
 {
     if (ollama_auto_catalog_enabled()) {
         const DynamicPrintConfig* filament_cfg = nullptr;
+#ifndef OLLAMA_HEADLESS_TEST
         if (wxTheApp) {
             if (auto* bundle = wxGetApp().preset_bundle)
                 filament_cfg = &bundle->filaments.get_edited_preset().config;
         }
+#endif
         return OllamaSettingSearch::lookup(keys, cfg, filament_cfg, ko_ui);
     }
     nlohmann::json arr = nlohmann::json::array();
