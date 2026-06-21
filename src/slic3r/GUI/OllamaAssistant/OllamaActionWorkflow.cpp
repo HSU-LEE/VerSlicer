@@ -329,29 +329,12 @@ static bool is_geometry_or_flow_only(const nlohmann::json& root)
     return true;
 }
 
-static bool is_geometry_action_type(const std::string& type)
-{
-    return type == "rotate" || type == "translate" || type == "scale" || type == "clone_selection"
-        || type == "arrange" || type == "delete_selection";
-}
-
 static bool is_inline_chat_apply(const nlohmann::json& root)
 {
-    if (!root.contains("actions") || !root["actions"].is_array() || root["actions"].empty())
+    // set_config always goes through the review dialog; inline only for geometry/flow.
+    if (root_has_set_config(root))
         return false;
-    if (!root_has_set_config(root))
-        return is_geometry_or_flow_only(root);
-    for (const auto& a : root["actions"]) {
-        if (!a.is_object())
-            return false;
-        const std::string type = a.value("type", "");
-        if (type == "set_config" || type == "slice")
-            continue;
-        if (is_geometry_action_type(type))
-            continue;
-        return false;
-    }
-    return true;
+    return is_geometry_or_flow_only(root);
 }
 
 } // namespace
@@ -416,6 +399,9 @@ OllamaWorkflowRun OllamaActionWorkflow::confirm_and_execute(const nlohmann::json
             OllamaTelemetry::workflow_finished(false, true, false, 0);
             return run;
         }
+
+        if (!dlg.preview_requested() && !dlg.apply_requested() && content.change_count > 0)
+            dlg.confirm_auto_apply();
 
         if (dlg.preview_requested()) {
             BambuSmartPrintService::instance().show_settings_compare(
