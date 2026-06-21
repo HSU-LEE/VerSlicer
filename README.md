@@ -54,6 +54,17 @@ Install [Ollama](https://ollama.com/), leave it running (`ollama serve` or the m
 - For Korean voice, add Korean in **System Settings → General → Language & Region** (above English if you speak Korean)
 - Speak clearly; garbled transcripts are rejected instead of being sent to the model
 
+Apply 모드에서는 품질·설정 요청에 **4단계 파이프라인**을 사용합니다:
+
+1. **문제 진단** — LLM이 증상·원인·검색할 Wiki 키워드·후보 설정 추출  
+2. **근거 검색** — Bambu Lab Wiki에서 관련 문서 발췌  
+3. **현재 설정 분석** — 후보 키의 현재값과 진단 대조 (코드)  
+4. **설정 변경 제안** — 진단+Wiki+분석을 바탕으로 `set_config` 제안  
+
+회전·배치·명시적 수치 지정 등 단순 요청은 1회 LLM으로 바로 처리합니다.
+
+Apply 모드에서는 요청마다 **pro_tips**(gyroid, 아이어링, 브릿지 팬 등)와 고급 설정 카탈로그를 LLM에 전달합니다. 모델이 `set_config`를 반환하면 키워드 시나리오로 덮어쓰지 않습니다.
+
 ## AI assistant defaults
 
 | Setting | Default | Notes |
@@ -62,9 +73,9 @@ Install [Ollama](https://ollama.com/), leave it running (`ollama serve` or the m
 | Context window | 8192 tokens | Smaller = faster |
 | Max reply tokens | 768 | Enough for JSON actions |
 | Keep-alive | 30 min | Avoids reload delay between messages |
-| Two-hop planner | off | Single LLM call = faster |
-| Keyword inject | on | Reliable fixes for stringing, brim, support, etc. |
-| Wiki search / critic | off | Enable for harder troubleshooting |
+| Two-hop planner | off | Single LLM call = faster; Deep routes use planner when enabled |
+| Keyword inject | on | **Fallback only** when the model returns no set_config — does not override LLM |
+| Wiki search / critic | on (wiki) / off (critic) | Wiki for vague quality issues; critic for second-pass review |
 
 Stored in `~/Library/Application Support/verslicer/verslicer.conf` under `"ollama"`:
 
@@ -72,9 +83,9 @@ Stored in `~/Library/Application Support/verslicer/verslicer.conf` under `"ollam
 "ollama": {
   "model": "qwen2.5:3b",
   "assistant_mode": true,
-  "keyword_inject": "true",
+  "keyword_inject": "false",
   "two_hop": "false",
-  "wiki_search": "false",
+  "wiki_search": "true",
   "critic": "false"
 }
 ```

@@ -6,43 +6,37 @@
 
 #include "libslic3r/PrintConfig.hpp"
 
+#include <boost/algorithm/string.hpp>
+
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
-#include <cctype>
 #include <unordered_map>
 
 namespace Slic3r { namespace GUI {
 
 namespace {
 
-std::string lower_ascii(std::string s)
-{
-    for (char& c : s)
-        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return s;
-}
-
 int score_token(const std::string& haystack, const std::string& token)
 {
     if (token.empty())
         return 0;
-    if (haystack == token)
+    if (boost::iequals(haystack, token))
         return 100;
-    if (haystack.find(token) != std::string::npos)
+    if (boost::icontains(haystack, token))
         return 60;
     return 0;
 }
 
-int score_spec(const OllamaAutoSettingSpec& sp, const std::string& query_lower)
+int score_spec(const OllamaAutoSettingSpec& sp, const std::string& query)
 {
-    int score = score_token(lower_ascii(sp.key), query_lower);
-    score     = std::max(score, score_token(lower_ascii(sp.label), query_lower));
-    score     = std::max(score, score_token(lower_ascii(sp.category), query_lower));
-    score     = std::max(score, score_token(lower_ascii(sp.tooltip), query_lower));
+    int score = score_token(sp.key, query);
+    score     = std::max(score, score_token(sp.label, query));
+    score     = std::max(score, score_token(sp.category, query));
+    score     = std::max(score, score_token(sp.tooltip, query));
     for (const std::string& ko : OllamaSettingAliases::ko_terms_for_key(sp.key))
-        score = std::max(score, score_token(lower_ascii(ko), query_lower));
-    score = std::max(score, OllamaSettingAliases::symptom_boost(query_lower, sp.key));
+        score = std::max(score, score_token(ko, query));
+    score = std::max(score, OllamaSettingAliases::symptom_boost(query, sp.key));
     return score;
 }
 
@@ -51,15 +45,14 @@ int score_spec(const OllamaAutoSettingSpec& sp, const std::string& query_lower)
 std::vector<OllamaSettingSearchHit> OllamaSettingSearch::search(const std::string& query, int max_tier,
                                                                  size_t limit)
 {
-    const std::string q = lower_ascii(query);
-    std::vector<OllamaSettingSearchHit> hits;
-    if (q.empty())
-        return hits;
+    if (query.empty())
+        return {};
 
+    std::vector<OllamaSettingSearchHit> hits;
     for (const OllamaAutoSettingSpec& sp : OllamaSettingCatalogBuilder::all()) {
         if (static_cast<int>(sp.tier) > max_tier || sp.virtual_key)
             continue;
-        const int score = score_spec(sp, q);
+        const int score = score_spec(sp, query);
         if (score <= 0)
             continue;
         hits.push_back({sp.key, score});
@@ -82,7 +75,7 @@ std::vector<std::string> OllamaSettingSearch::candidate_keys_for_request(const s
     for (const OllamaSettingSearchHit& hit : search(query, max_tier, limit))
         ranked[hit.key] = std::max(ranked[hit.key], hit.score);
     for (const std::string& key : OllamaSettingAliases::keys_from_symptoms(query)) {
-        const int boost = OllamaSettingAliases::symptom_boost(lower_ascii(query), key);
+        const int boost = OllamaSettingAliases::symptom_boost(query, key);
         ranked[key]     = std::max(ranked[key], boost > 0 ? boost : 70);
     }
     std::vector<std::pair<int, std::string>> ordered;

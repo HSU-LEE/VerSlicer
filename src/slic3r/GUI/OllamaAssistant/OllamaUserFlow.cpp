@@ -308,83 +308,42 @@ OllamaFlowDispatchResult OllamaUserFlow::dispatch_coach_action(const std::string
     return out;
 }
 
-void OllamaUserFlow::ensure_flow_actions_from_user_text(nlohmann::json& root, const std::string& user_request)
+void OllamaUserFlow::ensure_flow_actions_from_user_text(nlohmann::json& /*root*/, const std::string& /*user_request*/)
 {
+    // Flow/tab actions come from the LLM response — not keyword injection.
+}
+
+void OllamaUserFlow::prune_navigation_for_config_fixes(nlohmann::json& root, const std::string& user_request)
+{
+    if (!actions_contain_type(root, "set_config") || user_wants_smart_print(user_request))
+        return;
     if (!root.contains("actions") || !root["actions"].is_array())
-        root["actions"] = nlohmann::json::array();
-
-    const bool has_flow = actions_contain_type(root, "send_print") || actions_contain_type(root, "open_setup")
-                       || actions_contain_type(root, "open_smart_print") || actions_contain_type(root, "export_gcode")
-                       || actions_contain_type(root, "rollback_apply");
-
-    if (user_wants_undo_apply(user_request) && !actions_contain_type(root, "rollback_apply")) {
-        root["actions"].push_back({{"type", "rollback_apply"}});
-        return;
-    }
-
-    if (user_wants_failure_help(user_request) && !actions_contain_type(root, "open_smart_print")) {
-        root["actions"].push_back({{"type", "open_smart_print"}});
-        return;
-    }
-
-    if (user_wants_smart_print(user_request) && !actions_contain_type(root, "open_smart_print")) {
-        root["actions"].push_back({{"type", "open_smart_print"}});
-        return;
-    }
-
-    if (user_wants_setup_flow(user_request) && !actions_contain_type(root, "open_setup")) {
-        root["actions"].push_back({{"type", "open_setup"}});
-        return;
-    }
-
-    if (user_wants_device_flow(user_request) && !actions_contain_type(root, "ui_select_tab")) {
-        root["actions"].push_back({{"type", "ui_select_tab"}, {"tab", "monitor"}});
-        return;
-    }
-
-    if (user_wants_preview_flow(user_request) && !actions_contain_type(root, "ui_select_tab")) {
-        root["actions"].push_back({{"type", "ui_select_tab"}, {"tab", "preview"}});
-        if (user_wants_slice_flow(user_request) && !actions_contain_type(root, "slice"))
-            root["actions"].insert(root["actions"].begin(), {{"type", "slice"}, {"scope", "plate"}});
-        return;
-    }
-
-    if (user_wants_export_flow(user_request) && !actions_contain_type(root, "export_gcode")) {
-        root["actions"].push_back({{"type", "export_gcode"}});
-        return;
-    }
-
-    if (has_flow || !user_wants_print_flow(user_request))
         return;
 
-    if (SlicePilotSetupHub::completed_count() < int(SetupHubStep::Count)) {
-        if (!actions_contain_type(root, "open_setup"))
-            root["actions"].push_back({{"type", "open_setup"}});
-        return;
-    }
-
-    Plater* plater = wxGetApp().plater();
-    bool    has_model = false;
-    if (plater) {
-        try {
-            has_model = !plater->model().objects.empty();
-        } catch (...) {
+    nlohmann::json kept = nlohmann::json::array();
+    for (const auto& a : root["actions"]) {
+        if (!a.is_object()) {
+            kept.push_back(a);
+            continue;
         }
+        const std::string type = a.value("type", "");
+        if (type == "open_smart_print")
+            continue;
+        if (type == "ui_select_tab" && a.value("tab", "") == "smart_print")
+            continue;
+        kept.push_back(a);
     }
-    if (!has_model) {
-        if (!actions_contain_type(root, "open_setup"))
-            root["actions"].push_back({{"type", "open_setup"}});
-        return;
-    }
+    root["actions"] = std::move(kept);
+}
 
-    if (!actions_contain_type(root, "slice") && user_wants_slice_flow(user_request))
-        root["actions"].push_back({{"type", "slice"}, {"scope", "plate"}});
-
-    if (!actions_contain_type(root, "ui_select_tab"))
-        root["actions"].push_back({{"type", "ui_select_tab"}, {"tab", "preview"}});
-
-    if (!actions_contain_type(root, "send_print"))
-        root["actions"].push_back({{"type", "send_print"}});
+bool OllamaUserFlow::result_is_navigation_only(const OllamaActionResult& result)
+{
+    if (!result.success || !result.effective_change)
+        return false;
+    const std::string& m = result.message;
+    return m.find("Opened Smart Print") != std::string::npos
+        || m.find("Opened Smart Print setup") != std::string::npos
+        || m.find("Switched tab to smart_print") != std::string::npos;
 }
 
 OllamaActionResult OllamaUserFlow::apply_flow_action(const nlohmann::json& action, Plater* plater)

@@ -262,7 +262,7 @@ bool OllamaSettingRegistry::clamp_json_value(const std::string& key, nlohmann::j
 nlohmann::json OllamaSettingRegistry::build_catalog(const DynamicPrintConfig* cfg, bool ko_ui)
 {
     if (ollama_auto_catalog_enabled())
-        return OllamaSettingCatalogBuilder::build_catalog(cfg, ko_ui, 2);
+        return OllamaSettingCatalogBuilder::build_catalog(cfg, ko_ui, 3);
     nlohmann::json arr = nlohmann::json::array();
     for (const OllamaSettingSpec& sp : all()) {
         if (sp.virtual_key)

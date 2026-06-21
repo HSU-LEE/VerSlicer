@@ -1,7 +1,7 @@
 #include "OllamaVoiceTranscript.hpp"
 
-#include "OllamaIntentContext.hpp"
 #include "OllamaIntentRules.hpp"
+#include "OllamaSettingSearch.hpp"
 
 #include <boost/algorithm/string.hpp>
 
@@ -77,19 +77,13 @@ static bool locale_prefers_korean(const std::string& locale_id)
 
 static bool has_slicer_intent_hint(const std::string& text)
 {
-    if (OllamaIntentContext::user_wants_stringing_relief(text))
+    if (OllamaIntentRules::parse_z_rotation_degrees(text).has_value())
         return true;
-    if (contains_rotate_intent(text) || contains_placement_intent(text) || contains_flip_intent(text))
+    if (!OllamaSettingSearch::candidate_keys_for_request(text, 1, 3).empty())
         return true;
-    if (contains_support_intent(text) || contains_brim_intent(text) || contains_strength_intent(text))
-        return true;
-    if (contains_adhesion_intent(text) || contains_durability_intent(text))
-        return true;
-    if (text.find("슬라이스") != std::string::npos || text.find("slice") != std::string::npos)
+    if (text.find("슬라이스") != std::string::npos || boost::icontains(text, "slice"))
         return true;
     if (text.find("mm") != std::string::npos || text.find('%') != std::string::npos)
-        return true;
-    if (text.find("도") != std::string::npos && std::isdigit(static_cast<unsigned char>(text[0])))
         return true;
     return false;
 }

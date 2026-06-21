@@ -63,6 +63,7 @@ const std::vector<SymptomRule>& symptom_rules()
         {{"실", "stringing", "끈", "ooze"}, {"retraction_length", "nozzle_temperature", nullptr}, 82},
         {{"부서", "brittle", "break", "약"}, {"sparse_infill_density", "wall_loops", nullptr}, 78},
         {{"단단", "strong", "sturdy", "튼튼"}, {"sparse_infill_density", "wall_loops", nullptr}, 75},
+        {{"올려", "올리", "increase infill", "more infill"}, {"sparse_infill_density", nullptr}, 82},
         {{"느리", "slow", "speed up", "빠르"}, {"outer_wall_speed", "sparse_infill_speed", nullptr}, 70},
         {{"첫층", "first layer", "initial layer"}, {"initial_layer_print_height", "layer_height", nullptr}, 80},
         {{"솔기", "seam", "visible seam"}, {"seam_position", nullptr}, 75},
@@ -114,7 +115,6 @@ int OllamaSettingAliases::symptom_boost(const std::string& query_lower, const st
 
 std::vector<std::string> OllamaSettingAliases::keys_from_symptoms(const std::string& query)
 {
-    const std::string                    q = lower_ascii(query);
     std::vector<std::string>             keys;
     std::unordered_map<std::string, int> scores;
     for (const SymptomRule& rule : symptom_rules()) {
@@ -122,7 +122,7 @@ std::vector<std::string> OllamaSettingAliases::keys_from_symptoms(const std::str
         for (const char* phrase : rule.phrases) {
             if (!phrase)
                 break;
-            if (query_contains(q, phrase)) {
+            if (query_contains(query, phrase)) {
                 matched = true;
                 break;
             }

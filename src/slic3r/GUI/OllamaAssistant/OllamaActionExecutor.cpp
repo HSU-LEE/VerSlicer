@@ -6,6 +6,7 @@
 #include "OllamaSettingRegistry.hpp"
 #include "OllamaSettingSearch.hpp"
 #include "OllamaSystemPrompts.hpp"
+#include "OllamaPrintingTips.hpp"
 #include "OllamaUserFlow.hpp"
 #include "BambuLabWikiSearch.hpp"
 #include "OllamaTelemetry.hpp"
@@ -292,6 +293,33 @@ static bool json_truthy(const nlohmann::json& v)
     return false;
 }
 
+static bool json_brim_width_positive(const nlohmann::json& options)
+{
+    if (!options.contains("brim_width"))
+        return false;
+    if (options["brim_width"].is_number())
+        return options["brim_width"].get<double>() > 0.0;
+    if (options["brim_width"].is_string()) {
+        try {
+            return std::stod(options["brim_width"].get<std::string>()) > 0.0;
+        } catch (...) {
+        }
+    }
+    return false;
+}
+
+static bool is_auto_brim_type_value(const nlohmann::json& val)
+{
+    if (!val.is_string())
+        return false;
+    std::string bt = val.get<std::string>();
+    boost::algorithm::to_lower(bt);
+    boost::algorithm::trim(bt);
+    boost::algorithm::replace_all(bt, " ", "");
+    boost::algorithm::replace_all(bt, "-", "_");
+    return bt == "auto" || bt == "auto_brim" || bt == "autobrim";
+}
+
 /** Maps enable_brim / boolean "brim" to brim_width + brim_type before apply. */
 static void expand_brim_options(nlohmann::json& options)
 {
@@ -310,8 +338,8 @@ static void expand_brim_options(nlohmann::json& options)
             }
             if (!has_width || w <= 0.0)
                 options["brim_width"] = 5.0;
-            if (!options.contains("brim_type"))
-                options["brim_type"] = "outer_only";
+            // Explicit "turn on brim" → outer brim, not auto_brim (width-only auto mode).
+            options["brim_type"] = "outer_only";
         } else {
             options["brim_width"] = 0.0;
         }
@@ -326,6 +354,52 @@ static void expand_brim_options(nlohmann::json& options)
         apply_brim_on(json_truthy(options["brim"]));
         options.erase("brim");
     }
+    if (json_brim_width_positive(options)
+        && (!options.contains("brim_type") || is_auto_brim_type_value(options["brim_type"])))
+        options["brim_type"] = "outer_only";
+}
+
+/** Maps enable_support to support_type normal(auto) — manual/tree-only must not be left implicit. */
+static std::string normalize_support_type_value(std::string v)
+{
+    boost::algorithm::to_lower(v);
+    boost::algorithm::trim(v);
+    boost::algorithm::replace_all(v, " ", "");
+
+    if (v == "auto" || v == "normal" || v == "normalauto" || v == "hybrid(auto)" || v == "hybridauto")
+        return "normal(auto)";
+    if (v == "tree" || v == "treeauto")
+        return "tree(auto)";
+    if (v == "normalmanual" || v == "manual")
+        return "normal(manual)";
+    if (v == "treemanual")
+        return "tree(manual)";
+    if (v == "normal(auto)")
+        return "normal(auto)";
+    if (v == "tree(auto)")
+        return "tree(auto)";
+    if (v == "normal(manual)")
+        return "normal(manual)";
+    if (v == "tree(manual)")
+        return "tree(manual)";
+    return v;
+}
+
+static void expand_support_options(nlohmann::json& options)
+{
+    if (!options.is_object())
+        return;
+
+    if (options.contains("support_type") && options["support_type"].is_string())
+        options["support_type"] = normalize_support_type_value(options["support_type"].get<std::string>());
+
+    if (!options.contains("enable_support"))
+        return;
+    if (!json_truthy(options["enable_support"]))
+        return;
+
+    // Bambu/Orca: Normal (auto) generates supports from geometry; manual modes need enforcers only.
+    options["support_type"] = "normal(auto)";
 }
 
 static void strip_disallowed_config_keys(nlohmann::json& options)
@@ -346,6 +420,7 @@ static void normalize_set_config_options_impl(nlohmann::json& options)
         return;
     strip_disallowed_config_keys(options);
     expand_brim_options(options);
+    expand_support_options(options);
 }
 
 static std::string normalize_brim_type(std::string v)
@@ -1415,17 +1490,17 @@ static nlohmann::json build_context_object(bool compact)
 
     if (!compact) {
         if (ollama_auto_catalog_enabled()) {
-            ctx["setting_index"] = OllamaSettingRegistry::build_setting_index(2);
+            ctx["setting_index"] = OllamaSettingRegistry::build_setting_index(3);
             ctx["allowed_config_keys"] = OllamaSettingRegistry::allowed_keys_json();
         }
         if (bundle)
             ctx["setting_catalog"] = OllamaSettingRegistry::build_catalog(&bundle->prints.get_edited_preset().config, ko);
         else
             ctx["setting_catalog"] = OllamaSettingRegistry::build_catalog(nullptr, ko);
-        ctx["audience"]            = "beginner";
+        ctx["audience"]            = "intermediate";
         ctx["setting_rules"]       = ko
-            ? "결과 중심: current 값 기준 최소 변경. 한 요청에 키 1~2개 권장. setting_catalog 키만."
-            : "Outcome-first: minimal changes relative to current; 1–2 keys per request; setting_catalog keys only.";
+            ? "결과 중심: current 값 기준 최소 변경. pro_tips·모델 지식·setting_catalog(고급 키 포함) 활용. 키는 catalog에 있을 때만."
+            : "Outcome-first: use pro_tips, your 3D printing knowledge, and setting_catalog (incl. advanced keys). Catalog keys only.";
         nlohmann::json hints = nlohmann::json::object();
         if (ko) {
             hints["bed_adhesion"] =
@@ -1513,6 +1588,11 @@ std::string OllamaActionExecutor::fit_context_json_to_limit(std::string json, si
             ctx.erase("menu_catalog");
         if (json.size() > max_chars && ctx.contains("plain_language_hints"))
             ctx.erase("plain_language_hints");
+        if (json.size() > max_chars && ctx.contains("pro_tips") && ctx["pro_tips"].is_array()
+            && ctx["pro_tips"].size() > 2) {
+            auto& tips = ctx["pro_tips"];
+            tips.erase(tips.begin() + tips.size() / 2, tips.end());
+        }
         json = ctx.dump(2);
         if (json.size() > max_chars) {
             const std::string compact = build_compact_context_json();
@@ -1543,6 +1623,54 @@ std::string OllamaActionExecutor::build_system_prompt(bool apply_mode)
     return prompt;
 }
 
+std::string OllamaActionExecutor::build_diagnostic_system_prompt()
+{
+    return OllamaSystemPrompts::diagnostic_system_prompt(ui_prefers_korean());
+}
+
+std::string OllamaActionExecutor::build_diagnostic_user_message(const std::string& user_request)
+{
+    const bool     ko  = ui_prefers_korean();
+    nlohmann::json ctx = build_context_object(/*compact*/ true);
+    ctx["setting_index"] = OllamaSettingRegistry::build_setting_index(3);
+    ctx["pro_tips"]      = OllamaPrintingTips::tips_for_request(user_request, ko);
+    std::string body     = ctx.dump(2);
+    std::string packed =
+        std::string("Pipeline step 1 — problem diagnosis.\n\nCurrent slicer context (JSON):\n") + body
+        + "\n\nUser request:\n" + user_request;
+    return fit_context_json_to_limit(std::move(packed), 8000);
+}
+
+std::string OllamaActionExecutor::build_proposal_user_message(const std::string& user_request,
+                                                              const std::vector<std::string>& candidate_keys,
+                                                              const nlohmann::json& diagnosis_summary,
+                                                              const nlohmann::json& wiki_context,
+                                                              const nlohmann::json& settings_analysis)
+{
+    nlohmann::json ctx = build_context_object(/*compact*/ true);
+    const bool     ko  = ui_prefers_korean();
+    const DynamicPrintConfig* print_cfg    = nullptr;
+    const DynamicPrintConfig* filament_cfg = nullptr;
+    if (auto* bundle = wxGetApp().preset_bundle) {
+        print_cfg    = &bundle->prints.get_edited_preset().config;
+        filament_cfg = &bundle->filaments.get_edited_preset().config;
+    }
+    ctx["pipeline"] = ko ? nlohmann::json{{"step", 4}, {"name", "설정 변경 제안"}}
+                         : nlohmann::json{{"step", 4}, {"name", "Setting change proposal"}};
+    ctx["diagnosis_summary"] = diagnosis_summary;
+    ctx["settings_analysis"] = settings_analysis;
+    ctx["setting_catalog"]   = OllamaSettingSearch::lookup(candidate_keys, print_cfg, filament_cfg, ko);
+    if (wiki_context.is_array() && !wiki_context.empty()) {
+        ctx["wiki_context"] = wiki_context;
+        ctx["wiki_rules"]   = ko ? "Bambu Lab Wiki 근거 — setting_catalog 키와 맞을 때만 적용"
+                                 : "Bambu Lab Wiki evidence — apply only matching setting_catalog keys";
+    }
+    ctx["pro_tips"] = OllamaPrintingTips::tips_for_request(user_request, ko);
+    std::string body = ctx.dump(2);
+    return OllamaSystemPrompts::proposal_turn_instructions(ko) + "\n\nProposal context (JSON):\n" + body
+           + "\n\nUser request:\n" + user_request;
+}
+
 std::string OllamaActionExecutor::build_planner_system_prompt()
 {
     return OllamaSystemPrompts::planner_system_prompt(ui_prefers_korean());
@@ -1551,7 +1679,7 @@ std::string OllamaActionExecutor::build_planner_system_prompt()
 std::string OllamaActionExecutor::build_planner_user_message(const std::string& user_request)
 {
     nlohmann::json ctx = build_context_object(/*compact*/ true);
-    ctx["setting_index"] = OllamaSettingRegistry::build_setting_index(2);
+    ctx["setting_index"] = OllamaSettingRegistry::build_setting_index(3);
     std::string body     = ctx.dump(2);
     std::string packed   = std::string("Current slicer context (JSON):\n") + body + "\n\nUser request:\n" + user_request;
     return fit_context_json_to_limit(std::move(packed), 8000);
@@ -1578,7 +1706,7 @@ std::string OllamaActionExecutor::build_resolver_user_message(const std::string&
             : "wiki_context excerpts are from Bambu Lab Wiki. Apply only matching keys from setting_catalog.";
     }
     std::string body = ctx.dump(2);
-    return OllamaSystemPrompts::resolver_turn_instructions(ko) + "\n\nResolver context (JSON):\n" + body
+    return OllamaSystemPrompts::proposal_turn_instructions(ko) + "\n\nResolver context (JSON):\n" + body
            + "\n\nUser request:\n" + user_request;
 }
 

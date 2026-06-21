@@ -4,14 +4,15 @@
 #include "OllamaActionRegistry.hpp"
 #include "OllamaActionValidator.hpp"
 #include "OllamaConfig.hpp"
-#include "OllamaIntentRules.hpp"
 #include "OllamaResponseNormalizer.hpp"
+
+#include "../BambuSmartPrint/PrintPlannerGui.hpp"
+#include "../GUI_App.hpp"
+#include "../Plater.hpp"
 
 namespace Slic3r { namespace GUI {
 
 namespace {
-
-using namespace OllamaIntentRules;
 
 void filter_advisor_actions(nlohmann::json& root)
 {
@@ -47,6 +48,35 @@ bool root_actions_empty(const nlohmann::json& root)
     return !root.contains("actions") || !root["actions"].is_array() || root["actions"].empty();
 }
 
+void merge_planner_if_no_llm_config(nlohmann::json& root, const std::string& user_request)
+{
+    if (OllamaResponseNormalizer::has_viable_set_config(root))
+        return;
+    Plater* plater = wxGetApp().plater();
+    if (!plater)
+        return;
+    const BambuSmartPrint::PrintPlan plan = PrintPlannerGui::plan_for_user_text(plater, user_request);
+    if (!plan.root.contains("actions") || !plan.root["actions"].is_array() || plan.root["actions"].empty())
+        return;
+    if ((!root.contains("message") || !root["message"].is_string() || root["message"].get<std::string>().empty())
+        && plan.root.contains("message") && plan.root["message"].is_string())
+        root["message"] = plan.root["message"];
+
+    nlohmann::json merged = nlohmann::json::array();
+    if (root.contains("actions") && root["actions"].is_array()) {
+        for (const auto& a : root["actions"]) {
+            if (!a.is_object())
+                continue;
+            const std::string type = a.value("type", "");
+            if (type != "set_config")
+                merged.push_back(a);
+        }
+    }
+    for (const auto& a : plan.root["actions"])
+        merged.push_back(a);
+    root["actions"] = std::move(merged);
+}
+
 } // namespace
 
 void OllamaActionPipeline::dedupe_actions_in_turn(nlohmann::json& root)
@@ -69,6 +99,8 @@ OllamaPipelineResult OllamaActionPipeline::process_actions(nlohmann::json& root,
 {
     OllamaPipelineResult result;
     if (opt.apply_mode) {
+        if (!OllamaResponseNormalizer::has_viable_set_config(root))
+            merge_planner_if_no_llm_config(root, opt.user_request);
         result.normalized = OllamaResponseNormalizer::normalize(root, opt.user_request, opt.include_makerworld);
         result.sanitized  = OllamaActionValidator::sanitize(root, opt.user_request);
     } else if (opt.question_mode_strip) {
@@ -103,18 +135,16 @@ nlohmann::json OllamaActionPipeline::build_recovery_root(const std::string& assi
 {
     nlohmann::json root = try_salvage_ollama_action_json(assistant_text);
     if (root.empty()) {
-        root                = nlohmann::json::object();
-        root["message"]     = "Applying suggested fixes from your request.";
-        root["actions"]     = nlohmann::json::array();
+        root            = nlohmann::json::object();
+        root["message"] = "Applying suggested fixes from your request.";
+        root["actions"] = nlohmann::json::array();
     }
 
-    OllamaNormalizeResult norm =
-        OllamaResponseNormalizer::normalize(root, user_request, include_makerworld, /*force_user_intent*/ true);
-    (void) norm;
-    OllamaActionValidator::sanitize(root, user_request);
-    dedupe_actions_in_turn(root);
-    if (root_actions_empty(root) && root.contains("actions"))
-        root.erase("actions");
+    OllamaPipelineOptions opt;
+    opt.apply_mode         = true;
+    opt.include_makerworld = include_makerworld;
+    opt.user_request       = user_request;
+    process_actions(root, opt);
     return root;
 }
 

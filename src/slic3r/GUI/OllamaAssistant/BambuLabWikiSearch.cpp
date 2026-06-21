@@ -8,6 +8,9 @@
 #include <chrono>
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
+
+#include <boost/algorithm/string.hpp>
 
 namespace Slic3r { namespace GUI {
 
@@ -196,6 +199,39 @@ nlohmann::json BambuLabWikiSearch::build_wiki_context(const std::string& user_re
         wiki_cache()[cache_key(query, locale, max_pages)] = {articles, std::chrono::steady_clock::now()};
     }
     return articles;
+}
+
+nlohmann::json BambuLabWikiSearch::build_wiki_context_from_queries(const std::vector<std::string>& queries, bool ko_ui,
+                                                                   size_t max_pages, size_t max_chars_per_page)
+{
+    nlohmann::json merged   = nlohmann::json::array();
+    std::unordered_set<std::string> seen_paths;
+
+    for (const std::string& q : queries) {
+        if (merged.size() >= max_pages)
+            break;
+        const std::string trimmed = boost::trim_copy(q);
+        if (trimmed.empty())
+            continue;
+        const nlohmann::json batch = build_wiki_context(trimmed, ko_ui, max_pages, max_chars_per_page);
+        if (!batch.is_array())
+            continue;
+        for (const auto& item : batch) {
+            if (!item.is_object())
+                continue;
+            const std::string path = item.value("path", "");
+            const std::string dedupe_key = path.empty() ? item.value("url", "") : path;
+            if (!dedupe_key.empty() && !seen_paths.insert(dedupe_key).second)
+                continue;
+            merged.push_back(item);
+            if (merged.size() >= max_pages)
+                break;
+        }
+    }
+
+    if (merged.empty() && !queries.empty())
+        return build_wiki_context(queries.front(), ko_ui, max_pages, max_chars_per_page);
+    return merged;
 }
 
 }} // namespace

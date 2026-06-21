@@ -7,7 +7,6 @@
 #include "../BambuSmartPrint/BambuSmartPrintService.hpp"
 #include "../BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "../BambuSmartPrint/BambuSmartPrintWorkflowDialog.hpp"
-#include "../BambuSmartPrint/PrintPlannerGui.hpp"
 #include "../AICoach/AIGuiOrchestrator.hpp"
 #include "../I18N.hpp"
 #include "../GUI_App.hpp"
@@ -15,7 +14,6 @@
 
 #include "libslic3r/BambuSmartPrint/ConfigSnapshot.hpp"
 #include "libslic3r/BambuSmartPrint/ConfigVersionStack.hpp"
-#include "libslic3r/BambuSmartPrint/PrintGoalSession.hpp"
 #include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/libslic3r.h"
 
@@ -331,6 +329,31 @@ static bool is_geometry_or_flow_only(const nlohmann::json& root)
     return true;
 }
 
+static bool is_geometry_action_type(const std::string& type)
+{
+    return type == "rotate" || type == "translate" || type == "scale" || type == "clone_selection"
+        || type == "arrange" || type == "delete_selection";
+}
+
+static bool is_inline_chat_apply(const nlohmann::json& root)
+{
+    if (!root.contains("actions") || !root["actions"].is_array() || root["actions"].empty())
+        return false;
+    if (!root_has_set_config(root))
+        return is_geometry_or_flow_only(root);
+    for (const auto& a : root["actions"]) {
+        if (!a.is_object())
+            return false;
+        const std::string type = a.value("type", "");
+        if (type == "set_config" || type == "slice")
+            continue;
+        if (is_geometry_action_type(type))
+            continue;
+        return false;
+    }
+    return true;
+}
+
 } // namespace
 
 bool OllamaActionWorkflow::has_executable_actions(const nlohmann::json& root)
@@ -365,7 +388,7 @@ OllamaWorkflowRun OllamaActionWorkflow::confirm_and_execute(const nlohmann::json
         return run;
     }
 
-    if (is_geometry_or_flow_only(root))
+    if (is_inline_chat_apply(root))
         return execute_inline(root, parent);
 
     wxWindow* dlg_parent = dialog_parent(parent);
@@ -378,12 +401,7 @@ OllamaWorkflowRun OllamaActionWorkflow::confirm_and_execute(const nlohmann::json
     if (plater)
         BambuSmartPrintService::instance().update_plate_assessment_data(plater);
 
-    SmartPrintWorkflowContent content;
-    if (BambuSmartPrint::PrintGoalSession::instance().has_last_plan())
-        content = PrintPlannerGui::workflow_content_from_plan(
-            BambuSmartPrint::PrintGoalSession::instance().last_plan());
-    else
-        content = build_workflow_content(root);
+    SmartPrintWorkflowContent content = build_workflow_content(root);
     const DynamicPrintConfig before = capture_current_config();
     const DynamicPrintConfig after  = simulate_proposed_config_inner(before, root);
     const std::vector<BambuSmartPrint::SettingChange> change_reasons = diff_with_ai_reasons(before, after);
@@ -398,9 +416,6 @@ OllamaWorkflowRun OllamaActionWorkflow::confirm_and_execute(const nlohmann::json
             OllamaTelemetry::workflow_finished(false, true, false, 0);
             return run;
         }
-
-        if (!dlg.preview_requested() && !dlg.apply_requested() && content.change_count > 0)
-            dlg.confirm_auto_apply();
 
         if (dlg.preview_requested()) {
             BambuSmartPrintService::instance().show_settings_compare(

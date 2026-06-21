@@ -120,10 +120,14 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaChatPanel.hpp
     GUI/OllamaAssistant/OllamaClient.cpp
     GUI/OllamaAssistant/OllamaClient.hpp
+    GUI/OllamaAssistant/OllamaDiagnosticPipeline.cpp
+    GUI/OllamaAssistant/OllamaDiagnosticPipeline.hpp
     GUI/OllamaAssistant/OllamaConfig.cpp
     GUI/OllamaAssistant/OllamaConfig.hpp
     GUI/OllamaAssistant/OllamaIntentContext.cpp
     GUI/OllamaAssistant/OllamaIntentContext.hpp
+    GUI/OllamaAssistant/OllamaPrintingTips.cpp
+    GUI/OllamaAssistant/OllamaPrintingTips.hpp
     GUI/OllamaAssistant/OllamaModelLoadAdvisor.cpp
     GUI/OllamaAssistant/OllamaModelLoadAdvisor.hpp
     GUI/OllamaAssistant/OllamaProcessingNotice.cpp

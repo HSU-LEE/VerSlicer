@@ -88,12 +88,12 @@ bool ollama_two_hop_enabled()
 
 bool ollama_keyword_inject_enabled()
 {
-    return pipeline_flag(kOllamaKeywordInjectKey, "OLLAMA_KEYWORD_INJECT", true);
+    return pipeline_flag(kOllamaKeywordInjectKey, "OLLAMA_KEYWORD_INJECT", false);
 }
 
 bool ollama_rule_only_fallback_enabled()
 {
-    return pipeline_flag(kOllamaRuleOnlyKey, "OLLAMA_RULE_ONLY", true);
+    return pipeline_flag(kOllamaRuleOnlyKey, "OLLAMA_RULE_ONLY", false);
 }
 
 bool ollama_adaptive_routing_enabled()
@@ -103,7 +103,7 @@ bool ollama_adaptive_routing_enabled()
 
 bool ollama_wiki_search_enabled()
 {
-    return pipeline_flag(kOllamaWikiSearchKey, "OLLAMA_WIKI_SEARCH", false);
+    return pipeline_flag(kOllamaWikiSearchKey, "OLLAMA_WIKI_SEARCH", true);
 }
 
 bool ollama_critic_enabled()

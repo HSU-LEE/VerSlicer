@@ -23,6 +23,8 @@ public:
     static const char*        route_name(OllamaRequestRoute route);
     /** Quality/vague requests that benefit from Bambu Lab wiki lookup. */
     static bool               benefits_from_wiki(const std::string& user_request);
+    /** True when the user asked to move, rotate, scale, arrange, or delete models. */
+    static bool               is_geometry_request(const std::string& user_request);
 };
 
 }} // namespace

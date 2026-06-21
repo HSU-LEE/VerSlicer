@@ -4,62 +4,78 @@
 #include "OllamaSettingSearch.hpp"
 
 #include <boost/algorithm/string.hpp>
-#include <regex>
+
+#include <cctype>
+#include <cstring>
 
 namespace Slic3r { namespace GUI {
 
 namespace {
 
-using namespace OllamaIntentRules;
-
-bool is_vague_fix(const std::string& user)
+bool contains_word_ci(const std::string& hay, const char* needle)
 {
-    return user.find("고쳐") != std::string::npos || user.find("도와") != std::string::npos ||
-           user.find("help") != std::string::npos || user.find("fix") != std::string::npos ||
-           user.find("문제") != std::string::npos || user.find("안돼") != std::string::npos ||
-           user.find("안되") != std::string::npos || user.find("망했") != std::string::npos ||
-           boost::icontains(user, "failed");
+    if (!needle || !*needle)
+        return false;
+    const std::string token(needle);
+    std::string       lower_hay = hay;
+    boost::algorithm::to_lower(lower_hay);
+    std::string lower_tok = token;
+    boost::algorithm::to_lower(lower_tok);
+    for (size_t pos = 0;;) {
+        const size_t found = lower_hay.find(lower_tok, pos);
+        if (found == std::string::npos)
+            return false;
+        const bool before_ok =
+            found == 0 || !std::isalnum(static_cast<unsigned char>(lower_hay[found - 1]));
+        const size_t after_pos = found + lower_tok.size();
+        const bool after_ok    = after_pos >= lower_hay.size()
+            || !std::isalnum(static_cast<unsigned char>(lower_hay[after_pos]));
+        if (before_ok && after_ok)
+            return true;
+        pos = found + 1;
+    }
 }
 
-bool is_transform_only(const std::string& user)
+bool looks_like_quality_not_placement(const std::string& user)
 {
-    if (user_wants_delete(user))
+    return boost::icontains(user, "failed") || boost::icontains(user, "failure")
+        || boost::icontains(user, "breaking") || boost::icontains(user, "break")
+        || user.find("실패") != std::string::npos || user.find("망") != std::string::npos
+        || user.find("부서") != std::string::npos;
+}
+
+bool looks_like_placement_request(const std::string& user)
+{
+    if (user.find("정렬") != std::string::npos || user.find("배치") != std::string::npos)
         return true;
-    if (contains_placement_intent(user) && !describes_print_quality_symptom(user))
-        return true;
-    if (contains_rotate_intent(user) && !describes_print_quality_symptom(user))
-        return true;
-    if (contains_flip_intent(user) && !describes_print_quality_symptom(user))
+    if (contains_word_ci(user, "arrange") || contains_word_ci(user, "auto-arrange")
+        || contains_word_ci(user, "autoarrange"))
         return true;
     return false;
 }
 
-bool has_explicit_config_value(const std::string& user)
-{
-    static const std::regex re_pct(R"((\d+)\s*%)", std::regex::icase);
-    static const std::regex re_mm(R"((\d+(?:\.\d+)?)\s*mm)", std::regex::icase);
-    static const std::regex re_temp(R"((\d+)\s*(?:c|°|도)?\s*(?:nozzle|temp|온도))", std::regex::icase);
-    return std::regex_search(user, re_pct) || std::regex_search(user, re_mm) || std::regex_search(user, re_temp) ||
-           contains_explicit_infill_intent(user);
-}
-
-bool has_clear_single_intent(const std::string& user)
-{
-    int intents = 0;
-    if (contains_support_intent(user))
-        ++intents;
-    if (contains_brim_intent(user))
-        ++intents;
-    if (contains_strength_intent(user) || contains_durability_intent(user))
-        ++intents;
-    if (contains_adhesion_intent(user))
-        ++intents;
-    if (contains_explicit_infill_intent(user))
-        ++intents;
-    return intents == 1;
-}
-
 } // namespace
+
+bool OllamaRequestRouter::is_geometry_request(const std::string& user)
+{
+    if (OllamaIntentRules::parse_z_rotation_degrees(user).has_value())
+        return true;
+
+    if (contains_word_ci(user, "rotate") || contains_word_ci(user, "flip")
+        || contains_word_ci(user, "translate") || contains_word_ci(user, "scale")
+        || contains_word_ci(user, "delete"))
+        return true;
+
+    if (user.find("회전") != std::string::npos || user.find("돌려") != std::string::npos
+        || user.find("뒤집") != std::string::npos || user.find("삭제") != std::string::npos
+        || user.find("이동") != std::string::npos || user.find("크기") != std::string::npos)
+        return true;
+
+    if (looks_like_placement_request(user) && !looks_like_quality_not_placement(user))
+        return true;
+
+    return false;
+}
 
 OllamaRequestRoute OllamaRequestRouter::classify(const std::string& user_request)
 {
@@ -67,32 +83,15 @@ OllamaRequestRoute OllamaRequestRouter::classify(const std::string& user_request
     if (user.empty())
         return OllamaRequestRoute::Fast;
 
-    if (is_vague_fix(user))
-        return OllamaRequestRoute::Deep;
-
-    if (is_transform_only(user))
-        return OllamaRequestRoute::Fast;
-
-    if (has_explicit_config_value(user) && has_clear_single_intent(user))
+    if (OllamaRequestRouter::is_geometry_request(user))
         return OllamaRequestRoute::Fast;
 
     const auto hits = OllamaSettingSearch::search(user, 2, 8);
-    if (hits.empty() && describes_print_quality_symptom(user))
+    if (hits.empty())
         return OllamaRequestRoute::Deep;
-
-    if (!hits.empty() && hits.front().score >= 75 && has_clear_single_intent(user))
+    if (hits.front().score >= 55)
         return OllamaRequestRoute::Standard;
-
-    if (!hits.empty() && hits.front().score >= 60 && !describes_print_quality_symptom(user))
-        return OllamaRequestRoute::Standard;
-
-    if (describes_print_quality_symptom(user))
-        return OllamaRequestRoute::Deep;
-
-    if (!hits.empty())
-        return OllamaRequestRoute::Standard;
-
-    return OllamaRequestRoute::Fast;
+    return OllamaRequestRoute::Deep;
 }
 
 const char* OllamaRequestRouter::route_name(OllamaRequestRoute route)
@@ -107,9 +106,7 @@ const char* OllamaRequestRouter::route_name(OllamaRequestRoute route)
 
 bool OllamaRequestRouter::benefits_from_wiki(const std::string& user_request)
 {
-    if (is_vague_fix(user_request))
-        return true;
-    return describes_print_quality_symptom(user_request);
+    return classify(user_request) != OllamaRequestRoute::Fast;
 }
 
 }} // namespace

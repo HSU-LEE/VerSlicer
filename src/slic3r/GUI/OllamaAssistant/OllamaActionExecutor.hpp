@@ -67,6 +67,15 @@ public:
     /** Planner turn: pick candidate setting keys from setting_index. */
     static std::string build_planner_system_prompt();
     static std::string build_planner_user_message(const std::string& user_request);
+    /** Step 1: problem diagnosis. */
+    static std::string build_diagnostic_system_prompt();
+    static std::string build_diagnostic_user_message(const std::string& user_request);
+    /** Step 4: setting change proposal (after wiki + settings analysis). */
+    static std::string build_proposal_user_message(const std::string& user_request,
+                                                   const std::vector<std::string>& candidate_keys,
+                                                   const nlohmann::json& diagnosis_summary,
+                                                   const nlohmann::json& wiki_context,
+                                                   const nlohmann::json& settings_analysis);
     /** Resolver turn: apply changes using looked-up setting_catalog slice. */
     static std::string build_resolver_user_message(const std::string& user_request,
                                                    const std::vector<std::string>& candidate_keys,

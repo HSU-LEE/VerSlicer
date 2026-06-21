@@ -21,6 +21,9 @@ public:
                                            bool include_makerworld = true,
                                            bool force_user_intent  = false);
     static void drop_redundant_slice_actions(nlohmann::json& root);
+
+    /** True when actions contain set_config with at least one allowed option key. */
+    static bool has_viable_set_config(const nlohmann::json& root);
 };
 
 }} // namespace

@@ -45,6 +45,10 @@ public:
     static nlohmann::json build_wiki_context(const std::string& user_request, bool ko_ui, size_t max_pages = 2,
                                              size_t max_chars_per_page = 1600);
 
+    /** Merge wiki excerpts from multiple search queries (diagnosis step). */
+    static nlohmann::json build_wiki_context_from_queries(const std::vector<std::string>& queries, bool ko_ui,
+                                                          size_t max_pages = 2, size_t max_chars_per_page = 1400);
+
     /** Strip HTML to plain text (testable). */
     static std::string html_to_plain_text(const std::string& html, size_t max_chars = 0);
 };

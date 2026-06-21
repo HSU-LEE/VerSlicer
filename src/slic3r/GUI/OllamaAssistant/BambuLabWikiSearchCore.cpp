@@ -1,15 +1,14 @@
 #include "BambuLabWikiSearchCore.hpp"
 
-#include "OllamaIntentRules.hpp"
+#include "OllamaSettingSearch.hpp"
 
 #include <boost/algorithm/string.hpp>
 
 #include <regex>
+#include <sstream>
 
 namespace Slic3r { namespace GUI {
 namespace BambuLabWikiSearchCore {
-
-using namespace OllamaIntentRules;
 
 std::string wiki_locale(bool ko_ui) { return ko_ui ? "ko" : "en"; }
 
@@ -20,21 +19,16 @@ std::string normalize_search_query(const std::string& user_request, bool ko_ui)
     if (q.empty())
         return q;
 
-    if (contains_midair_or_failure_intent(q) || contains_support_intent(q))
-        return "overhang support print quality";
-    if (contains_adhesion_intent(q) || user_request.find("warp") != std::string::npos)
-        return "warping bed adhesion brim";
-    if (user_request.find("실") != std::string::npos || boost::icontains(q, "stringing")
-        || boost::icontains(q, "ooze"))
-        return "stringing oozing retraction";
-    if (contains_durability_intent(q) || contains_strength_intent(q))
-        return "print strength infill wall";
-    if (user_request.find("첫") != std::string::npos || boost::icontains(q, "first layer"))
-        return "first layer adhesion";
-    if (boost::icontains(q, "elephant") || user_request.find("코끼리") != std::string::npos)
-        return "elephant foot compensation";
-    if (boost::icontains(q, "layer height") || user_request.find("층") != std::string::npos)
-        return "layer height print quality";
+    const auto keys = OllamaSettingSearch::candidate_keys_for_request(q, 2, 5);
+    if (!keys.empty()) {
+        std::ostringstream oss;
+        for (size_t i = 0; i < keys.size(); ++i) {
+            if (i)
+                oss << ' ';
+            oss << keys[i];
+        }
+        return oss.str();
+    }
 
     if (ko_ui) {
         static const std::pair<const char*, const char*> ko_to_en[] = {
@@ -44,6 +38,7 @@ std::string normalize_search_query(const std::string& user_request, bool ko_ui)
             {"리트랙션", "retraction stringing"},
             {"온도", "nozzle temperature"},
             {"베드", "bed adhesion"},
+            {"강도", "print strength infill wall"},
         };
         for (const auto& kv : ko_to_en) {
             if (user_request.find(kv.first) != std::string::npos)

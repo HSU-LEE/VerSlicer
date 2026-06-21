@@ -2,7 +2,6 @@
 #include "OllamaActionExecutor.hpp"
 #include "OllamaActionRegistry.hpp"
 #include "OllamaIntentContext.hpp"
-#include "OllamaIntentRules.hpp"
 #include "OllamaSettingRegistry.hpp"
 #include "OllamaSettingCatalogBuilder.hpp"
 #include "OllamaTelemetry.hpp"
@@ -18,7 +17,12 @@ namespace Slic3r { namespace GUI {
 
 namespace {
 
-using namespace OllamaIntentRules;
+static bool user_allows_delete(const std::string& user)
+{
+    return user.find("delete") != std::string::npos || user.find("remove") != std::string::npos
+        || user.find("erase") != std::string::npos || user.find("삭제") != std::string::npos
+        || user.find("지워") != std::string::npos || user.find("지우") != std::string::npos;
+}
 
 double clamp_double(double v, double lo, double hi)
 {
@@ -251,7 +255,7 @@ bool sanitize_one_action(nlohmann::json& action, const std::string& user, Ollama
         return false;
     }
 
-    if (type == "delete_selection" && !user_wants_delete(user)) {
+    if (type == "delete_selection" && !user_allows_delete(user)) {
         block_action(out, "Blocked delete (user did not ask to delete)", /*quiet*/ true);
         return false;
     }
@@ -283,11 +287,6 @@ bool sanitize_one_action(nlohmann::json& action, const std::string& user, Ollama
             action["scope"] = "plate";
             warn(out, "slice scope normalized to plate");
         }
-    }
-
-    if (type == "arrange" && describes_print_quality_symptom(user) && !user_wants_plate_arrange(user)) {
-        block_action(out, "Blocked arrange (user described print quality, not layout)", /*quiet*/ true);
-        return false;
     }
 
     if (type == "makerworld_search") {

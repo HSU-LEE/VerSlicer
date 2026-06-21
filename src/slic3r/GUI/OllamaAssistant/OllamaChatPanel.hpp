@@ -4,6 +4,7 @@
 #include "../GUI_Utils.hpp"
 #include "../MakerWorld/MakerWorldImportFlow.hpp"
 #include "OllamaClient.hpp"
+#include "OllamaDiagnosticPipeline.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -42,19 +43,25 @@ private:
     void ensure_ollama_running();
     void ensure_default_model_ready(const std::vector<std::string>& models);
     void append_chat(const wxString& role, const wxString& text);
+    void begin_thinking_block();
+    void append_thinking_line(const wxString& line);
+    void append_thinking_text(const wxString& text);
+    void clear_thinking_block();
+    void refresh_chat_display();
+    wxString thinking_role_label() const;
     void set_busy(bool busy);
     void on_send(wxCommandEvent& event);
     void on_models_loaded(const std::vector<std::string>& models, const std::string& error);
-    void on_planner_response(const std::string& planner_text, const std::string& user_utf8, const std::string& error);
-    void start_resolver_turn(const std::string& planner_text, const std::string& user_utf8);
-    void start_standard_turn(const std::string& user_utf8);
-    void launch_resolver_llm(const std::string& user_utf8, std::vector<std::string> keys,
-                             const nlohmann::json& wiki_context, int critic_attempt);
-    void fetch_wiki_and_launch_resolver(const std::string& user_utf8, std::vector<std::string> keys, int critic_attempt);
-    void on_resolver_llm_response(const std::string& assistant_text, const std::string& error,
-                                  const std::string& user_utf8, std::vector<std::string> keys,
-                                  const nlohmann::json& wiki_context, int critic_attempt);
+    void on_diagnosis_response(const std::string& diagnosis_text, const std::string& user_utf8, const std::string& error);
+    void start_diagnostic_turn(const std::string& user_utf8);
+    void launch_proposal_llm(const std::string& user_utf8, const OllamaDiagnosis& diagnosis,
+                             std::vector<std::string> keys, const nlohmann::json& wiki_context,
+                             const nlohmann::json& settings_analysis, int critic_attempt);
+    void on_proposal_llm_response(const std::string& assistant_text, const std::string& error,
+                                    const std::string& user_utf8, std::vector<std::string> keys,
+                                    const nlohmann::json& wiki_context, int critic_attempt);
     void on_chat_response(const std::string& assistant_text, const std::string& error);
+    void launch_single_chat_llm(std::string final_user_msg);
     void schedule_model_poll(int delay_ms);
     void trim_message_history();
     void trim_history_display();
@@ -77,6 +84,8 @@ private:
 
     wxPanel*      m_body{nullptr};
     wxTextCtrl*   m_history_ctrl{nullptr};
+    wxString      m_persistent_chat;
+    wxString      m_thinking_block;
     TextInput*    m_input_field{nullptr};
     wxTextCtrl*   m_input_ctrl{nullptr};
     Button*       m_send_btn{nullptr};

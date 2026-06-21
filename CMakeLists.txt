@@ -573,7 +573,7 @@ endif()
 if(POLICY CMP0167)
   cmake_policy(SET CMP0167 NEW)
 endif()
-set(Boost_NO_SYSTEM_PATHS TRUE)
+set(Boost_NO_SYSTEM_PATHS FALSE)
 find_package(Boost 1.83.0 REQUIRED COMPONENTS system filesystem thread log log_setup locale regex chrono atomic date_time iostreams program_options nowide)
 
 # Find and configure Eigen3
@@ -896,7 +896,7 @@ if(SLIC3R_BUILD_SANDBOXES)
     add_subdirectory(sandboxes)
 endif()
 
-if(BUILD_TESTS)
+if(BUILD_TESTS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
     add_subdirectory(tests)
 endif()
 

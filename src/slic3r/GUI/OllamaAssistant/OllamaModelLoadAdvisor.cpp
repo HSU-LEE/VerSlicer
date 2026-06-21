@@ -231,8 +231,22 @@ void run_model_load_chat(Plater* plater)
                     std::string summary;
                     if (root.contains("message") && root["message"].is_string())
                         summary = root["message"].get<std::string>();
+
+                    bool effective = false;
+                    for (const auto& r : workflow.results) {
+                        if (r.success && r.effective_change) {
+                            effective = true;
+                            break;
+                        }
+                    }
+                    if (!effective) {
+                        push_plater_notification(p, _u8L("AI recommendations — no settings were changed."));
+                        finish_schedule();
+                        return;
+                    }
+
                     if (summary.empty())
-                        summary = "Applied AI recommendations for the loaded model.";
+                        summary = _u8L("Applied AI recommendations for the loaded model.");
 
                     if (!workflow.results.empty()) {
                         summary += " [";

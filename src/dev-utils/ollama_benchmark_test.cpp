@@ -24,9 +24,6 @@ static void expect_true(bool cond, const char* label)
 int main()
 {
     setenv("OLLAMA_AUTO_CATALOG", "1", 1);
-    setenv("OLLAMA_TWO_HOP", "1", 1);
-    setenv("OLLAMA_KEYWORD_INJECT", "0", 1);
-    setenv("OLLAMA_RULE_ONLY", "0", 1);
     setenv("OLLAMA_ADAPTIVE_ROUTING", "1", 1);
 
     const auto& scenarios = ollama_benchmark_scenarios();
@@ -62,7 +59,7 @@ int main()
     expect_true(!hits.empty(), "search layer height");
 
     expect_true(ollama_auto_catalog_enabled(), "auto catalog default on");
-    expect_true(ollama_two_hop_enabled(), "two hop default on");
+    expect_true(!ollama_two_hop_enabled(), "two hop default off");
     expect_true(!ollama_keyword_inject_enabled(), "keyword inject default off");
     expect_true(!ollama_rule_only_fallback_enabled(), "rule only default off");
 

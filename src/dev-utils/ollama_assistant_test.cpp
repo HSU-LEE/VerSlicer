@@ -81,10 +81,10 @@ int main()
     expect_true(OllamaIntentContext::clamp_filament_index(-1, 4) == 0, "filament idx clamp low");
     expect_true(OllamaIntentContext::clamp_filament_index(9, 4) == 3, "filament idx clamp high");
 
-    expect_true(!OllamaIntentRules::contains_midair_or_failure_intent("프린트 설정"), "print word alone not midair");
-    expect_true(OllamaIntentRules::contains_midair_or_failure_intent("공중에 출력"), "midair phrase detected");
-    expect_true(OllamaIntentRules::contains_durability_intent("부서져요"), "durability intent");
-    expect_true(!OllamaIntentRules::contains_brim_intent("브림 없"), "disable brim");
+    {
+        const auto z = OllamaIntentRules::parse_z_rotation_degrees("90도 돌려");
+        expect_true(z.has_value() && *z == 90.0, "parse rotation degrees");
+    }
 
     if (g_failures == 0) {
         std::cout << "ollama_assistant_test: all passed\n";
