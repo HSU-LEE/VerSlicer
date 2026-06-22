@@ -8,9 +8,8 @@
 #include "OllamaModelPick.hpp"
 #include "OllamaServerManager.hpp"
 #include "OllamaActionWorkflow.hpp"
-#include "OllamaAgentProactive.hpp"
+#include "OllamaConfig.hpp"
 #include "OllamaExecutionPolicy.hpp"
-#include "OllamaToolResult.hpp"
 #include "OllamaProcessingNotice.hpp"
 #include "OllamaSettingSearch.hpp"
 #include "OllamaPrintingTips.hpp"
@@ -60,7 +59,6 @@ namespace {
 constexpr const char* kAssistantModeKey = "assistant_mode";
 constexpr const char* kModeApply         = "apply";
 constexpr const char* kModeAssist        = "assist";
-constexpr const char* kModeAgent         = "agent";
 constexpr const char* kModeQuestion      = "question";
 constexpr int         kMaxModelPollFailures = 12;
 constexpr size_t      kMaxHistoryChars      = 48000;
@@ -490,7 +488,6 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     m_mode_choice = new wxChoice(m_body, wxID_ANY);
     m_mode_choice->Append(_L("Question"));
     m_mode_choice->Append(_L("Assist"));
-    m_mode_choice->Append(_L("Agent"));
     m_mode_choice->SetMinSize(wxSize(FromDIP(96), row_h));
     m_mode_choice->SetFont(Label::Body_13);
     m_mode_choice->SetBackgroundColour(SlicePilotUi::Theme::background());
@@ -570,9 +567,7 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
         m_collapse_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { set_collapsed(!m_collapsed); });
 
     m_mode_choice->Bind(wxEVT_CHOICE, [this](wxCommandEvent& e) {
-        const int sel = e.GetSelection();
-        m_apply_mode  = sel != 0;
-        m_agent_mode  = sel == 2;
+        m_apply_mode = e.GetSelection() != 0;
         save_settings();
         refresh_mode_ui();
         if (!m_messages.empty()) {
@@ -759,20 +754,12 @@ void OllamaChatPanel::load_settings()
         m_model = resolve_installed_model(m_available_models, m_model);
     update_model_label_ui();
     const std::string mode = wxGetApp().app_config->get(kOllamaConfigSection, kAssistantModeKey);
-    if (mode == kModeAgent || mode == kAssistantModeAgent) {
-        m_apply_mode = true;
-        m_agent_mode = true;
-    } else if (mode == kModeQuestion || mode == kAssistantModeQuestion) {
+    if (mode == kModeQuestion || mode == kAssistantModeQuestion)
         m_apply_mode = false;
-        m_agent_mode = false;
-    } else {
+    else
         m_apply_mode = true;
-        m_agent_mode = false;
-    }
-    if (m_mode_choice) {
-        int sel = m_agent_mode ? 2 : (m_apply_mode ? 1 : 0);
-        m_mode_choice->SetSelection(sel);
-    }
+    if (m_mode_choice)
+        m_mode_choice->SetSelection(m_apply_mode ? 1 : 0);
     refresh_mode_ui();
 }
 
@@ -781,15 +768,13 @@ void OllamaChatPanel::save_settings()
     if (!wxGetApp().app_config)
         return;
     wxGetApp().app_config->set(kOllamaConfigSection, kOllamaModelKey, normalize_ollama_model_tag(m_model));
-    const char* mode_str = m_agent_mode ? kModeAgent : (m_apply_mode ? kModeAssist : kModeQuestion);
+    const char* mode_str = m_apply_mode ? kModeAssist : kModeQuestion;
     wxGetApp().app_config->set(kOllamaConfigSection, kAssistantModeKey, mode_str);
     wxGetApp().app_config->save();
 }
 
 wxString OllamaChatPanel::system_welcome_message() const
 {
-    if (m_agent_mode)
-        return _L("Agent mode: describe a goal — the AI will read state, call tools, and work toward completion in one turn.");
     if (m_apply_mode)
         return _L("Assist mode: describe your problem in everyday words — e.g. “won’t stick to the bed”, “breaks easily”, or “infill 20%”. Settings will be applied for you.");
     return _L("Question mode: ask anything about printing. Nothing will be changed — you’ll get a plain-language explanation.");
@@ -798,16 +783,12 @@ wxString OllamaChatPanel::system_welcome_message() const
 void OllamaChatPanel::refresh_mode_ui()
 {
     if (m_mode_choice) {
-        const int sel = m_agent_mode ? 2 : (m_apply_mode ? 1 : 0);
+        const int sel = m_apply_mode ? 1 : 0;
         if (m_mode_choice->GetSelection() != sel)
             m_mode_choice->SetSelection(sel);
     }
     if (m_input_ctrl) {
-        if (m_agent_mode) {
-            m_input_ctrl->SetHint(ui_is_korean()
-                ? wxString::FromUTF8("예: 브림 켜고 슬라이스까지, MakerWorld에서 자동차 찾아서 올려줘")
-                : _L("e.g. enable brim and slice, find a car on MakerWorld and place it"));
-        } else if (m_apply_mode) {
+        if (m_apply_mode) {
             m_input_ctrl->SetHint(ui_is_korean()
                 ? wxString::FromUTF8("예: 브림 켜 줘, 서포트 켜 줘, 안 붙어요, 채움 20%")
                 : _L("e.g. turn on brim, enable support, won't stick, infill 20%"));
@@ -836,10 +817,9 @@ void OllamaChatPanel::set_status_text(const wxString& text)
 
 void OllamaChatPanel::set_assistant_mode(bool apply_mode)
 {
-    if (m_apply_mode == apply_mode && !m_agent_mode)
+    if (m_apply_mode == apply_mode)
         return;
     m_apply_mode = apply_mode;
-    m_agent_mode = false;
     save_settings();
     refresh_mode_ui();
     if (!m_messages.empty()) {
@@ -853,8 +833,6 @@ void OllamaChatPanel::set_assistant_mode(bool apply_mode)
 void OllamaChatPanel::reset_conversation()
 {
     ++m_request_gen;
-    if (m_agent_controller && m_agent_controller->is_running())
-        m_agent_controller->cancel();
     set_busy(false);
     m_messages.clear();
     m_messages.push_back({"system", OllamaActionExecutor::build_system_prompt(m_apply_mode)});
@@ -995,8 +973,6 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
         return;
 
     save_settings();
-    if (m_apply_mode)
-        OllamaAgentProactive::install();
     OllamaClient::cancel_active_requests(OllamaCancelDomain::Chat);
     m_input_ctrl->Clear();
     append_chat(_L("You"), user_text);
@@ -1031,7 +1007,8 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
     for (const auto& m : m_messages)
         if (m.role == "user")
             ++user_turns;
-    const bool attach_context =
+
+    bool attach_context =
         (user_turns == 0) || (m_apply_mode ? (user_turns % 2 == 0) : (user_turns % 4 == 0));
 
     std::string user_msg = user_text.utf8_string();
@@ -1060,30 +1037,6 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
 
     if (OllamaDiagnosticPipeline::needs_pipeline(user_utf8, m_apply_mode)) {
         start_diagnostic_turn(user_utf8);
-        return;
-    }
-
-    if (m_agent_mode) {
-        set_busy(true);
-        if (!m_agent_controller)
-            m_agent_controller = std::make_unique<OllamaAgentController>(m_client, normalize_ollama_model_tag(m_model));
-        else
-            m_agent_controller->set_model(normalize_ollama_model_tag(m_model));
-        const auto alive = m_alive;
-        m_agent_controller->run_goal(
-            user_utf8, ollama_execution_policy_for_agent_mode(), this,
-            OllamaAgentCallbacks{
-                [alive, this](const wxString& line) {
-                    if (!alive->load())
-                        return;
-                    append_thinking_line(line);
-                },
-                [alive, this](const OllamaAgentRunResult& result) {
-                    if (!alive->load())
-                        return;
-                    on_agent_finished(result);
-                },
-            });
         return;
     }
 
@@ -1383,8 +1336,6 @@ void OllamaChatPanel::on_models_loaded(const std::vector<std::string>& models, c
     m_available_models    = models;
     OllamaServerManager::note_serve_reachable();
     m_model = resolve_installed_model(models, m_model);
-    if (m_agent_controller)
-        m_agent_controller->set_model(normalize_ollama_model_tag(m_model));
     update_model_label_ui();
     save_settings();
     ensure_default_model_ready(models);
@@ -1514,8 +1465,7 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
         }
 
         if (m_apply_mode) {
-            const OllamaExecutionPolicy policy =
-                m_agent_mode ? ollama_execution_policy_for_agent_mode() : ollama_execution_policy_for_assist_mode();
+            const OllamaExecutionPolicy policy = ollama_execution_policy_for_assist_mode();
             const OllamaWorkflowRun workflow = OllamaActionWorkflow::execute_with_policy(root, this, policy);
 
             const auto workflow_had_effective_change = [&]() {
@@ -1631,37 +1581,6 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
         }
     }
 
-    trim_message_history();
-    append_chat(_L("Assistant"), display);
-    set_status_text(completion_status_for_reply(display));
-}
-
-void OllamaChatPanel::on_agent_finished(const OllamaAgentRunResult& result)
-{
-    if (!m_alive->load() || wxGetApp().is_closing())
-        return;
-
-    clear_thinking_block();
-    set_busy(false);
-
-    const bool ko = wxGetApp().current_language_code().StartsWith("ko");
-    wxString   display;
-    if (!result.final_message.empty())
-        display = wxString::FromUTF8(result.final_message);
-    else if (result.cancelled)
-        display = ko ? wxString::FromUTF8("에이전트가 취소되었습니다.") : _L("Agent cancelled.");
-    else if (result.blocked)
-        display = ko ? wxString::FromUTF8("에이전트가 중단되었습니다.") : _L("Agent stopped.");
-    else
-        display = _L("OK.");
-
-    if (result.completed && !result.step_tool_results.empty()) {
-        const std::string report = ollama_format_agent_completion_report(result.step_tool_results, ko);
-        if (!report.empty())
-            display += "\n\n" + wxString::FromUTF8(report);
-    }
-
-    m_messages.push_back({"assistant", into_u8(display)});
     trim_message_history();
     append_chat(_L("Assistant"), display);
     set_status_text(completion_status_for_reply(display));

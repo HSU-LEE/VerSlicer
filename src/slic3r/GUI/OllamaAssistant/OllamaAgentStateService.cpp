@@ -2,6 +2,7 @@
 
 #include "OllamaActionExecutor.hpp"
 #include "OllamaUserFlow.hpp"
+#include "OllamaSettingSearch.hpp"
 
 #include "../BambuSmartPrint/BambuSmartPrintService.hpp"
 #include "../GUI_App.hpp"
@@ -153,6 +154,34 @@ nlohmann::json OllamaAgentStateService::snapshot()
 std::string OllamaAgentStateService::snapshot_json()
 {
     return snapshot().dump(2);
+}
+
+nlohmann::json OllamaAgentStateService::config_digest(const std::string& user_goal_hint)
+{
+    nlohmann::json out = nlohmann::json::object();
+    if (!wxGetApp().preset_bundle)
+        return out;
+
+    std::vector<std::string> keys = OllamaSettingSearch::candidate_keys_for_request(user_goal_hint, 2, 12);
+    if (keys.empty()) {
+        static const char* kDefaultKeys[] = {
+            "layer_height", "sparse_infill_density", "enable_support", "brim_width",
+            "retraction_length", "nozzle_temperature", "bed_temperature", "outer_wall_speed",
+        };
+        for (const char* k : kDefaultKeys)
+            keys.push_back(k);
+    }
+
+    const DynamicPrintConfig cfg = wxGetApp().preset_bundle->full_config(false);
+    for (const std::string& key : keys) {
+        const std::string norm = OllamaActionExecutor::normalize_config_key(key);
+        if (!cfg.has(norm))
+            continue;
+        const ConfigOption* opt = cfg.option(norm);
+        if (opt)
+            out[norm] = opt->serialize();
+    }
+    return out;
 }
 
 std::vector<std::string> OllamaAgentStateService::verify_config_applied(const nlohmann::json& expected_options,

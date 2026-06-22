@@ -18,6 +18,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <sstream>
 #include <utility>
 
 namespace Slic3r { namespace GUI {
@@ -309,14 +310,14 @@ std::vector<std::string> list_models_sync_impl(const std::string& base_url, std:
 ChatAttemptResult run_chat_http(const std::string& url, const std::string& model,
                                 const std::vector<OllamaMessage>& messages,
                                 const std::shared_ptr<std::atomic<bool>>& cancel_flag, int retry_tier,
-                                OllamaRequestKind kind)
+                                OllamaRequestKind kind, OllamaClient::StreamCallback stream_cb = nullptr)
 {
     ChatAttemptResult out;
     out.retry_tier = retry_tier;
 
     nlohmann::json body;
-    body["model"]    = model;
-    body["stream"]     = false;
+    body["model"]      = model;
+    body["stream"]     = static_cast<bool>(stream_cb);
     body["keep_alive"] = kOllamaKeepAlive;
     body["options"]    = {{"temperature", 0.2},
                           {"top_p", 0.9},
@@ -383,6 +384,48 @@ ChatAttemptResult run_chat_http(const std::string& url, const std::string& model
     if (response.empty())
         return { {}, "Empty HTTP body from Ollama", 0, http_status, model };
 
+    if (stream_cb) {
+        std::string accumulated;
+        std::istringstream iss(response);
+        std::string        line;
+        while (std::getline(iss, line)) {
+            if (cancel_flag && cancel_flag->load())
+                return { {}, "Request cancelled", 0, http_status, model };
+            boost::trim(line);
+            if (line.empty())
+                continue;
+            try {
+                const nlohmann::json j = nlohmann::json::parse(line);
+                if (j.contains("error")) {
+                    out.error          = j["error"].is_string() ? j["error"].get<std::string>() : j["error"].dump();
+                    out.http_status    = http_status;
+                    out.resolved_model = model;
+                    return out;
+                }
+                std::string piece;
+                if (j.contains("message") && j["message"].is_object()) {
+                    const auto& msg = j["message"];
+                    if (msg.contains("content") && msg["content"].is_string())
+                        piece = msg["content"].get<std::string>();
+                }
+                if (!piece.empty()) {
+                    accumulated += piece;
+                    stream_cb(piece);
+                }
+                if (j.value("done", false))
+                    break;
+            } catch (...) {
+            }
+        }
+        out.content        = accumulated;
+        out.http_status    = http_status;
+        out.resolved_model = model;
+        if (!is_effectively_empty(out.content))
+            return out;
+        out.error = "Empty streamed Ollama reply";
+        return out;
+    }
+
     try {
         const nlohmann::json j = nlohmann::json::parse(response);
 
@@ -431,7 +474,7 @@ void OllamaClient::cancel_active_requests(OllamaCancelDomain domain)
 }
 
 void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessage>& messages, ChatCallback callback,
-                        OllamaRequestKind kind)
+                        OllamaRequestKind kind, StreamCallback stream_cb)
 {
     if (!callback)
         return;
@@ -450,6 +493,7 @@ void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessag
 
     struct Job {
         ChatCallback                       callback;
+        StreamCallback                     stream_cb;
         std::string                        base_url;
         std::string                        url;
         std::string                        model;
@@ -460,6 +504,7 @@ void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessag
 
     auto job         = std::make_shared<Job>();
     job->callback    = std::move(callback);
+    job->stream_cb   = std::move(stream_cb);
     job->base_url    = m_base_url;
     job->url         = m_base_url + "/api/chat";
     job->model       = normalize_model_tag(model);
@@ -487,11 +532,13 @@ void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessag
             if (!installed.empty())
                 model = pick_installed_ollama_model(installed, model);
 
-            result = run_chat_http(job->url, model, job->messages, job->cancel_flag, retry_tier, job->kind);
+            result = run_chat_http(job->url, model, job->messages, job->cancel_flag, retry_tier, job->kind,
+                                   job->stream_cb);
 
             if (result.content.empty() && result.error.find("HTTP 404") != std::string::npos && !installed.empty()) {
                 model  = pick_installed_ollama_model(installed, model);
-                result = run_chat_http(job->url, model, job->messages, job->cancel_flag, retry_tier, job->kind);
+                result = run_chat_http(job->url, model, job->messages, job->cancel_flag, retry_tier, job->kind,
+                                       job->stream_cb);
             }
 
             if (result.content.empty() && result.error.find("HTTP 404") == std::string::npos
@@ -499,12 +546,12 @@ void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessag
                 if (!job->messages.empty()) {
                     retry_tier = 1;
                     result     = run_chat_http(job->url, model, slim_messages_for_retry(job->messages), job->cancel_flag,
-                                           retry_tier, job->kind);
+                                           retry_tier, job->kind, job->stream_cb);
                 }
                 if (result.content.empty()) {
                     retry_tier = 2;
                     result     = run_chat_http(job->url, model, minimal_messages_for_retry(job->messages),
-                                           job->cancel_flag, retry_tier, job->kind);
+                                           job->cancel_flag, retry_tier, job->kind, job->stream_cb);
                 }
             }
             result.retry_tier = retry_tier;

@@ -201,20 +201,6 @@ const std::vector<OllamaBenchmarkScenario>& ollama_benchmark_scenarios()
         {"route_vague", "고쳐줘", [](const std::string&) {
              return OllamaRequestRouter::classify("고쳐줘") == OllamaRequestRoute::Deep;
          }},
-        {"agent_get_state", "get_state", [](const std::string&) { return true; }},
-        {"agent_multistep_brim", "enable brim then slice", [](const std::string& u) {
-             return search_hits_key(u, "brim") || u.find("slice") != std::string::npos;
-         }},
-        {"agent_multistep_brim_ko", "브림 켜고 슬라이스해줘", [](const std::string& u) {
-             return u.find("브림") != std::string::npos && u.find("슬라이스") != std::string::npos;
-         }},
-        {"agent_multistep_send_ko", "슬라이스하고 프린터로 보내줘", [](const std::string& u) {
-             return u.find("슬라이스") != std::string::npos
-                 && (u.find("보내") != std::string::npos || u.find("프린터") != std::string::npos);
-         }},
-        {"agent_multistep_mw", "makerworld search import arrange", [](const std::string& u) {
-             return u.find("makerworld") != std::string::npos || u.find("MakerWorld") != std::string::npos;
-         }},
     };
     return scenarios;
 }

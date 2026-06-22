@@ -39,10 +39,11 @@ public:
     const std::string& base_url() const { return m_base_url; }
 
     using ChatCallback   = std::function<void(const std::string& assistant_text, const std::string& error)>;
+    using StreamCallback = std::function<void(const std::string& chunk)>;
     using ModelsCallback = std::function<void(const std::vector<std::string>& models, const std::string& error)>;
 
     void chat(const std::string& model, const std::vector<OllamaMessage>& messages, ChatCallback callback,
-              OllamaRequestKind kind = OllamaRequestKind::Chat);
+              OllamaRequestKind kind = OllamaRequestKind::Chat, StreamCallback stream = nullptr);
     void list_models(ModelsCallback callback);
     /** Blocking; for model validation before chat. */
     std::vector<std::string> list_models_sync() const;

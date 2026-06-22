@@ -8,6 +8,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include <cstdlib>
+#include <algorithm>
 
 namespace Slic3r { namespace GUI {
 
@@ -117,6 +118,23 @@ bool ollama_wiki_search_enabled()
 bool ollama_critic_enabled()
 {
     return pipeline_flag(kOllamaCriticKey, "OLLAMA_CRITIC", false);
+}
+
+int config_int(const char* key, int default_value)
+{
+#ifndef OLLAMA_HEADLESS_TEST
+    if (wxTheApp && wxGetApp().app_config) {
+        const std::string v = wxGetApp().app_config->get(kOllamaConfigSection, key);
+        if (!v.empty()) {
+            try {
+                return std::stoi(v);
+            } catch (...) {
+            }
+        }
+    }
+#endif
+    (void) key;
+    return default_value;
 }
 
 }} // namespace

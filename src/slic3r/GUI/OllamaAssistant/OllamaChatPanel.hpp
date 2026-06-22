@@ -5,12 +5,12 @@
 #include "../MakerWorld/MakerWorldImportFlow.hpp"
 #include "OllamaClient.hpp"
 #include "OllamaDiagnosticPipeline.hpp"
-#include "OllamaAgentController.hpp"
 #include "OllamaExecutionPolicy.hpp"
 
 #include <nlohmann/json.hpp>
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -70,7 +70,6 @@ private:
     void reset_conversation();
     void set_assistant_mode(bool apply_mode);
     bool apply_mode() const { return m_apply_mode; }
-    void on_agent_finished(const OllamaAgentRunResult& result);
     void refresh_mode_ui();
     wxString system_welcome_message() const;
     void set_status_text(const wxString& text);
@@ -99,9 +98,6 @@ private:
     wxStaticText* m_model_label{nullptr};
     wxStaticText* m_status{nullptr};
     bool          m_apply_mode{true};
-    bool          m_agent_mode{false};
-
-    std::unique_ptr<OllamaAgentController> m_agent_controller;
 
     OllamaClient               m_client;
     std::string                m_model;
@@ -120,4 +116,3 @@ private:
 }} // namespace
 
 #endif
-

@@ -8,18 +8,14 @@ namespace Slic3r { namespace GUI {
 /** How AI actions pass through confirmation dialogs and inline execution. */
 enum class OllamaExecutionPolicy
 {
-    ConfirmAlways,    /** Always show review dialog for set_config; coach confirms manually. */
-    AutoSafe,         /** Geometry/flow inline; set_config via review dialog with auto-apply. */
-    AgentAutonomous,  /** Agent loop: safe tools inline; dangerous tools still gated. */
+    ConfirmAlways, /** Always show review dialog for set_config; coach confirms manually. */
 };
 
 OllamaExecutionPolicy ollama_execution_policy_for_assist_mode();
-OllamaExecutionPolicy ollama_execution_policy_for_agent_mode();
 
 /** Chat / coach UI mode strings persisted in assistant_mode config key. */
 constexpr const char* kAssistantModeQuestion = "question";
 constexpr const char* kAssistantModeAssist   = "assist";
-constexpr const char* kAssistantModeAgent    = "agent";
 
 OllamaExecutionPolicy ollama_execution_policy_from_mode_string(const std::string& mode);
 std::string           ollama_mode_string_from_policy(OllamaExecutionPolicy policy);

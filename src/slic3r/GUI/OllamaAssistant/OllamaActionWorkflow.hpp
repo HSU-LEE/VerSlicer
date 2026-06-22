@@ -25,7 +25,7 @@ class OllamaActionWorkflow
 public:
     static bool            has_executable_actions(const nlohmann::json& root);
     static OllamaWorkflowRun confirm_and_execute(const nlohmann::json& root, wxWindow* parent);
-    /** Apply with unified execution policy (Assist / Agent / Coach). */
+    /** Apply with unified execution policy (Assist / Coach). */
     static OllamaWorkflowRun execute_with_policy(const nlohmann::json& root, wxWindow* parent,
                                                  OllamaExecutionPolicy policy);
     /** Apply without modal dialog (AI Coach inline buttons). */

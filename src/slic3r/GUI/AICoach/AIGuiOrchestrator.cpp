@@ -4,9 +4,12 @@
 #include "AICoachController.hpp"
 #include "AICoachRulesEngine.hpp"
 
-#include "../OllamaAssistant/OllamaAgentEventBus.hpp"
-
 #include "../OllamaAssistant/OllamaActionPipeline.hpp"
+#include "../OllamaAssistant/OllamaAgentStateService.hpp"
+#include "../OllamaAssistant/OllamaModelLoadAdvisor.hpp"
+
+#include "../GUI.hpp"
+#include "../I18N.hpp"
 
 #include "../BambuSmartPrint/PrintPlannerGui.hpp"
 
@@ -22,11 +25,12 @@ namespace Slic3r { namespace GUI {
 
 namespace {
 
-bool can_publish_agent_events()
+bool ollama_assist_active()
 {
-    if (!wxTheApp)
+    if (!wxGetApp().app_config)
         return false;
-    return wxGetApp().initialized() && !wxGetApp().is_closing();
+    const std::string mode = wxGetApp().app_config->get("ollama", "assistant_mode");
+    return mode == "assist" || mode == "apply";
 }
 
 } // namespace
@@ -91,26 +95,21 @@ bool AIGuiOrchestrator::should_enqueue_beginner_tour() const
 
 void AIGuiOrchestrator::on_model_loaded(Plater* plater)
 {
-    if (can_publish_agent_events())
-        OllamaAgentEventBus::instance().publish(OllamaAgentEventKind::ModelLoaded);
+    if (plater && ollama_assist_active())
+        OllamaModelLoadAdvisor::schedule_after_model_load(plater);
     PrintPlannerGui::dispatch_model_loaded(plater);
 }
 
 void AIGuiOrchestrator::on_slice_completed(Plater* plater, const Print* print, bool success)
 {
-    if (can_publish_agent_events()) {
-        nlohmann::json payload = {{"success", success}};
-        if (!success) {
-            const bool ko = wxGetApp().current_language_code().StartsWith("ko");
-            payload["summary"] =
-                ko ? "슬라이싱에 실패했습니다. 모델 배치, 서포트, 벽 두께를 확인해 보세요."
-                   : "Slicing failed. Check model placement, supports, and wall settings.";
-            nlohmann::json apply_root = OllamaActionPipeline::build_symptom_fallback_root(
-                ko ? "슬라이싱 실패 서포트 브림" : "slicing failed support brim", false);
-            if (apply_root.contains("actions") && apply_root["actions"].is_array() && !apply_root["actions"].empty())
-                payload["apply_root"] = std::move(apply_root);
-        }
-        OllamaAgentEventBus::instance().publish(OllamaAgentEventKind::SliceDone, std::move(payload));
+    if (!success && plater && AICoachController::is_enabled_for_current_mode()) {
+        const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+        const std::string summary =
+            ko ? "슬라이싱에 실패했습니다. 모델 배치, 서포트, 벽 두께를 확인해 보세요."
+               : "Slicing failed. Check model placement, supports, and wall settings.";
+        nlohmann::json apply_root = OllamaActionPipeline::build_symptom_fallback_root(
+            ko ? "슬라이싱 실패 서포트 브림" : "slicing failed support brim", false);
+        AICoachController::instance().on_print_failure_hint(plater, summary, apply_root);
     }
     if (!plater || !success || !AICoachController::is_enabled_for_current_mode()) {
         AICoachController::instance().on_slice_completed(plater, print, success);
@@ -156,10 +155,13 @@ void AIGuiOrchestrator::on_chat_apply_end(bool applied, const nlohmann::json& ro
             AICoachApplyDedup::instance().record_applied_root(root, dedup_source);
         if (root.contains("actions") && root["actions"].is_array()) {
             for (const auto& a : root["actions"]) {
-                if (can_publish_agent_events() && a.is_object() && a.value("type", "") == "set_config"
-                    && a.contains("options"))
-                    OllamaAgentEventBus::instance().publish(OllamaAgentEventKind::ConfigApplied,
-                                                             {{"options", a["options"]}});
+                if (!a.is_object() || a.value("type", "") != "set_config" || !a.contains("options")
+                    || !a["options"].is_object())
+                    continue;
+                const auto mismatches =
+                    OllamaAgentStateService::verify_config_applied(a["options"], a.value("preset", "print"));
+                if (!mismatches.empty() && wxGetApp().plater())
+                    show_info(wxGetApp().plater(), mismatches.front(), _L("AI Assistant"));
             }
         }
     }

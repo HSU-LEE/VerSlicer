@@ -15,6 +15,9 @@ public:
     static nlohmann::json snapshot();
     static std::string    snapshot_json();
 
+    /** Compact print-setting values for agent context (goal-aware key pick). */
+    static nlohmann::json config_digest(const std::string& user_goal_hint = {});
+
     /** Compare key fields after set_config; returns mismatched keys. */
     static std::vector<std::string> verify_config_applied(const nlohmann::json& expected_options,
                                                           const std::string&    preset = "print");
