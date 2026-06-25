@@ -210,6 +210,7 @@ AI assistant (Ollama) — required for chat/voice
   1. Download and install Ollama: https://ollama.com/download
   2. Open Terminal and run:  ollama pull qwen2.5:3b
   3. Leave Ollama running, then use the chat button on the 3D toolbar.
+  4. In chat, set Mode to Assist to apply slicer changes (Question = advice only).
 
 System requirements
   • macOS 11.3 or later

@@ -45,25 +45,43 @@ Install [Ollama](https://ollama.com/), leave it running (`ollama serve` or the m
 ### 2. First launch
 
 1. Open VerSlicer → 3D view → **Ollama chat**
-2. Set **Mode** to **Apply** to change slicer settings from chat
+2. Set **Mode** to **Assist** to let the assistant change slicer settings and run actions
 3. Confirm the model label shows `qwen2.5:3b`
 
-### 3. Voice (macOS)
+### 3. Chat modes
+
+| Mode | What it does |
+| --- | --- |
+| **Question** | Advice only — no settings or plate changes |
+| **Assist** | Applies changes: `set_config`, rotate, arrange, slice, MakerWorld import, and more |
+
+### 4. Voice (macOS)
 
 - Grant **Microphone** and **Speech Recognition** when prompted
 - For Korean voice, add Korean in **System Settings → General → Language & Region** (above English if you speak Korean)
 - Speak clearly; garbled transcripts are rejected instead of being sent to the model
 
-Apply 모드에서는 품질·설정 요청에 **4단계 파이프라인**을 사용합니다:
+## Assist backend (v3.1.1)
 
-1. **문제 진단** — LLM이 증상·원인·검색할 Wiki 키워드·후보 설정 추출  
-2. **근거 검색** — Bambu Lab Wiki에서 관련 문서 발췌  
-3. **현재 설정 분석** — 후보 키의 현재값과 진단 대조 (코드)  
-4. **설정 변경 제안** — 진단+Wiki+분석을 바탕으로 `set_config` 제안  
+Assist mode picks a backend route automatically. The UI stays the same — only the pipeline changes.
+
+| Route | When it runs |
+| --- | --- |
+| **Assist loop** | Multi-step observe → plan → act (slice + brim/support, multi-action goals, etc.) |
+| **Diagnostic pipeline** | Vague print-quality issues — 4 steps: diagnose → Wiki search → analyze current settings → propose `set_config` |
+| **Two-hop** | Planner LLM → resolver LLM for complex setting changes |
+| **Single-shot** | Simple geometry / explicit numeric requests in one LLM call |
+
+Assist 모드에서는 품질·설정 요청에 **4단계 진단 파이프라인**을 사용할 수 있습니다:
+
+1. **문제 진단** — LLM이 증상·원인·검색할 Wiki 키워드·후보 설정 추출
+2. **근거 검색** — Bambu Lab Wiki에서 관련 문서 발췌
+3. **현재 설정 분석** — 후보 키의 현재값과 진단 대조 (코드)
+4. **설정 변경 제안** — 진단+Wiki+분석을 바탕으로 `set_config` 제안
 
 회전·배치·명시적 수치 지정 등 단순 요청은 1회 LLM으로 바로 처리합니다.
 
-Apply 모드에서는 요청마다 **pro_tips**(gyroid, 아이어링, 브릿지 팬 등)와 고급 설정 카탈로그를 LLM에 전달합니다. 모델이 `set_config`를 반환하면 키워드 시나리오로 덮어쓰지 않습니다.
+Assist 모드에서는 요청마다 **pro_tips**(gyroid, 아이어링, 브릿지 팬 등)와 고급 설정 카탈로그를 LLM에 전달합니다. 모델이 `set_config`를 반환하면 키워드 시나리오로 덮어쓰지 않습니다.
 
 ## AI assistant defaults
 
@@ -73,8 +91,11 @@ Apply 모드에서는 요청마다 **pro_tips**(gyroid, 아이어링, 브릿지 
 | Context window | 8192 tokens | Smaller = faster |
 | Max reply tokens | 768 | Enough for JSON actions |
 | Keep-alive | 30 min | Avoids reload delay between messages |
-| Two-hop planner | off | Single LLM call = faster; Deep routes use planner when enabled |
-| Keyword inject | on | **Fallback only** when the model returns no set_config — does not override LLM |
+| Assist loop | on | Multi-step agent; up to 8 steps |
+| Assist max steps | 8 | `OLLAMA_ASSIST_MAX_STEPS` env override |
+| Adaptive routing | on | Fast / Standard / Deep request classification |
+| Two-hop planner | off | Deep routes can use planner when enabled |
+| Keyword inject | off | Fallback only when the model returns no `set_config` |
 | Wiki search / critic | on (wiki) / off (critic) | Wiki for vague quality issues; critic for second-pass review |
 
 Stored in `~/Library/Application Support/verslicer/verslicer.conf` under `"ollama"`:
@@ -82,7 +103,10 @@ Stored in `~/Library/Application Support/verslicer/verslicer.conf` under `"ollam
 ```json
 "ollama": {
   "model": "qwen2.5:3b",
-  "assistant_mode": true,
+  "assistant_mode": "assist",
+  "assist_loop": "true",
+  "assist_max_steps": "8",
+  "adaptive_routing": "true",
   "keyword_inject": "false",
   "two_hop": "false",
   "wiki_search": "true",
@@ -90,7 +114,7 @@ Stored in `~/Library/Application Support/verslicer/verslicer.conf` under `"ollam
 }
 ```
 
-Environment overrides: `OLLAMA_TWO_HOP`, `OLLAMA_KEYWORD_INJECT`, `OLLAMA_WIKI_SEARCH`, `OLLAMA_CRITIC` (`1` / `true` / `on`).
+Environment overrides: `OLLAMA_ASSIST_LOOP`, `OLLAMA_ASSIST_MAX_STEPS`, `OLLAMA_ADAPTIVE_ROUTING`, `OLLAMA_TWO_HOP`, `OLLAMA_KEYWORD_INJECT`, `OLLAMA_WIKI_SEARCH`, `OLLAMA_CRITIC` (`1` / `true` / `on`).
 
 ## Build
 
@@ -105,11 +129,11 @@ macOS 11.3+, Xcode or CLT, CMake 3.13+.
 Output: `build/<arch>/src/Release/verslicer.app`  
 Symlink: `build/<arch>/OrcaSlicer/Verslicer.app`
 
-Quick rebuild after code changes:
+Quick rebuild after code changes (Ninja):
 
 ```bash
 cd build/arm64
-cmake --build . --config Release --target OrcaSlicer -j$(sysctl -n hw.ncpu)
+ninja -f build-Release.ninja -j4 src/Release/verslicer.app/Contents/MacOS/verslicer
 open src/Release/verslicer.app
 ```
 
@@ -118,13 +142,14 @@ open src/Release/verslicer.app
 Package an existing Release build for another Mac (no dev tools required):
 
 ```bash
-./scripts/make_macos_installer.sh          # package existing build
-./scripts/make_macos_installer.sh --build  # rebuild app, then package
-./build_release_macos.sh -s -x -M          # same as --build + .dmg
+./scripts/make_macos_installer.sh              # package existing build
+./scripts/make_macos_installer.sh --build      # rebuild app, then package
+./scripts/make_macos_installer.sh --build-only # portable .app only (no .dmg)
+./build_release_macos.sh -s -x -M              # same as --build + .dmg
 ```
 
 **Output:** `build/<arch>/dist/VerSlicer-macOS-<arch>-<version>.dmg`  
-Example: `build/arm64/dist/VerSlicer-macOS-arm64-3.0.0.dmg`
+Example: `build/arm64/dist/VerSlicer-macOS-arm64-3.1.1.dmg`
 
 **On another Mac:**
 
