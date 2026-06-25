@@ -2,6 +2,7 @@
 
 #include "BambuLabWikiSearch.hpp"
 #include "OllamaActionJsonExtract.hpp"
+#include "OllamaConfig.hpp"
 #include "OllamaIntentContext.hpp"
 #include "OllamaRequestRouter.hpp"
 #include "OllamaSettingSearch.hpp"
@@ -182,7 +183,14 @@ bool OllamaDiagnosticPipeline::needs_pipeline(const std::string& user_request, b
 {
     if (!apply_mode || user_request.empty())
         return false;
-    return OllamaRequestRouter::classify(user_request) != OllamaRequestRoute::Fast;
+    const OllamaRequestRoute route = OllamaRequestRouter::classify(user_request);
+    if (route == OllamaRequestRoute::Fast)
+        return false;
+    if (!ollama_adaptive_routing_enabled())
+        return true;
+    if (route == OllamaRequestRoute::Deep)
+        return true;
+    return !ollama_two_hop_enabled();
 }
 
 OllamaDiagnosis OllamaDiagnosticPipeline::parse_diagnosis(const std::string& llm_text)

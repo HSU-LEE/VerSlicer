@@ -27,6 +27,8 @@
 #include "MsgDialog.hpp"
 #include "format.hpp"
 
+#include <wx/timer.h>
+
 #include "WebUserLoginDialog.hpp"
 
 #include "libslic3r/Print.hpp"
@@ -277,6 +279,38 @@ void show_info(wxWindow* parent, const char* message, const char* title)
 {
 	assert(message);
 	show_info(parent, wxString::FromUTF8(message), title ? wxString::FromUTF8(title) : wxString());
+}
+
+void show_info_timed(wxWindow* parent, const wxString& message, const wxString& title, int seconds)
+{
+	MessageDialog dlg(parent, message,
+		wxString(SLIC3R_APP_FULL_NAME " - ") + (title.empty() ? _L("Notice") : title),
+		wxOK | wxICON_INFORMATION);
+
+	int remaining = seconds > 0 ? seconds : 1;
+	dlg.SetButtonLabel(wxID_OK, wxString::Format(_L("OK (%ds)"), remaining));
+
+	wxTimer timer(&dlg);
+	timer.Bind(wxEVT_TIMER, [&dlg, &timer, &remaining](wxTimerEvent&) {
+		--remaining;
+		if (remaining <= 0) {
+			timer.Stop();
+			if (dlg.IsShown())
+				dlg.EndModal(wxID_OK);
+		} else {
+			dlg.SetButtonLabel(wxID_OK, wxString::Format(_L("OK (%ds)"), remaining));
+		}
+	});
+	timer.Start(1000);
+
+	dlg.ShowModal();
+	timer.Stop();
+}
+
+void show_info_timed(wxWindow* parent, const char* message, const char* title, int seconds)
+{
+	assert(message);
+	show_info_timed(parent, wxString::FromUTF8(message), title ? wxString::FromUTF8(title) : wxString(), seconds);
 }
 
 void warning_catcher(wxWindow* parent, const wxString& message)

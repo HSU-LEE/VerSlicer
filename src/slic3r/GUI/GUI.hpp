@@ -49,6 +49,8 @@ void show_error_id(int id, const std::string& message);   // For Perl
 void show_info(wxWindow* parent, const wxString& message, const wxString& title = wxString());
 void show_info(wxWindow* parent, const char* message, const char* title = nullptr);
 inline void show_info(wxWindow* parent, const std::string& message,const std::string& title = std::string()) { show_info(parent, message.c_str(), title.c_str()); }
+void show_info_timed(wxWindow* parent, const wxString& message, const wxString& title = wxString(), int seconds = 5);
+void show_info_timed(wxWindow* parent, const char* message, const char* title = nullptr, int seconds = 5);
 void warning_catcher(wxWindow* parent, const wxString& message);
 void show_substitutions_info(const PresetsConfigSubstitutions& presets_config_substitutions);
 void show_substitutions_info(const ConfigSubstitutions& config_substitutions, const std::string& filename);

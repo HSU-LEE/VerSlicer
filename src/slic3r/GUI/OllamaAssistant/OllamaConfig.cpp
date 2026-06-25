@@ -137,4 +137,21 @@ int config_int(const char* key, int default_value)
     return default_value;
 }
 
+bool ollama_assist_loop_enabled()
+{
+    return pipeline_flag(kOllamaAssistLoopKey, "OLLAMA_ASSIST_LOOP", true);
+}
+
+int ollama_assist_max_steps()
+{
+    const char* v = std::getenv("OLLAMA_ASSIST_MAX_STEPS");
+    if (v && *v) {
+        try {
+            return std::max(1, std::stoi(v));
+        } catch (...) {
+        }
+    }
+    return std::max(1, config_int(kOllamaAssistMaxStepsKey, 8));
+}
+
 }} // namespace

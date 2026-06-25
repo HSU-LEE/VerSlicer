@@ -5,10 +5,9 @@
 #include "AICoachRulesEngine.hpp"
 
 #include "../OllamaAssistant/OllamaActionPipeline.hpp"
-#include "../OllamaAssistant/OllamaAgentStateService.hpp"
+#include "../OllamaAssistant/OllamaAgentEventBus.hpp"
 #include "../OllamaAssistant/OllamaModelLoadAdvisor.hpp"
 
-#include "../GUI.hpp"
 #include "../I18N.hpp"
 
 #include "../BambuSmartPrint/PrintPlannerGui.hpp"
@@ -102,6 +101,10 @@ void AIGuiOrchestrator::on_model_loaded(Plater* plater)
 
 void AIGuiOrchestrator::on_slice_completed(Plater* plater, const Print* print, bool success)
 {
+    if (plater) {
+        nlohmann::json payload = {{"success", success}};
+        OllamaAgentEventBus::instance().publish(OllamaAgentEventKind::SliceDone, std::move(payload));
+    }
     if (!success && plater && AICoachController::is_enabled_for_current_mode()) {
         const bool ko = wxGetApp().current_language_code().StartsWith("ko");
         const std::string summary =
@@ -153,17 +156,6 @@ void AIGuiOrchestrator::on_chat_apply_end(bool applied, const nlohmann::json& ro
         wxGetApp().set_show_gcode_window(false);
         if (!root.empty() && dedup_source && dedup_source[0] != '\0')
             AICoachApplyDedup::instance().record_applied_root(root, dedup_source);
-        if (root.contains("actions") && root["actions"].is_array()) {
-            for (const auto& a : root["actions"]) {
-                if (!a.is_object() || a.value("type", "") != "set_config" || !a.contains("options")
-                    || !a["options"].is_object())
-                    continue;
-                const auto mismatches =
-                    OllamaAgentStateService::verify_config_applied(a["options"], a.value("preset", "print"));
-                if (!mismatches.empty() && wxGetApp().plater())
-                    show_info(wxGetApp().plater(), mismatches.front(), _L("AI Assistant"));
-            }
-        }
     }
     flush_deferred_coach_cards();
 }

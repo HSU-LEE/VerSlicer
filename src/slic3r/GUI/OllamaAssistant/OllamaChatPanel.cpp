@@ -8,10 +8,13 @@
 #include "OllamaModelPick.hpp"
 #include "OllamaServerManager.hpp"
 #include "OllamaActionWorkflow.hpp"
+#include "OllamaAgentStateService.hpp"
+#include "OllamaAssistRouter.hpp"
 #include "OllamaConfig.hpp"
 #include "OllamaExecutionPolicy.hpp"
 #include "OllamaProcessingNotice.hpp"
 #include "OllamaSettingSearch.hpp"
+#include "OllamaToolResult.hpp"
 #include "OllamaPrintingTips.hpp"
 #include "OllamaRequestRouter.hpp"
 #include "OllamaResponseNormalizer.hpp"
@@ -833,6 +836,8 @@ void OllamaChatPanel::set_assistant_mode(bool apply_mode)
 void OllamaChatPanel::reset_conversation()
 {
     ++m_request_gen;
+    if (m_assist_controller && m_assist_controller->is_running())
+        m_assist_controller->cancel();
     set_busy(false);
     m_messages.clear();
     m_messages.push_back({"system", OllamaActionExecutor::build_system_prompt(m_apply_mode)});
@@ -1028,12 +1033,32 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
         context = OllamaActionExecutor::fit_context_json_to_limit(std::move(context), kMaxContextChars);
         user_msg = std::string("Current slicer context (JSON):\n") + context + "\n\nUser request:\n" + user_msg;
     }
-
-    m_messages.push_back({"user", user_msg});
-    trim_message_history();
+    if (m_apply_mode) {
+        try {
+            const nlohmann::json digest = OllamaAgentStateService::config_digest(user_utf8);
+            user_msg += std::string("\n\nConfig digest (JSON):\n") + digest.dump(2);
+        } catch (...) {
+        }
+    }
 
     if (!m_available_models.empty())
         m_model = resolve_installed_model(m_available_models, m_model);
+
+    if (OllamaAssistRouter::should_use_assist_loop(user_utf8, m_apply_mode)) {
+        m_messages.push_back({"user", user_msg});
+        trim_message_history();
+        start_assist_loop_turn(user_utf8);
+        return;
+    }
+    if (OllamaAssistRouter::should_use_two_hop(user_utf8, m_apply_mode)) {
+        m_messages.push_back({"user", user_msg});
+        trim_message_history();
+        start_two_hop_turn(user_utf8);
+        return;
+    }
+
+    m_messages.push_back({"user", user_msg});
+    trim_message_history();
 
     if (OllamaDiagnosticPipeline::needs_pipeline(user_utf8, m_apply_mode)) {
         start_diagnostic_turn(user_utf8);
@@ -1060,6 +1085,128 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
             panel->on_chat_response(text, error);
         });
     });
+}
+
+void OllamaChatPanel::start_assist_loop_turn(const std::string& user_utf8)
+{
+    set_busy(true);
+    begin_thinking_block();
+    const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+    append_thinking_line(ko ? wxString::FromUTF8("목표 분석 및 작업 계획 중…") : wxString("Planning work…"));
+
+    if (!m_assist_controller)
+        m_assist_controller = std::make_unique<OllamaAgentController>(m_client, normalize_ollama_model_tag(m_model));
+    else
+        m_assist_controller->set_model(normalize_ollama_model_tag(m_model));
+
+    const auto alive = m_alive;
+    m_assist_controller->run_goal(
+        user_utf8, ollama_execution_policy_for_assist_loop(), this,
+        OllamaAgentCallbacks{
+            [alive, this](const wxString& line) {
+                if (!alive->load())
+                    return;
+                append_thinking_line(line);
+            },
+            [alive, this](const OllamaAgentRunResult& result) {
+                if (!alive->load())
+                    return;
+                on_assist_loop_finished(result);
+            },
+        },
+        ollama_assist_max_steps());
+}
+
+void OllamaChatPanel::on_assist_loop_finished(const OllamaAgentRunResult& result)
+{
+    if (!m_alive->load() || wxGetApp().is_closing())
+        return;
+
+    clear_thinking_block();
+    set_busy(false);
+
+    const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+    wxString   display;
+    if (!result.final_message.empty())
+        display = wxString::FromUTF8(result.final_message);
+    else if (result.cancelled)
+        display = ko ? wxString::FromUTF8("작업이 취소되었습니다.") : _L("Cancelled.");
+    else if (result.blocked)
+        display = ko ? wxString::FromUTF8("작업을 완료하지 못했습니다.") : _L("Could not complete the request.");
+    else
+        display = _L("OK.");
+
+    if (result.completed && !result.step_tool_results.empty()) {
+        const std::string report = ollama_format_agent_completion_report(result.step_tool_results, ko);
+        if (!report.empty())
+            display += "\n\n" + wxString::FromUTF8(report);
+    }
+
+    m_messages.push_back({"assistant", into_u8(display)});
+    trim_message_history();
+    append_chat(_L("Assistant"), display);
+    set_status_text(completion_status_for_reply(display));
+}
+
+void OllamaChatPanel::start_two_hop_turn(const std::string& user_utf8)
+{
+    set_busy(true);
+    const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+    append_thinking_line(ko ? wxString::FromUTF8("설정 키 분석 중…") : wxString("Analyzing setting keys…"));
+
+    std::vector<OllamaMessage> planner_msgs;
+    planner_msgs.push_back({"system", OllamaActionExecutor::build_planner_system_prompt()});
+    planner_msgs.push_back({"user", OllamaActionExecutor::build_planner_user_message(user_utf8)});
+
+    const std::string   model = normalize_ollama_model_tag(m_model);
+    const auto          alive = m_alive;
+    const uint64_t      gen   = ++m_request_gen;
+    wxWeakRef<wxWindow> weak_panel(this);
+    m_client.chat(
+        model, planner_msgs,
+        [alive, gen, weak_panel, user_utf8](const std::string& text, const std::string& error) {
+            wxGetApp().CallAfter([alive, gen, weak_panel, user_utf8, text, error]() {
+                if (!alive->load() || wxGetApp().is_closing())
+                    return;
+                auto* panel = dynamic_cast<OllamaChatPanel*>(weak_panel.get());
+                if (!panel || panel->m_request_gen != gen)
+                    return;
+                panel->on_two_hop_planner_response(text, user_utf8, error);
+            });
+        },
+        OllamaRequestKind::Planner);
+}
+
+void OllamaChatPanel::on_two_hop_planner_response(const std::string& planner_text, const std::string& user_utf8,
+                                                  const std::string& error)
+{
+    if (!error.empty()) {
+        if (run_symptom_fallback_turn(user_utf8))
+            return;
+        clear_thinking_block();
+        set_busy(false);
+        append_chat(_L("Error"), wxString::FromUTF8(error));
+        set_status_text(wxString::FromUTF8(error));
+        return;
+    }
+
+    std::vector<std::string> keys = OllamaSettingSearch::keys_from_planner_json(planner_text);
+    if (keys.empty())
+        keys = OllamaSettingSearch::candidate_keys_for_request(user_utf8, 3, 10);
+
+    const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+    append_thinking_line(ko ? wxString::FromUTF8("설정 변경안 생성 중…") : wxString("Generating changes…"));
+
+    nlohmann::json wiki_context = nlohmann::json::array();
+    if (ollama_wiki_search_enabled() && OllamaRequestRouter::benefits_from_wiki(user_utf8)) {
+        OllamaDiagnosis pseudo;
+        pseudo.wiki_queries.push_back(user_utf8);
+        wiki_context = OllamaDiagnosticPipeline::build_wiki_evidence(pseudo, user_utf8, ko);
+    }
+
+    const std::string resolver_user =
+        OllamaActionExecutor::build_resolver_user_message(user_utf8, keys, wiki_context);
+    launch_single_chat_llm(resolver_user);
 }
 
 void OllamaChatPanel::launch_single_chat_llm(std::string final_user_msg)
@@ -1259,7 +1406,9 @@ void OllamaChatPanel::on_proposal_llm_response(const std::string& assistant_text
         return;
     }
 
-    if (ollama_critic_enabled() && critic_attempt < 1) {
+    const bool use_critic =
+        ollama_critic_enabled() || OllamaRequestRouter::classify(user_utf8) == OllamaRequestRoute::Deep;
+    if (use_critic && critic_attempt < 1) {
         try {
             nlohmann::json root = OllamaActionPipeline::extract_from_assistant_text(assistant_text);
             OllamaResponseNormalizer::normalize(root, user_utf8, /*include_makerworld*/ true);
@@ -1336,6 +1485,8 @@ void OllamaChatPanel::on_models_loaded(const std::vector<std::string>& models, c
     m_available_models    = models;
     OllamaServerManager::note_serve_reachable();
     m_model = resolve_installed_model(models, m_model);
+    if (m_assist_controller)
+        m_assist_controller->set_model(normalize_ollama_model_tag(m_model));
     update_model_label_ui();
     save_settings();
     ensure_default_model_ready(models);

@@ -5,6 +5,7 @@
 #include "../MakerWorld/MakerWorldImportFlow.hpp"
 #include "OllamaClient.hpp"
 #include "OllamaDiagnosticPipeline.hpp"
+#include "OllamaAgentController.hpp"
 #include "OllamaExecutionPolicy.hpp"
 
 #include <nlohmann/json.hpp>
@@ -62,6 +63,11 @@ private:
     void on_proposal_llm_response(const std::string& assistant_text, const std::string& error,
                                     const std::string& user_utf8, std::vector<std::string> keys,
                                     const nlohmann::json& wiki_context, int critic_attempt);
+    void start_assist_loop_turn(const std::string& user_utf8);
+    void on_assist_loop_finished(const OllamaAgentRunResult& result);
+    void start_two_hop_turn(const std::string& user_utf8);
+    void on_two_hop_planner_response(const std::string& planner_text, const std::string& user_utf8,
+                                     const std::string& error);
     void on_chat_response(const std::string& assistant_text, const std::string& error);
     void launch_single_chat_llm(std::string final_user_msg);
     void schedule_model_poll(int delay_ms);
@@ -98,6 +104,8 @@ private:
     wxStaticText* m_model_label{nullptr};
     wxStaticText* m_status{nullptr};
     bool          m_apply_mode{true};
+
+    std::unique_ptr<OllamaAgentController> m_assist_controller;
 
     OllamaClient               m_client;
     std::string                m_model;

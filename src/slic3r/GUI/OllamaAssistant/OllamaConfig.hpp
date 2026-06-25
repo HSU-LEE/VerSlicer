@@ -22,6 +22,8 @@ constexpr const char* kOllamaRuleOnlyKey       = "rule_only_fallback";
 constexpr const char* kOllamaAdaptiveRouteKey  = "adaptive_routing";
 constexpr const char* kOllamaWikiSearchKey     = "wiki_search";
 constexpr const char* kOllamaCriticKey         = "critic";
+constexpr const char* kOllamaAssistLoopKey     = "assist_loop";
+constexpr const char* kOllamaAssistMaxStepsKey = "assist_max_steps";
 
 std::string ollama_host_from_config();
 std::string ollama_model_from_config();
@@ -35,6 +37,8 @@ bool ollama_rule_only_fallback_enabled();
 bool ollama_adaptive_routing_enabled();
 bool ollama_wiki_search_enabled();
 bool ollama_critic_enabled();
+bool ollama_assist_loop_enabled();
+int  ollama_assist_max_steps();
 
 }} // namespace
 

@@ -114,10 +114,24 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaActionValidator.hpp
     GUI/OllamaAssistant/OllamaActionWorkflow.cpp
     GUI/OllamaAssistant/OllamaActionWorkflow.hpp
+    GUI/OllamaAssistant/OllamaAgentController.cpp
+    GUI/OllamaAssistant/OllamaAgentController.hpp
+    GUI/OllamaAssistant/OllamaAgentGoalPlanner.cpp
+    GUI/OllamaAssistant/OllamaAgentGoalPlanner.hpp
+    GUI/OllamaAssistant/OllamaAgentEventBus.cpp
+    GUI/OllamaAssistant/OllamaAgentEventBus.hpp
     GUI/OllamaAssistant/OllamaAgentStateService.cpp
     GUI/OllamaAssistant/OllamaAgentStateService.hpp
+    GUI/OllamaAssistant/OllamaAssistContextBuilder.cpp
+    GUI/OllamaAssistant/OllamaAssistContextBuilder.hpp
+    GUI/OllamaAssistant/OllamaAssistRouter.cpp
+    GUI/OllamaAssistant/OllamaAssistRouter.hpp
     GUI/OllamaAssistant/OllamaExecutionPolicy.cpp
     GUI/OllamaAssistant/OllamaExecutionPolicy.hpp
+    GUI/OllamaAssistant/OllamaToolRegistry.cpp
+    GUI/OllamaAssistant/OllamaToolRegistry.hpp
+    GUI/OllamaAssistant/OllamaToolResult.cpp
+    GUI/OllamaAssistant/OllamaToolResult.hpp
     GUI/OllamaAssistant/OllamaChatDialog.cpp
     GUI/OllamaAssistant/OllamaChatDialog.hpp
     GUI/OllamaAssistant/OllamaChatPanel.cpp
