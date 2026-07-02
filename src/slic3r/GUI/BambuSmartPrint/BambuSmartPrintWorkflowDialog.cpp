@@ -16,22 +16,27 @@ namespace Slic3r { namespace GUI {
 using namespace SlicePilotUi;
 
 BambuSmartPrintWorkflowDialog::BambuSmartPrintWorkflowDialog(wxWindow* parent, const SmartPrintWorkflowContent& content)
-    : DPIDialog(parent, wxID_ANY, _L("Smart Print"),
+    : DPIDialog(parent, wxID_ANY,
+                smart_print_locale_korean() ? wxString::FromUTF8("스마트 프린트") : _L("Smart Print"),
                 wxDefaultPosition, wxDefaultSize,
                 wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
 {
     apply_dialog_chrome(this);
+    const bool ko = smart_print_locale_korean();
 
     wxString header_sub;
     if (content.is_failure_workflow)
-        header_sub = _L("Review diagnosis and suggested fixes");
+        header_sub = ko ? wxString::FromUTF8("진단 결과와 제안된 수정을 검토하세요")
+                        : _L("Review diagnosis and suggested fixes");
     else if (content.is_smart_slice_result)
-        header_sub = _L("Smart slice results for the current plate");
+        header_sub = ko ? wxString::FromUTF8("현재 플레이트 스마트 슬라이스 결과")
+                        : _L("Smart slice results for the current plate");
     else
         header_sub.clear();
 
     auto* root = new wxBoxSizer(wxVERTICAL);
-    root->Add(create_header(this, _L("Smart Print"), header_sub, true), 0, wxEXPAND);
+    root->Add(create_header(this,
+        ko ? wxString::FromUTF8("스마트 프린트") : _L("Smart Print"), header_sub, true), 0, wxEXPAND);
 
     wxBoxSizer* body = nullptr;
     auto* scroll = create_scroll_body(this, &body);
@@ -58,7 +63,7 @@ BambuSmartPrintWorkflowDialog::BambuSmartPrintWorkflowDialog(wxWindow* parent, c
                   wxEXPAND | wxLEFT | wxRIGHT | wxTOP, pad);
     }
 
-    add_block(_L("Summary"), wxString::FromUTF8(content.summary));
+    add_block(ko ? wxString::FromUTF8("요약") : _L("Summary"), wxString::FromUTF8(content.summary));
 
     if (!content.suggested_material.empty()) {
         wxString mat = wxString::FromUTF8(content.suggested_material);
@@ -93,7 +98,7 @@ BambuSmartPrintWorkflowDialog::BambuSmartPrintWorkflowDialog(wxWindow* parent, c
         wxBoxSizer* ins_inner = nullptr;
         wxPanel* ins_body = nullptr;
         auto* ins_card = create_card(scroll, &ins_inner, &ins_body, 12);
-        add_card_section_title(ins_body, ins_inner, _L("Model insights"), {});
+        add_card_section_title(ins_body, ins_inner, ko ? wxString::FromUTF8("모델 인사이트") : _L("Model insights"), {});
         add_insight_list(ins_body, ins_inner, content.insights, 32);
         body->Add(ins_card, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, pad);
     }
@@ -118,7 +123,8 @@ BambuSmartPrintWorkflowDialog::BambuSmartPrintWorkflowDialog(wxWindow* parent, c
         wxPanel* ch_body = nullptr;
         auto* ch_card = create_card(scroll, &ch_inner, &ch_body, 12);
         add_card_section_title(ch_body, ch_inner,
-            wxString::Format(_L("Planned adjustments (%zu)"), content.change_preview.size()), {});
+            ko ? wxString::Format(wxString::FromUTF8("예정된 조정 (%zu)"), content.change_preview.size())
+               : wxString::Format(_L("Planned adjustments (%zu)"), content.change_preview.size()), {});
         for (const std::string& line : content.change_preview) {
             auto* row = new wxStaticText(ch_body, wxID_ANY, wxString::FromUTF8("• " + line),
                                          wxDefaultPosition, wxDefaultSize, wxST_NO_AUTORESIZE);
@@ -142,12 +148,16 @@ BambuSmartPrintWorkflowDialog::BambuSmartPrintWorkflowDialog(wxWindow* parent, c
     auto* hint = new wxStaticText(hint_body, wxID_ANY, {});
     wrap_static_text(hint, scroll, 480);
     if (content.change_count > 0) {
-        hint->SetLabel(wxString::Format(
-            _L("%zu setting change(s) suggested. Preview the diff before applying."),
-            content.change_count));
+        hint->SetLabel(ko
+            ? wxString::Format(wxString::FromUTF8("설정 변경 %zu건이 제안되었습니다. 적용 전에 미리보기로 확인하세요."),
+                               content.change_count)
+            : wxString::Format(
+                _L("%zu setting change(s) suggested. Preview the diff before applying."),
+                content.change_count));
         style_body_text(hint, false);
     } else {
-        hint->SetLabel(_L("No setting changes recommended. You can close this dialog and continue slicing."));
+        hint->SetLabel(ko ? wxString::FromUTF8("추가 설정 변경은 없습니다. 닫고 슬라이스를 계속하셔도 됩니다.")
+                          : _L("No setting changes recommended. You can close this dialog and continue slicing."));
         style_body_text(hint, true);
     }
     hint_inner->Add(hint, 0, wxEXPAND);
@@ -158,22 +168,28 @@ BambuSmartPrintWorkflowDialog::BambuSmartPrintWorkflowDialog(wxWindow* parent, c
     wxBoxSizer* btn_row = nullptr;
     auto* footer = create_modal_footer(this, &btn_row);
 
-    auto* btn_later = new Button(footer, _L("Not now"));
+    auto* btn_later = new Button(footer, ko ? wxString::FromUTF8("나중에") : _L("Not now"));
     style_dialog_button(btn_later, false);
     size_action_button(footer, btn_later);
 
-    auto* btn_preview = new Button(footer, _L("Preview changes"));
+    auto* btn_preview = new Button(footer, ko ? wxString::FromUTF8("변경 미리보기") : _L("Preview changes"));
     style_dialog_button(btn_preview, false);
     size_action_button(footer, btn_preview);
 
     const bool has_changes = content.change_count > 0;
     wxString apply_label;
     if (content.is_smart_slice_result)
-        apply_label = has_changes ? _L("Apply & re-slice") : _L("Got it");
+        apply_label = has_changes
+            ? (ko ? wxString::FromUTF8("적용 후 다시 슬라이스") : _L("Apply & re-slice"))
+            : (ko ? wxString::FromUTF8("알겠습니다") : _L("Got it"));
     else if (content.is_failure_workflow)
-        apply_label = has_changes ? _L("Apply fixes & reprint") : _L("Reprint");
+        apply_label = has_changes
+            ? (ko ? wxString::FromUTF8("수정 적용 후 재출력") : _L("Apply fixes & reprint"))
+            : (ko ? wxString::FromUTF8("재출력") : _L("Reprint"));
     else
-        apply_label = has_changes ? _L("Apply & slice") : _L("Got it");
+        apply_label = has_changes
+            ? (ko ? wxString::FromUTF8("적용 후 슬라이스") : _L("Apply & slice"))
+            : (ko ? wxString::FromUTF8("알겠습니다") : _L("Got it"));
     auto* btn_apply = new Button(footer, apply_label);
     style_dialog_button(btn_apply, has_changes);
     size_action_button(footer, btn_apply);

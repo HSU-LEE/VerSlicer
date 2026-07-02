@@ -87,6 +87,7 @@
 #include "Plater.hpp"
 #include "BambuSmartPrint/BambuSmartPrintService.hpp"
 #include "OllamaAssistant/OllamaChatDialog.hpp"
+#include "OllamaAssistant/OllamaProcessingNotice.hpp"
 #include "libslic3r/SlicePilot/SlicePilotRestrictions.hpp"
 #include "GLCanvas3D.hpp"
 #include "EncodedFilament.hpp"
@@ -1074,8 +1075,11 @@ void GUI_App::cleanup_ollama_assistant()
     dlg->Show(false);
 
     // During MainFrame close, reparent/destroy can crash on macOS; wx deletes children with the frame.
-    if (is_closing())
+    if (is_closing()) {
+        if (Plater* plater = plater_)
+            OllamaProcessingNotice::hide(plater);
         return;
+    }
 
     if (wxWindow* parent = dlg->GetParent()) {
         if (parent->IsBeingDeleted())

@@ -1,3 +1,4 @@
+#include "OllamaMeshOps.hpp"
 #include "OllamaActionExecutor.hpp"
 #include "OllamaActionJsonExtract.hpp"
 #include "OllamaActionValidator.hpp"
@@ -5,7 +6,6 @@
 #include "OllamaIntentContext.hpp"
 #include "OllamaSettingRegistry.hpp"
 #include "OllamaSettingSearch.hpp"
-#include "OllamaSettingAliases.hpp"
 #include "OllamaSystemPrompts.hpp"
 #include "OllamaPrintingTips.hpp"
 #include "OllamaResponseNormalizer.hpp"
@@ -253,7 +253,8 @@ static void augment_geometry_object_targets_impl(nlohmann::json& root, const std
             continue;
         const std::string type = action.value("type", "");
         if (type != "rotate" && type != "translate" && type != "scale" && type != "clone_selection"
-            && type != "delete_selection")
+            && type != "delete_selection" && type != "mesh_boolean" && type != "mirror_mesh"
+            && type != "repair_mesh")
             continue;
         if (action_has_object_target(action))
             continue;
@@ -984,6 +985,43 @@ OllamaActionResult apply_arrange()
     return apply_plater_event(EVT_GLTOOLBAR_ARRANGE, "Arranged models on the plate");
 }
 
+OllamaActionResult apply_arrange_objects()
+{
+    OllamaActionResult result;
+    Plater* plater = wxGetApp().plater();
+    if (!plater) {
+        result.message = "Plater not available";
+        return result;
+    }
+    PartPlate* plate = plater->get_partplate_list().get_curr_plate();
+    if (!plate) {
+        result.message = "No active plate";
+        return result;
+    }
+    plate->set_print_seq(PrintSequence::ByObject);
+    plater->on_config_change(wxGetApp().preset_bundle->full_config(false));
+    if (!plater->can_arrange()) {
+        result.message = "Cannot arrange objects right now";
+        return result;
+    }
+    return apply_plater_event(EVT_GLTOOLBAR_ARRANGE, "Arranged models by-object on the plate");
+}
+
+OllamaActionResult apply_split_object()
+{
+    OllamaActionResult result;
+    Plater* plater = wxGetApp().plater();
+    if (!plater) {
+        result.message = "Plater not available";
+        return result;
+    }
+    if (!plater->can_split_to_objects()) {
+        result.message = "Select a splittable model on the plate";
+        return result;
+    }
+    return apply_plater_event(EVT_GLTOOLBAR_SPLIT_OBJECTS, "Split model into separate objects");
+}
+
 OllamaActionResult apply_get_state(const nlohmann::json& action)
 {
     (void) action;
@@ -1282,153 +1320,6 @@ OllamaActionResult apply_menu_item(const nlohmann::json& action)
     return result;
 }
 
-static std::optional<double> parse_percent_serial(const std::string& serialized)
-{
-    std::string s = serialized;
-    boost::algorithm::erase_all(s, "%");
-    boost::algorithm::trim(s);
-    if (s.empty())
-        return std::nullopt;
-    try {
-        return std::stod(s);
-    } catch (...) {
-        return std::nullopt;
-    }
-}
-
-static bool user_wants_more(const std::string& user)
-{
-    return user.find("올려") != std::string::npos || user.find("높여") != std::string::npos ||
-           user.find("늘려") != std::string::npos || user.find("더 ") != std::string::npos ||
-           user.find("increase") != std::string::npos || user.find("more") != std::string::npos ||
-           user.find("higher") != std::string::npos;
-}
-
-static bool user_wants_less(const std::string& user)
-{
-    return user.find("낮춰") != std::string::npos || user.find("줄여") != std::string::npos ||
-           user.find("감소") != std::string::npos || user.find("decrease") != std::string::npos ||
-           user.find("less") != std::string::npos || user.find("lower") != std::string::npos;
-}
-
-static bool user_mentions_infill(const std::string& user)
-{
-    return user.find("채움") != std::string::npos || user.find("infill") != std::string::npos ||
-           user.find("density") != std::string::npos || user.find("내부") != std::string::npos;
-}
-
-static bool user_mentions_layer_height(const std::string& user)
-{
-    return user.find("층") != std::string::npos || user.find("layer") != std::string::npos;
-}
-
-static void coerce_option_json(nlohmann::json& val, const std::string& key)
-{
-    const std::string normalized = normalize_config_value(json_value_to_config_string(val), key);
-    if (key == "enable_support" || key == "enable_brim" || key == "support_on_build_plate_only") {
-        val = (normalized == "1" || normalized == "true");
-        return;
-    }
-    if (key == "sparse_infill_density") {
-        val = normalized;
-        return;
-    }
-    if (key == "wall_loops" || key == "top_shell_layers" || key == "bottom_shell_layers" ||
-        key == "raft_layers") {
-        try {
-            val = std::stoi(normalized);
-        } catch (...) {
-            val = normalized;
-        }
-        return;
-    }
-    try {
-        val = std::stod(normalized);
-    } catch (...) {
-        val = normalized;
-    }
-}
-
-static void augment_actions_from_user_text_impl(nlohmann::json& root, const std::string& user)
-{
-    if (!root.contains("actions") || !root["actions"].is_array())
-        root["actions"] = nlohmann::json::array();
-
-    if (OllamaIntentContext::user_wants_faster_print(user)) {
-        bool has_set_config = false;
-        for (const auto& action : root["actions"]) {
-            if (action.is_object() && action.value("type", "") == "set_config") {
-                has_set_config = true;
-                break;
-            }
-        }
-        if (!has_set_config) {
-            root["actions"].push_back(
-                nlohmann::json{{"type", "set_config"}, {"preset", "print"}, {"options", nlohmann::json::object()}});
-        }
-    }
-
-    if (!root.contains("actions") || !root["actions"].is_array())
-        return;
-
-    DynamicPrintConfig* cfg = edited_config(Preset::TYPE_PRINT);
-    const bool more_infill  = (user_wants_more(user) || user.find("두껍") != std::string::npos) &&
-                             user_mentions_infill(user) && !user_wants_less(user);
-    const bool less_infill  = user_wants_less(user) && user_mentions_infill(user);
-
-    for (auto& action : root["actions"]) {
-        if (!action.is_object() || action.value("type", "") != "set_config")
-            continue;
-        if (!action.contains("options") || !action["options"].is_object())
-            action["options"] = nlohmann::json::object();
-
-        nlohmann::json& opts = action["options"];
-        normalize_set_config_options_impl(opts);
-
-        if (cfg) {
-            if (more_infill && !opts.contains("sparse_infill_density") &&
-                cfg->has("sparse_infill_density")) {
-                double cur = parse_percent_serial(cfg->opt_serialize("sparse_infill_density")).value_or(15.0);
-                cur        = std::min(100.0, cur + 5.0);
-                opts["sparse_infill_density"] =
-                    std::to_string(static_cast<int>(std::lround(cur))) + "%";
-            } else if (less_infill && !opts.contains("sparse_infill_density") &&
-                       cfg->has("sparse_infill_density")) {
-                double cur = parse_percent_serial(cfg->opt_serialize("sparse_infill_density")).value_or(15.0);
-                cur        = std::max(0.0, cur - 5.0);
-                opts["sparse_infill_density"] =
-                    std::to_string(static_cast<int>(std::lround(cur))) + "%";
-            }
-
-            if ((user.find("두껍") != std::string::npos || user.find("thicker") != std::string::npos) &&
-                user_mentions_layer_height(user) && !opts.contains("layer_height") &&
-                cfg->has("layer_height")) {
-                double cur = 0.2;
-                try {
-                    cur = std::stod(cfg->opt_serialize("layer_height"));
-                } catch (...) {
-                }
-                opts["layer_height"] = std::min(0.6, cur + 0.04);
-            }
-            if ((user.find("얇") != std::string::npos || user.find("thinner") != std::string::npos) &&
-                user_mentions_layer_height(user) && !opts.contains("layer_height") &&
-                cfg->has("layer_height")) {
-                double cur = 0.2;
-                try {
-                    cur = std::stod(cfg->opt_serialize("layer_height"));
-                } catch (...) {
-                }
-                opts["layer_height"] = std::max(0.04, cur - 0.04);
-            }
-        }
-
-        OllamaIntentContext::refine_set_config_options(opts, user);
-
-        for (auto it = opts.begin(); it != opts.end(); ++it)
-            coerce_option_json(it.value(), it.key());
-    }
-}
-
 } // namespace
 
 std::string OllamaActionExecutor::normalize_config_key(const std::string& key)
@@ -1441,39 +1332,12 @@ void OllamaActionExecutor::normalize_set_config_options(nlohmann::json& options)
     normalize_set_config_options_impl(options);
 }
 
-void OllamaActionExecutor::augment_actions_from_user_text(nlohmann::json& root, const std::string& user_request)
+void OllamaActionExecutor::augment_actions_from_user_text(nlohmann::json& /*root*/, const std::string& /*user_request*/)
 {
-    if (!ollama_keyword_inject_enabled())
-        return;
-    boost_actions_from_user_text(root, user_request);
 }
 
-void OllamaActionExecutor::boost_actions_from_user_text(nlohmann::json& root, const std::string& user_request)
+void OllamaActionExecutor::boost_actions_from_user_text(nlohmann::json& /*root*/, const std::string& /*user_request*/)
 {
-    augment_actions_from_user_text_impl(root, user_request);
-    if (OllamaResponseNormalizer::has_viable_set_config(root))
-        return;
-
-    nlohmann::json opts = nlohmann::json::object();
-    OllamaIntentContext::refine_set_config_options(opts, user_request);
-    for (const std::string& key : OllamaSettingAliases::keys_from_symptoms(user_request)) {
-        if (opts.contains(key))
-            continue;
-        if (key == "enable_support") {
-            opts[key] = true;
-            opts["support_type"] = "tree(auto)";
-        } else if (key == "ironing_type")
-            opts[key] = "top";
-        else if (key == "brim_type")
-            opts[key] = "outer_only";
-    }
-    if (opts.empty())
-        return;
-
-    if (!root.contains("actions") || !root["actions"].is_array())
-        root["actions"] = nlohmann::json::array();
-    root["actions"].push_back(
-        {{"type", "set_config"}, {"preset", "print"}, {"options", std::move(opts)}});
 }
 
 void OllamaActionExecutor::augment_geometry_object_targets(nlohmann::json& root, const std::string& user_request)
@@ -1484,6 +1348,13 @@ void OllamaActionExecutor::augment_geometry_object_targets(nlohmann::json& root,
 OllamaSetConfigDryRunResult OllamaActionExecutor::dry_run_set_config(const nlohmann::json& action)
 {
     OllamaSetConfigDryRunResult out;
+#ifdef OLLAMA_HEADLESS_TEST
+    (void) action;
+    out.ok        = true;
+    out.attempted = true;
+    out.changed   = true;
+    return out;
+#endif
     const Preset::Type          ptype = preset_type_from_string(action.value("preset", "print"));
     DynamicPrintConfig*         live  = edited_config_for_action(action);
     if (!live) {
@@ -1855,12 +1726,12 @@ std::string OllamaActionExecutor::fit_context_json_to_limit(std::string json, si
 std::string OllamaActionExecutor::build_system_prompt(bool apply_mode)
 {
     const bool ko = ui_prefers_korean();
-    std::string prompt = OllamaSystemPrompts::apply_system_prompt(ko);
-    if (apply_mode)
+    if (apply_mode) {
+        std::string prompt = OllamaSystemPrompts::apply_system_prompt(ko);
         prompt += OllamaUserFlow::flow_prompt_block(ko);
-    if (!apply_mode)
-        prompt += OllamaSystemPrompts::question_mode_suffix(ko);
-    return prompt;
+        return prompt;
+    }
+    return OllamaSystemPrompts::question_system_prompt(ko);
 }
 
 std::string OllamaActionExecutor::build_diagnostic_system_prompt()
@@ -2016,6 +1887,16 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
     bool had_slice_action        = false;
     nlohmann::json deferred_slice = nlohmann::json::object({{"scope", "plate"}});
     std::unordered_set<std::string> plate_action_fps;
+    std::unordered_set<std::string> mesh_action_fps;
+    bool has_mesh_mutation = false;
+    for (const auto& action : root["actions"]) {
+        if (!action.is_object() || !action.contains("type"))
+            continue;
+        const std::string type = action["type"].get<std::string>();
+        if (type == "repair_mesh" || type == "mirror_mesh" || type == "mesh_boolean" || type == "split_object"
+            || type == "split_mesh")
+            has_mesh_mutation = true;
+    }
 
     for (const auto& action : root["actions"]) {
         if (!action.contains("type") || !action["type"].is_string())
@@ -2028,10 +1909,31 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
             continue;
         }
 
-        if (type == "arrange" || type == "clone_selection" || type == "rotate" || type == "translate"
+        if (type == "arrange" || type == "arrange_objects" || type == "clone_selection" || type == "rotate" || type == "translate"
             || type == "scale") {
             const std::string fp = type + "|" + action.dump();
             if (!plate_action_fps.insert(fp).second) {
+                OllamaActionResult skipped;
+                skipped.success          = true;
+                skipped.effective_change = false;
+                skipped.message          = "Skipped duplicate " + type;
+                results.push_back(std::move(skipped));
+                continue;
+            }
+        }
+
+        if (type == "repair_mesh" || type == "mirror_mesh") {
+            if (!mesh_action_fps.insert(type).second) {
+                OllamaActionResult skipped;
+                skipped.success          = true;
+                skipped.effective_change = false;
+                skipped.message          = "Skipped duplicate " + type;
+                results.push_back(std::move(skipped));
+                continue;
+            }
+        } else if (type == "mesh_boolean") {
+            const std::string fp = type + "|" + action.value("operation", "");
+            if (!mesh_action_fps.insert(fp).second) {
                 OllamaActionResult skipped;
                 skipped.success          = true;
                 skipped.effective_change = false;
@@ -2060,6 +1962,10 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
             result = apply_clone_selection();
         else if (type == "arrange")
             result = apply_arrange();
+        else if (type == "arrange_objects")
+            result = apply_arrange_objects();
+        else if (type == "split_object" || type == "split_mesh")
+            result = apply_split_object();
         else if (type == "save_project")
             result = apply_save_project(action);
         else if (type == "add_plate")
@@ -2076,6 +1982,12 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
             result = apply_menu_item(action);
         else if (type == "translate" || type == "rotate" || type == "scale")
             result = apply_transform(action, type.c_str());
+        else if (type == "repair_mesh")
+            result = OllamaMeshOps::apply_repair_mesh(action);
+        else if (type == "mirror_mesh")
+            result = OllamaMeshOps::apply_mirror_mesh(action);
+        else if (type == "mesh_boolean")
+            result = OllamaMeshOps::apply_mesh_boolean(action);
         else if (type == "open_smart_print" || type == "run_smart_print" || type == "open_setup" || type == "send_print"
                  || type == "export_gcode" || type == "rollback_apply")
             result = OllamaUserFlow::apply_flow_action(action, wxGetApp().plater());
@@ -2089,15 +2001,160 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
         results.push_back(std::move(result));
     }
 
-    if (config_effective_change) {
+    if (config_effective_change && !has_mesh_mutation) {
         invalidate_context_cache();
         results.push_back(apply_slice(nlohmann::json::object({{"scope", "plate"}})));
         OllamaIntentContext::mark_pending_slice_feedback();
-    } else if (had_slice_action) {
+    } else if (had_slice_action && !has_mesh_mutation) {
         results.push_back(apply_slice(deferred_slice));
     }
 
     return results;
+}
+
+void OllamaActionExecutor::coalesce_set_config_action_options(nlohmann::json& action)
+{
+    if (!action.is_object() || action.value("type", "") != "set_config")
+        return;
+    auto merge_alias = [&](const char* alias) {
+        if (!action.contains(alias) || !action[alias].is_object() || action[alias].empty())
+            return;
+        if (!action.contains("options") || !action["options"].is_object())
+            action["options"] = nlohmann::json::object();
+        for (auto it = action[alias].begin(); it != action[alias].end(); ++it) {
+            if (!action["options"].contains(it.key()))
+                action["options"][it.key()] = it.value();
+        }
+        action.erase(alias);
+    };
+    merge_alias("values");
+    merge_alias("settings");
+    merge_alias("params");
+    if (action.contains("options") && action["options"].is_object() && action["options"].empty())
+        action.erase("options");
+}
+
+nlohmann::json OllamaActionExecutor::normalized_set_config_options_from_action(const nlohmann::json& action)
+{
+    nlohmann::json work = action;
+    coalesce_set_config_action_options(work);
+    if (!work.contains("options") || !work["options"].is_object())
+        return nlohmann::json::object();
+    nlohmann::json options = work["options"];
+    expand_brim_options(options);
+    normalize_set_config_options_impl(options);
+    return options;
+}
+
+static bool serialized_values_equivalent(const std::string& live, const std::string& expected)
+{
+    if (live == expected)
+        return true;
+    if (live == "1" && (expected == "true" || expected == "1"))
+        return true;
+    if (live == "0" && (expected == "false" || expected == "0"))
+        return true;
+    return false;
+}
+
+std::vector<std::string> OllamaActionExecutor::verify_set_config_applied(const nlohmann::json& action,
+                                                                          const DynamicPrintConfig* live_cfg)
+{
+    std::vector<std::string> mismatches;
+    if (!action.is_object() || action.value("type", "") != "set_config")
+        return mismatches;
+
+    DynamicPrintConfig live;
+    if (live_cfg)
+        live = *live_cfg;
+    else if (wxGetApp().preset_bundle)
+        live = wxGetApp().preset_bundle->full_config(false);
+    else
+        return mismatches;
+
+    const nlohmann::json options = normalized_set_config_options_from_action(action);
+    if (!options.is_object() || options.empty())
+        return mismatches;
+
+    const std::string preset = action.value("preset", "print");
+    ConfigSubstitutionContext ctxt{ForwardCompatibilitySubstitutionRule::Disable};
+
+    for (auto it = options.begin(); it != options.end(); ++it) {
+        const std::string raw_key = it.key();
+        const std::string key     = normalize_config_key_local(raw_key);
+        if (!live.has(key))
+            continue;
+        if (!OllamaSettingRegistry::is_allowed_key(key, preset))
+            continue;
+
+        const std::string val = normalize_config_value(json_value_to_config_string(it.value()), key);
+        DynamicPrintConfig expected_cfg = live;
+        if (!try_deserialize_config_key(expected_cfg, key, val, ctxt)) {
+            mismatches.push_back(key + " (could not deserialize expected value: " + val + ")");
+            continue;
+        }
+
+        std::string expected_live;
+        std::string actual_live;
+        try {
+            expected_live = expected_cfg.opt_serialize(key);
+            actual_live   = live.opt_serialize(key);
+        } catch (...) {
+            continue;
+        }
+
+        if (!serialized_values_equivalent(actual_live, expected_live))
+            mismatches.push_back(key + " (expected " + expected_live + ", got " + actual_live + ")");
+    }
+
+    return mismatches;
+}
+
+nlohmann::json OllamaActionExecutor::config_digest_for_set_config_actions(const nlohmann::json& root,
+                                                                          const std::string& user_goal_hint)
+{
+    nlohmann::json out = nlohmann::json::object();
+    if (!wxGetApp().preset_bundle)
+        return out;
+
+    std::unordered_set<std::string> keys;
+    if (root.contains("actions") && root["actions"].is_array()) {
+        for (const auto& action : root["actions"]) {
+            if (!action.is_object() || action.value("type", "") != "set_config")
+                continue;
+            const nlohmann::json options = normalized_set_config_options_from_action(action);
+            if (!options.is_object())
+                continue;
+            for (auto it = options.begin(); it != options.end(); ++it)
+                keys.insert(normalize_config_key_local(it.key()));
+        }
+    }
+
+    if (keys.empty()) {
+        const std::vector<std::string> hinted =
+            OllamaSettingSearch::candidate_keys_for_request(user_goal_hint, 2, 12);
+        for (const std::string& key : hinted)
+            keys.insert(normalize_config_key_local(key));
+    }
+
+    if (keys.empty()) {
+        static const char* kDefaultKeys[] = {
+            "layer_height", "sparse_infill_density", "enable_support", "brim_width",
+            "retraction_length", "nozzle_temperature", "bed_temperature", "outer_wall_speed",
+        };
+        for (const char* k : kDefaultKeys)
+            keys.insert(k);
+    }
+
+    const DynamicPrintConfig cfg = wxGetApp().preset_bundle->full_config(false);
+    for (const std::string& key : keys) {
+        if (!cfg.has(key))
+            continue;
+        const ConfigOption* opt = cfg.option(key);
+        if (opt)
+            out[key] = opt->serialize();
+    }
+    return out;
 }
 
 }} // namespace

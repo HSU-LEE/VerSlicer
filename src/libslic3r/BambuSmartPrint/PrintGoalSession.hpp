@@ -18,6 +18,8 @@ public:
 
     void set_goal(const PrintGoal& goal);
     void merge_goal(const PrintGoal& delta);
+    /** Unified entry: parse user text then merge into the session goal. */
+    void merge_user_text(const std::string& user_text);
     void set_last_plan(const PrintPlan& plan);
     void clear();
 

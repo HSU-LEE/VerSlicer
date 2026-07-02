@@ -22,7 +22,7 @@ class OllamaSettingSearch
 public:
     static std::vector<OllamaSettingSearchHit> search(const std::string& query, int max_tier = 2,
                                                       size_t limit = 15);
-    /** Merge fuzzy search + symptom-derived keys (deduped, ranked). */
+    /** Fuzzy catalog search ranked by relevance. */
     static std::vector<std::string>              candidate_keys_for_request(const std::string& query,
                                                                             int max_tier = 2,
                                                                             size_t limit = 8);

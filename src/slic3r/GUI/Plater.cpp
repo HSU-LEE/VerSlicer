@@ -10036,7 +10036,8 @@ void Plater::priv::on_process_completed(SlicingProcessCompletedEvent &evt)
         if (slice_ok) {
             GUI::BeginnerJourney::on_sliced();
             GUI::OllamaActionExecutor::notify_plater_context_changed(false);
-            if (GUI::AIGuiOrchestrator::instance().should_enqueue_beginner_tour())
+            if (GUI::AICoachController::is_enabled_for_current_mode()
+                && GUI::AIGuiOrchestrator::instance().should_enqueue_beginner_tour())
                 GUI::BeginnerTour::on_first_slice(this->q);
         }
     }
@@ -10135,9 +10136,9 @@ void Plater::priv::on_process_completed(SlicingProcessCompletedEvent &evt)
     {
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(":finished, reload print soon");
         m_is_slicing = false;
-        this->preview->reload_print(false);
         if (evt.success() && !has_error && !evt.cancelled())
             switch_to_preview_tab_after_slice(q);
+        this->preview->reload_print(false);
         /* BBS if in publishing progress */
         if (m_is_publishing) {
             if (m_publish_dlg && !m_publish_dlg->was_cancelled()) {
@@ -18463,7 +18464,7 @@ Mouse3DController& Plater::get_mouse3d_controller()
 
 NotificationManager * Plater::get_notification_manager()
 {
-    return p->notification_manager.get();
+    return p ? p->notification_manager.get() : nullptr;
 }
 
 DailyTipsWindow* Plater::get_dailytips() const
@@ -18474,7 +18475,7 @@ DailyTipsWindow* Plater::get_dailytips() const
 
 const NotificationManager * Plater::get_notification_manager() const
 {
-    return p->notification_manager.get();
+    return p ? p->notification_manager.get() : nullptr;
 }
 
 void Plater::init_notification_manager()

@@ -17,6 +17,7 @@ class BambuErrorCatalog
 {
 public:
     static void set_prefer_korean_ui(bool prefer_ko);
+    static bool prefer_korean_ui();
     static FailureDiagnosis diagnose(int mc_print_error_code, int print_error, const std::vector<std::string>& hms_codes);
     // Fills likely_causes and recommended_fixes for d.category (used after heuristic reclassification).
     static void apply_category_fixes(FailureDiagnosis& d);

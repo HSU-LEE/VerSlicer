@@ -1,7 +1,5 @@
 #include "Downloader.hpp"
 #include "GUI_App.hpp"
-#include "MakerWorld/MakerWorldSearchService.hpp"
-#include "MakerWorld/MakerWorldUrl.hpp"
 #include "NotificationManager.hpp"
 #include "format.hpp"
 #include "MainFrame.hpp"
@@ -158,15 +156,8 @@ void Downloader::start_download(const std::string& full_url)
 	}
     size_t id = get_next_id();
     std::string escaped_url = FileGet::escape_url(full_url.substr(results.length()));
-    if (is_bambustudio_open(full_url) || (is_orca_open(full_url) && is_makerworld_link(full_url))) {
-        std::string download_target = escaped_url;
-        if (is_makerworld_host_url(download_target) || download_target.find(".3mf") != std::string::npos) {
-            const std::string resolved = MakerWorldSearchService::resolve_download_info(download_target);
-            if (!resolved.empty())
-                download_target = resolved;
-        }
-        plater->request_model_download(wxString::FromUTF8(download_target));
-    }
+    if (is_bambustudio_open(full_url) || (is_orca_open(full_url) && is_makerworld_link(full_url)))
+        plater->request_model_download(wxString::FromUTF8(escaped_url));
     else {
         std::string text(escaped_url);
         m_downloads.emplace_back(std::make_unique<Download>(id, std::move(escaped_url), this, m_dest_folder));

@@ -3,7 +3,6 @@
 #include "libslic3r/Time.hpp"
 #include "libslic3r/Thread.hpp"
 #include "slic3r/Utils/NetworkAgent.hpp"
-#include "slic3r/Utils/bambu_networking.hpp"
 #include "GuiColor.hpp"
 
 #include "GUI_App.hpp"
@@ -42,7 +41,6 @@
 #include "DeviceCore/DevMapping.h"
 #include "DeviceCore/DevManager.h"
 #include "DeviceCore/DevUtil.h"
-#include "BambuSmartPrint/BambuSmartPrintService.hpp"
 
 
 #define CALI_DEBUG
@@ -2409,22 +2407,14 @@ int MachineObject::connect(bool use_openssl)
     std::string username = "bblp";
     std::string password = get_access_code();
 
-    if (!m_agent) {
-        BOOST_LOG_TRIVIAL(error) << "MachineObject::connect: network agent unavailable, dev_id=" << dev_id;
-        return BAMBU_NETWORK_ERR_INVALID_HANDLE;
+    if (m_agent) {
+        try {
+            return m_agent->connect_printer(get_dev_id(), get_dev_ip(), username, password, use_openssl);
+        } catch (...) {
+            ;
+        }
     }
-    try {
-        const int ret = m_agent->connect_printer(get_dev_id(), get_dev_ip(), username, password, use_openssl);
-        if (ret != 0)
-            BOOST_LOG_TRIVIAL(error) << "MachineObject::connect failed, dev_id=" << dev_id
-                                     << " ip=" << get_dev_ip() << " code=" << ret;
-        return ret;
-    } catch (const std::exception& e) {
-        BOOST_LOG_TRIVIAL(error) << "MachineObject::connect exception, dev_id=" << dev_id << ": " << e.what();
-    } catch (...) {
-        BOOST_LOG_TRIVIAL(error) << "MachineObject::connect unknown exception, dev_id=" << dev_id;
-    }
-    return BAMBU_NETWORK_ERR_CONNECT_FAILED;
+    return -1;
 }
 
 int MachineObject::disconnect()
@@ -2529,28 +2519,20 @@ int MachineObject::publish_json(const json& json_item, int qos, int flag)
 
 int MachineObject::cloud_publish_json(std::string json_str, int qos, int flag)
 {
-    if (!m_agent) {
-        BOOST_LOG_TRIVIAL(error) << "cloud_publish_json: network agent unavailable, dev_id=" << dev_id;
-        Slic3r::GUI::wxGetApp().notify_bambu_network_plugin_required();
-        return BAMBU_NETWORK_ERR_INVALID_HANDLE;
-    }
-    const int ret = m_agent->send_message(get_dev_id(), json_str, qos, flag);
-    if (ret == BAMBU_NETWORK_ERR_INVALID_HANDLE)
-        Slic3r::GUI::wxGetApp().notify_bambu_network_plugin_required();
-    return ret;
+    int result = -1;
+    if (m_agent)
+        result = m_agent->send_message(get_dev_id(), json_str, qos, flag);
+
+    return result;
 }
 
 int MachineObject::local_publish_json(std::string json_str, int qos, int flag)
 {
-    if (!m_agent) {
-        BOOST_LOG_TRIVIAL(error) << "local_publish_json: network agent unavailable, dev_id=" << dev_id;
-        Slic3r::GUI::wxGetApp().notify_bambu_network_plugin_required();
-        return BAMBU_NETWORK_ERR_INVALID_HANDLE;
+    int result = -1;
+    if (m_agent) {
+        result = m_agent->send_message_to_printer(get_dev_id(), json_str, qos, flag);
     }
-    const int ret = m_agent->send_message_to_printer(get_dev_id(), json_str, qos, flag);
-    if (ret == BAMBU_NETWORK_ERR_INVALID_HANDLE)
-        Slic3r::GUI::wxGetApp().notify_bambu_network_plugin_required();
-    return ret;
+    return result;
 }
 
 std::string MachineObject::setting_id_to_type(std::string setting_id, std::string tray_type)
@@ -3201,11 +3183,7 @@ int MachineObject::parse_json(std::string tunnel, std::string payload, bool key_
 
 #pragma region print_task
                     if (jj.contains("gcode_state")) {
-                        const std::string new_state = jj["gcode_state"].get<std::string>();
-                        const std::string old_state = this->print_status;
-                        this->set_print_state(new_state);
-                        if (GUI::BambuSmartPrintService::should_handle(*this))
-                            GUI::BambuSmartPrintService::instance().on_print_state_changed(this, old_state, new_state);
+                        this->set_print_state(jj["gcode_state"].get<std::string>());
                     }
                     if (jj.contains("job_id")) {
                         is_support_wait_sending_finish = true;

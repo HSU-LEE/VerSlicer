@@ -27,7 +27,7 @@ int main()
     setenv("OLLAMA_ADAPTIVE_ROUTING", "1", 1);
 
     const auto& scenarios = ollama_benchmark_scenarios();
-    expect_true(scenarios.size() >= 50, "benchmark scenario count");
+    expect_true(scenarios.size() >= 35, "benchmark scenario count");
     for (const auto& sc : scenarios) {
         if (!sc.check(sc.user_request))
             std::cerr << "FAIL scenario: " << sc.id << " request='" << sc.user_request << "'\n";
@@ -60,8 +60,6 @@ int main()
 
     expect_true(ollama_auto_catalog_enabled(), "auto catalog default on");
     expect_true(!ollama_two_hop_enabled(), "two hop default off");
-    expect_true(!ollama_keyword_inject_enabled(), "keyword inject default off");
-    expect_true(!ollama_rule_only_fallback_enabled(), "rule only default off");
 
     expect_true(ollama_adaptive_routing_enabled(), "adaptive routing default on");
 

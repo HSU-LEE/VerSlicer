@@ -8,6 +8,7 @@
 #include "PrintPlannerGui.hpp"
 #include "SlicePilotSetupHub.hpp"
 #include "libslic3r/BambuSmartPrint/PrintGoalSession.hpp"
+#include "libslic3r/BambuSmartPrint/PrintPlanner.hpp"
 #include "SlicePilotSimpleLayout.hpp"
 #include "libslic3r/BambuSmartPrint/BambuErrorCatalog.hpp"
 #include "BambuSmartPrintCompareDialog.hpp"
@@ -154,22 +155,18 @@ SmartPrintWorkflowContent workflow_content_from(const PreparedPlateWorkflow& pre
                                                 const BambuSmartPrint::ReadinessReport& readiness)
 {
     SmartPrintWorkflowContent content;
-    content.summary            = prep.auto_result.summary;
     content.suggested_material = prep.mesh.suggested_material;
     content.prediction_summary = prep.prediction.summary;
-    content.readiness_headline = readiness.headline;
     content.active_filament    = readiness.active_filament_hint;
     content.filament_mismatch  = readiness.filament_mismatch;
-    content.success_rate       = prep.prediction.success_rate;
     content.complexity_score   = prep.mesh.complexity_score;
-    content.change_count       = prep.change_count;
     content.risk_factors       = prep.prediction.risk_factors;
     content.insights           = readiness.insights;
     content.show_success_gauge = true;
     content.is_failure_workflow = false;
 
-    for (const auto& ch : prep.auto_result.changes)
-        content.change_preview.push_back(ch.key + ": " + ch.reason);
+    PrintPlannerGui::enrich_workflow_content(content, prep.auto_result.changes, readiness,
+                                             prep.auto_result.summary);
     return content;
 }
 
@@ -322,6 +319,57 @@ void BambuSmartPrintService::sync_from_plan(const BambuSmartPrint::PrintPlan& pl
     m_last_auto_result   = plan.auto_result;
     m_last_prediction    = plan.prediction;
     m_last_readiness     = plan.readiness;
+}
+
+BambuSmartPrint::PlateContext BambuSmartPrintService::plate_context_from_cache(Plater* plater) const
+{
+    BambuSmartPrint::PlateContext ctx;
+    ctx.mesh            = m_last_mesh_analysis;
+    ctx.readiness       = m_last_readiness;
+    ctx.prediction      = m_last_prediction;
+    ctx.base_config     = m_last_baseline;
+    ctx.proposed_config = m_last_applied;
+    ctx.auto_result     = m_last_auto_result;
+    ctx.slice           = m_last_slice_analysis;
+    ctx.has_slice       = m_last_slice_analysis.valid;
+    ctx.has_model       = plater && !plater->model().objects.empty();
+    ctx.change_count    = m_last_auto_result.changes.size();
+    ctx.filament_name   = m_last_mesh_analysis.suggested_material;
+    ctx.printer_id      = "local";
+    if (wxGetApp().getDeviceManager()) {
+        if (MachineObject* sel = wxGetApp().getDeviceManager()->get_selected_machine())
+            ctx.printer_id = sel->get_dev_id();
+    }
+    return ctx;
+}
+
+void BambuSmartPrintService::merge_print_goal(const std::string& user_text)
+{
+    BambuSmartPrint::PrintGoalSession::instance().merge_user_text(user_text);
+}
+
+void BambuSmartPrintService::refresh_from_goal_session(Plater* plater)
+{
+    if (!plater || !is_enabled())
+        return;
+    if (!wxGetApp().preset_bundle || !SlicePilot::is_active_printer_bbl(*wxGetApp().preset_bundle))
+        return;
+    if (plater->model().objects.empty())
+        return;
+
+    try {
+        update_plate_assessment_data(plater);
+        const BambuSmartPrint::PlateContext ctx = plate_context_from_cache(plater);
+        auto&                                 session = BambuSmartPrint::PrintGoalSession::instance();
+        BambuSmartPrint::PrintPlan            plan    = BambuSmartPrint::PrintPlanner::replan(ctx, session);
+        session.set_last_plan(plan);
+        sync_from_plan(plan);
+        refresh_all_panels();
+    } catch (const std::exception& ex) {
+        BOOST_LOG_TRIVIAL(error) << "BambuSmartPrint refresh_from_goal_session: " << ex.what();
+    } catch (...) {
+        BOOST_LOG_TRIVIAL(error) << "BambuSmartPrint refresh_from_goal_session: unknown error";
+    }
 }
 
 void BambuSmartPrintService::refresh_post_slice_assessment(Plater* plater)
@@ -504,7 +552,7 @@ void BambuSmartPrintService::initialize()
         if (!wxGetApp().app_config->has(kEnabledKey))
             wxGetApp().app_config->set_bool(kEnabledKey, true);
         if (!wxGetApp().app_config->has(kAutoLoadModeKey))
-            wxGetApp().app_config->set(kAutoLoadModeKey, std::to_string(int(AutoLoadMode::FullDialog)));
+            wxGetApp().app_config->set(kAutoLoadModeKey, std::to_string(int(AutoLoadMode::Notify)));
         if (!wxGetApp().app_config->has(kLearningAutoApplyKey))
             wxGetApp().app_config->set_bool(kLearningAutoApplyKey, true);
         if (!wxGetApp().app_config->has(kSafeModeKey))
@@ -778,6 +826,9 @@ bool BambuSmartPrintService::apply_config_with_workflow(Plater* plater, const Dy
     else
         plater->update();
 
+    if (!BambuSmartPrint::PrintGoalSession::instance().goal().empty())
+        refresh_from_goal_session(plater);
+
     (void) change_reasons;
     return true;
 }
@@ -853,24 +904,51 @@ bool BambuSmartPrintService::show_settings_compare_approval(
     }
 }
 
+void BambuSmartPrintService::notify_readiness_suggestions(Plater* plater, int score_percent, size_t change_count)
+{
+    if (!plater || change_count == 0)
+        return;
+    NotificationManager* nm = plater->get_notification_manager();
+    if (!nm)
+        return;
+    wxString msg = wxString::Format(
+        _L("Smart Print: %d%% ready — %zu suggested change(s). Open Smart Print when you want to review."),
+        score_percent, change_count);
+    nm->push_notification(
+        NotificationType::CustomNotification,
+        NotificationManager::NotificationLevel::RegularNotificationLevel,
+        std::string(msg.utf8_str()),
+        std::string(_L("Open Smart Print").utf8_str()),
+        [](wxEvtHandler*) -> bool {
+            if (MainFrame* mf = wxGetApp().mainframe)
+                mf->select_tab(MainFrame::tpSmartPrint);
+            return false;
+        });
+}
+
 bool BambuSmartPrintService::show_workflow_dialog(Plater* plater, const SmartPrintWorkflowContent& content,
                                                   const DynamicPrintConfig& before, const DynamicPrintConfig& proposed,
                                                   const std::string& compare_title, const std::string& filament_name,
-                                                  const std::vector<BambuSmartPrint::SettingChange>* change_reasons)
+                                                  const std::vector<BambuSmartPrint::SettingChange>* change_reasons,
+                                                  bool user_initiated)
 {
     wxWindow* dlg_parent = smart_print_dialog_parent(plater ? static_cast<wxWindow*>(plater) : nullptr);
     if (!dlg_parent) {
         BOOST_LOG_TRIVIAL(error) << "BambuSmartPrint workflow: no parent window";
         return false;
     }
+    if (!user_initiated) {
+        if (plater && content.change_count > 0) {
+            const int rate = int(std::round(content.success_rate));
+            notify_readiness_suggestions(plater, rate, content.change_count);
+        }
+        return false;
+    }
     try {
         BambuSmartPrintWorkflowDialog dlg(dlg_parent, content);
-        const int rc = SlicePilotUi::show_modal_with_auto_default(&dlg, wxID_OK);
+        const int rc = SlicePilotUi::show_modal_with_auto_default(&dlg, wxID_CANCEL);
         if (rc != wxID_OK)
             return false;
-
-        if (!dlg.preview_requested() && !dlg.apply_requested() && content.change_count > 0)
-            dlg.confirm_auto_apply();
 
         if (dlg.preview_requested()) {
             show_settings_compare(before, proposed, compare_title.empty()
@@ -930,7 +1008,7 @@ void BambuSmartPrintService::analyze_current_plate(Plater* plater)
         return;
     }
     try {
-        run_auto_workflow(plater);
+        run_auto_workflow(plater, true);
     } catch (const std::exception& ex) {
         BOOST_LOG_TRIVIAL(error) << "BambuSmartPrint analyze: " << ex.what();
         show_error(parent,
@@ -1003,7 +1081,7 @@ void BambuSmartPrintService::analyze_all_plates(Plater* plater)
         }
 
         BambuSmartPrintBatchDialog dlg(parent, batch);
-        const int batch_rc = SlicePilotUi::show_modal_with_auto_default(&dlg, wxID_OK);
+        const int batch_rc = SlicePilotUi::show_modal_with_auto_default(&dlg, wxID_CANCEL);
         if (!dlg.open_plate_requested() && batch_rc == wxID_OK)
             dlg.confirm_auto_open();
         if (batch_rc != wxID_OK || !dlg.open_plate_requested())
@@ -1014,7 +1092,7 @@ void BambuSmartPrintService::analyze_all_plates(Plater* plater)
             return;
 
         list.select_plate(pick);
-        run_auto_workflow(plater);
+        run_auto_workflow(plater, true);
     } catch (const std::exception& ex) {
         BOOST_LOG_TRIVIAL(error) << "BambuSmartPrint analyze all plates: " << ex.what();
         show_error(parent,
@@ -1178,49 +1256,6 @@ void BambuSmartPrintService::run_reprint_with_failure_fixes(Plater* plater)
     run_one_click_print(plater);
 }
 
-void BambuSmartPrintService::auto_prepare_safe_on_load(Plater* plater)
-{
-    if (!is_enabled() || !plater || !wxGetApp().preset_bundle)
-        return;
-    if (!SlicePilot::is_active_printer_bbl(*wxGetApp().preset_bundle))
-        return;
-    if (plater->model().objects.empty())
-        return;
-
-    try {
-        PreparedPlateWorkflow prep;
-        if (!prepare_plate_workflow(plater, wxGetApp().preset_bundle, prep))
-            return;
-
-        m_last_mesh_analysis = prep.mesh;
-        m_last_baseline      = prep.base;
-        m_last_readiness     = readiness_from_prep(prep,
-            m_last_slice_analysis.valid ? &m_last_slice_analysis : nullptr);
-
-        if (!prep.mesh.fits_bed)
-            FirstPrintExperience::apply_bed_fit_fix(plater);
-
-        if (prep.change_count == 0) {
-            refresh_all_panels();
-            return;
-        }
-
-        BambuSmartPrint::SafeModeResult safe =
-            BambuSmartPrint::SafeModeGuard::apply(prep.base, prep.proposed);
-        const size_t safe_changes = BambuSmartPrint::ConfigSnapshot::diff(prep.base, safe.config).size();
-        if (safe_changes > 0)
-            apply_config_with_workflow(plater, prep.base, safe.config, false, &prep.auto_result.changes);
-
-        m_last_applied = safe.config;
-        update_plate_assessment_data(plater);
-        refresh_all_panels();
-    } catch (const std::exception& ex) {
-        BOOST_LOG_TRIVIAL(error) << "BambuSmartPrint auto_prepare_safe_on_load: " << ex.what();
-    } catch (...) {
-        BOOST_LOG_TRIVIAL(error) << "BambuSmartPrint auto_prepare_safe_on_load: unknown error";
-    }
-}
-
 void BambuSmartPrintService::run_one_click_print(Plater* plater)
 {
     wxWindow* parent = smart_print_dialog_parent(plater ? static_cast<wxWindow*>(plater) : nullptr);
@@ -1241,6 +1276,9 @@ void BambuSmartPrintService::run_one_click_print(Plater* plater)
         show_error(parent, _L("Wait for the current slice or export to finish before starting Smart Print."));
         return;
     }
+
+    if (!BambuSmartPrint::PrintGoalSession::instance().goal().empty())
+        refresh_from_goal_session(plater);
 
     try {
         m_one_click_active           = true;
@@ -1370,14 +1408,8 @@ void BambuSmartPrintService::run_smart_slice(Plater* plater)
         m_post_slice_apply_rounds = 0;
         struct Guard {
             bool& f;
-            BambuSmartPrintService* svc;
-            ~Guard()
-            {
-                f = false;
-                if (svc)
-                    svc->flush_pending_failure_dialog();
-            }
-        } guard{ m_workflow_running, this };
+            ~Guard() { f = false; }
+        } guard{ m_workflow_running };
 
         PreparedPlateWorkflow prep;
         if (!prepare_plate_workflow(plater, wxGetApp().preset_bundle, prep))
@@ -1515,7 +1547,7 @@ void BambuSmartPrintService::prompt_bambu_logout()
     wxGetApp().request_user_logout(BBL_CLOUD_PROVIDER);
 }
 
-void BambuSmartPrintService::run_auto_workflow(Plater* plater)
+void BambuSmartPrintService::run_auto_workflow(Plater* plater, bool user_initiated)
 {
     if (!plater || m_workflow_running) return;
     if (!wxGetApp().preset_bundle || !SlicePilot::is_active_printer_bbl(*wxGetApp().preset_bundle)) return;
@@ -1526,14 +1558,8 @@ void BambuSmartPrintService::run_auto_workflow(Plater* plater)
         m_workflow_running = true;
         struct Guard {
             bool& f;
-            BambuSmartPrintService* svc;
-            ~Guard()
-            {
-                f = false;
-                if (svc)
-                    svc->flush_pending_failure_dialog();
-            }
-        } guard{ m_workflow_running, this };
+            ~Guard() { f = false; }
+        } guard{ m_workflow_running };
 
         PreparedPlateWorkflow prep;
         if (!prepare_plate_workflow(plater, wxGetApp().preset_bundle, prep))
@@ -1552,9 +1578,14 @@ void BambuSmartPrintService::run_auto_workflow(Plater* plater)
                 std::string(_L("Slice this plate for slice-aware analysis (unsupported islands, bridges).").utf8_str()));
         }
 
-        show_workflow_dialog(plater, content, prep.base, prep.proposed,
-                             std::string(SLIC3R_APP_FULL_NAME) + " — auto settings", prep.filament_name,
-                             &prep.auto_result.changes);
+        refresh_all_panels();
+        if (user_initiated) {
+            show_workflow_dialog(plater, content, prep.base, prep.proposed,
+                std::string(SLIC3R_APP_FULL_NAME) + " — review settings", prep.filament_name,
+                &prep.auto_result.changes, true);
+        } else if (prep.change_count > 0) {
+            notify_readiness_suggestions(plater, int(std::round(m_last_readiness.score)), prep.change_count);
+        }
     } catch (const std::exception& ex) {
         BOOST_LOG_TRIVIAL(error) << "BambuSmartPrint auto workflow: " << ex.what();
         show_error(parent,
@@ -1565,70 +1596,15 @@ void BambuSmartPrintService::run_auto_workflow(Plater* plater)
     }
 }
 
-void BambuSmartPrintService::schedule_auto_workflow_after_load(Plater* plater)
-{
-    if (!is_enabled() || !plater)
-        return;
-    if (auto_load_mode() == AutoLoadMode::Off)
-        return;
-    if (!wxGetApp().preset_bundle || !SlicePilot::is_active_printer_bbl(*wxGetApp().preset_bundle))
-        return;
-
-    wxGetApp().CallAfter([]() {
-        Plater* plater = wxGetApp().plater();
-        if (!plater || plater->model().objects.empty())
-            return;
-        try {
-            BambuSmartPrintService::instance().on_models_loaded(plater);
-        } catch (const std::exception& ex) {
-            BOOST_LOG_TRIVIAL(error) << "BambuSmartPrint on_models_loaded: " << ex.what();
-        } catch (...) {
-            BOOST_LOG_TRIVIAL(error) << "BambuSmartPrint on_models_loaded: unknown error";
-        }
-    });
-}
-
 void BambuSmartPrintService::on_models_loaded(Plater* plater)
 {
     PrintPlannerGui::dispatch_model_loaded(plater);
 }
 
-void BambuSmartPrintService::notify_model_load_summary(Plater* plater)
-{
-    if (!plater || !wxGetApp().preset_bundle)
-        return;
-
-    PreparedPlateWorkflow prep;
-    if (!prepare_plate_workflow(plater, wxGetApp().preset_bundle, prep))
-        return;
-
-    m_last_mesh_analysis = prep.mesh;
-    m_last_baseline      = prep.base;
-    m_last_readiness     = readiness_from_prep(prep,
-        m_last_slice_analysis.valid ? &m_last_slice_analysis : nullptr);
-    refresh_all_panels();
-
-    const int rate = int(std::round(prep.prediction.success_rate));
-    wxString msg = wxString::Format(
-        _L("Smart Print: %d%% estimated ready — %zu suggested change(s). Open Smart Print for details."),
-        rate, prep.change_count);
-
-    if (NotificationManager* nm = plater->get_notification_manager()) {
-        nm->push_notification(NotificationType::CustomNotification,
-            NotificationManager::NotificationLevel::RegularNotificationLevel,
-            std::string(msg.utf8_str()),
-            std::string(_L("Open Smart Print").utf8_str()),
-            [](wxEvtHandler*) -> bool {
-                wxGetApp().open_smart_print();
-                return true;
-            });
-    }
-}
-
 void BambuSmartPrintService::open_full_workflow_for_current_plate(Plater* plater)
 {
     if (plater)
-        run_auto_workflow(plater);
+        run_auto_workflow(plater, true);
 }
 
 void BambuSmartPrintService::capture_active_print_config(MachineObject* obj)
@@ -1671,9 +1647,9 @@ DynamicPrintConfig BambuSmartPrintService::config_for_print_record(MachineObject
     return capture_current_plate_config();
 }
 
-void BambuSmartPrintService::flush_pending_failure_dialog()
+void BambuSmartPrintService::flush_pending_failure_dialog(bool user_initiated)
 {
-    if (m_pending_failures.empty() || m_workflow_running)
+    if (!user_initiated || m_pending_failures.empty() || m_workflow_running)
         return;
     Plater* plater = wxGetApp().plater();
     if (!plater)
@@ -1709,11 +1685,10 @@ void BambuSmartPrintService::flush_pending_failure_dialog()
     } else {
         SmartPrintWorkflowContent content = failure_workflow_content(pending.record, pending.fixes);
         show_workflow_dialog(plater, content, pending.record.config_snapshot, pending.fixes.config_delta,
-                             std::string(SLIC3R_APP_FULL_NAME) + " — failure fixes", "", &pending.fixes.changes);
+                             std::string(SLIC3R_APP_FULL_NAME) + " — failure fixes", "", &pending.fixes.changes,
+                             true);
     }
 
-    if (!m_pending_failures.empty())
-        wxGetApp().CallAfter([this]() { flush_pending_failure_dialog(); });
 }
 
 void BambuSmartPrintService::enqueue_failure_workflow(MachineObject* obj)
@@ -1791,19 +1766,8 @@ void BambuSmartPrintService::enqueue_failure_workflow(MachineObject* obj)
     SlicePilotOnboardingFunnel::record_first_failure_seen();
 
     Plater* plater = wxGetApp().plater();
-    if (m_workflow_running) {
-        if (plater)
-            show_pending_failure_notification(plater);
-        wxGetApp().CallAfter([this]() { flush_pending_failure_dialog(); });
-        return;
-    }
-
-    if (!plater) {
-        wxGetApp().CallAfter([this]() { flush_pending_failure_dialog(); });
-        return;
-    }
-
-    flush_pending_failure_dialog();
+    if (plater)
+        show_pending_failure_notification(plater);
 }
 
 void BambuSmartPrintService::handle_print_failed(MachineObject* obj)
@@ -2013,7 +1977,7 @@ void BambuSmartPrintService::on_slice_completed(Plater* plater, const Print* pri
 
 void BambuSmartPrintService::maybe_notify_slice_analysis(Plater* plater)
 {
-    if (m_one_click_active)
+    if (m_one_click_active || !m_pending_smart_slice_followup)
         return;
     if (!m_last_slice_analysis.valid || !plater || !wxGetApp().preset_bundle)
         return;

@@ -34,9 +34,20 @@ int score_spec(const OllamaAutoSettingSpec& sp, const std::string& query)
     score     = std::max(score, score_token(sp.label, query));
     score     = std::max(score, score_token(sp.category, query));
     score     = std::max(score, score_token(sp.tooltip, query));
-    for (const std::string& ko : OllamaSettingAliases::ko_terms_for_key(sp.key))
+    if (boost::icontains(query, sp.key))
+        score = std::max(score, 65);
+    for (const std::string& ko : OllamaSettingAliases::ko_terms_for_key(sp.key)) {
         score = std::max(score, score_token(ko, query));
-    score = std::max(score, OllamaSettingAliases::symptom_boost(query, sp.key));
+        if (boost::icontains(query, ko))
+            score = std::max(score, 75);
+    }
+    for (size_t pos = 0; pos < sp.key.size(); ++pos) {
+        if (sp.key[pos] != '_')
+            continue;
+        const std::string part = sp.key.substr(pos + 1);
+        if (part.size() >= 3 && boost::icontains(query, part))
+            score = std::max(score, 60);
+    }
     return score;
 }
 
@@ -71,27 +82,11 @@ std::vector<OllamaSettingSearchHit> OllamaSettingSearch::search(const std::strin
 std::vector<std::string> OllamaSettingSearch::candidate_keys_for_request(const std::string& query, int max_tier,
                                                                            size_t limit)
 {
-    std::unordered_map<std::string, int> ranked;
-    for (const OllamaSettingSearchHit& hit : search(query, max_tier, limit))
-        ranked[hit.key] = std::max(ranked[hit.key], hit.score);
-    for (const std::string& key : OllamaSettingAliases::keys_from_symptoms(query)) {
-        const int boost = OllamaSettingAliases::symptom_boost(query, key);
-        ranked[key]     = std::max(ranked[key], boost > 0 ? boost : 70);
-    }
-    std::vector<std::pair<int, std::string>> ordered;
-    ordered.reserve(ranked.size());
-    for (const auto& kv : ranked)
-        ordered.push_back({kv.second, kv.first});
-    std::sort(ordered.begin(), ordered.end(), [](const auto& a, const auto& b) {
-        if (a.first != b.first)
-            return a.first > b.first;
-        return a.second < b.second;
-    });
     std::vector<std::string> keys;
-    for (const auto& p : ordered) {
+    for (const OllamaSettingSearchHit& hit : search(query, max_tier, limit)) {
         if (keys.size() >= limit)
             break;
-        keys.push_back(p.second);
+        keys.push_back(hit.key);
     }
     return keys;
 }

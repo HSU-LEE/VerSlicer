@@ -1,4 +1,5 @@
 #include "OllamaActionRegistry.hpp"
+#include "OllamaActionValidator.hpp"
 
 #include <boost/algorithm/string.hpp>
 #include <unordered_set>
@@ -16,7 +17,10 @@ const OllamaActionTypeSpec kActionTypes[] = {
     {"rotate", true, true, true, "Rotate selection", "선택 모델 회전"},
     {"scale", true, false, false, "Scale selection", "선택 모델 크기 조절"},
     {"clone_selection", true, true, true, "Duplicate selection", "선택 복제"},
-    {"arrange", true, true, true, "Auto-arrange on build plate", "플레이트 자동 배치"},
+    {"arrange", true, true, true, "Auto-arrange on build plate (by layer)", "플레이트 자동 배치 (층별)"},
+    {"arrange_objects", true, true, true, "Arrange by object (print-by-object layout)", "객체 단위 재배치 (물체 객체로)"},
+    {"split_object", true, true, true, "Split selected model into separate objects", "모델을 개별 객체로 분할"},
+    {"split_mesh", true, true, true, "Split selected model into separate objects (alias)", "모델을 개별 객체로 분할"},
     {"delete_selection", true, false, false, "Delete selected models", "선택 삭제"},
     {"ui_select_tab", true, false, false, "Switch main tab", "탭 전환"},
     {"open_calibration", true, false, false, "Open calibration tab", "캘리브레이션 탭"},
@@ -28,13 +32,16 @@ const OllamaActionTypeSpec kActionTypes[] = {
     {"open_setup", true, false, true, "Open Smart Print setup wizard", "프린터 설정/연결"},
     {"send_print", true, false, true, "Send sliced job to printer", "프린터로 출력"},
     {"export_gcode", true, false, true, "Export G-code file", "G-code 내보내기"},
-    {"add_plate", true, false, false, "Add build plate", "플레이트 추가"},
+    {"add_plate", true, true, true, "Add a new build plate (palette)", "빌드 플레이트(팔레트) 추가"},
     {"delete_plate", true, false, false, "Delete current plate", "플레이트 삭제"},
     {"select_plate", true, false, false, "Select plate by index", "플레이트 선택"},
     {"save_project", true, false, false, "Save project", "프로젝트 저장"},
     {"select_preset", true, false, false, "Select print/filament/printer preset", "프리셋 선택"},
     {"run_smart_print", true, false, true, "Run Smart Print workflow", "스마트 프린트 실행"},
     {"rollback_apply", true, false, true, "Undo last AI settings apply", "AI 설정 되돌리기"},
+    {"repair_mesh", true, true, true, "Repair STL mesh (non-manifold, holes, normals)", "메쉬 수리"},
+    {"mirror_mesh", true, true, true, "Mirror mesh on axis", "메쉬 대칭"},
+    {"mesh_boolean", true, true, true, "Boolean mesh ops (hole, union handle)", "메쉬 불린 연산"},
 };
 
 const std::unordered_set<std::string> kBlockedTypes = {
@@ -60,8 +67,9 @@ bool OllamaActionRegistry::is_allowed_type(const std::string& type)
 {
     if (is_blocked_type(type))
         return false;
+    const std::string canon = OllamaActionValidator::canonical_action_type(type);
     for (const auto& spec : all()) {
-        if (type == spec.type)
+        if (canon == spec.type || type == spec.type)
             return true;
     }
     return false;

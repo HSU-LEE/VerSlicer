@@ -14,6 +14,9 @@ public:
 
     /** Planner → resolver two-hop LLM path. */
     static bool should_use_two_hop(const std::string& user_request, bool apply_mode);
+
+    /** Skip LLM: apply rule fallbacks for stringing / strength / slice-suggested support. */
+    static bool should_apply_rule_only(const std::string& user_request, bool apply_mode);
 };
 
 }} // namespace

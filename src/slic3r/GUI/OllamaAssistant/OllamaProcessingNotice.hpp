@@ -13,6 +13,11 @@ class OllamaProcessingNotice
 public:
     static void show(Plater* plater, const std::string& text);
     static void hide(Plater* plater);
+
+    /** Localized notice while the assistant is working on a request. */
+    static void show_thinking(Plater* plater);
+    /** Localized notice while Ollama is starting. */
+    static void show_starting(Plater* plater);
 };
 
 }} // namespace

@@ -54,6 +54,7 @@ namespace Slic3r {
 namespace GUI {
 
 class MediaFilePanel;
+class BambuSmartPrintDeviceSummary;
 
 class AddMachinePanel : public wxPanel
 {
@@ -71,8 +72,6 @@ public:
 
 	void msw_rescale();
 };
-
-class BambuSmartPrintDeviceSummary;
 
 class MonitorPanel : public wxPanel
 {

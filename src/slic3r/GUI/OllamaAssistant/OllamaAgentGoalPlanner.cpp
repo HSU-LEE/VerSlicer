@@ -1,6 +1,7 @@
 #include "OllamaAgentGoalPlanner.hpp"
 
-#include "OllamaAgentStateService.hpp"
+#include "OllamaRequestRouter.hpp"
+#include "OllamaSettingSearch.hpp"
 
 #include <boost/algorithm/string.hpp>
 
@@ -18,170 +19,150 @@ bool contains_ci(const std::string& hay, const char* needle)
     return needle && *needle && boost::ifind_first(hay, needle);
 }
 
-bool any_tool_ok(const std::vector<nlohmann::json>& step_tool_results, const std::string& tool,
-                 bool require_changed = false)
+bool tool_applied(const std::vector<nlohmann::json>& step_tool_results, const char* tool)
 {
     for (const auto& step : step_tool_results) {
         if (!step.is_array())
             continue;
         for (const auto& r : step) {
-            if (!r.is_object() || r.value("tool", "") != tool || !r.value("ok", false))
+            if (!r.is_object())
                 continue;
-            if (!require_changed || r.value("changed", false))
+            if (r.value("tool", "") == tool && r.value("ok", false) && r.value("changed", false))
                 return true;
         }
     }
     return false;
-}
-
-bool options_contain_key_substr(const nlohmann::json& data, const char* key_substr)
-{
-    if (!data.is_object() || !data.contains("options") || !data["options"].is_object())
-        return false;
-    for (auto it = data["options"].begin(); it != data["options"].end(); ++it) {
-        if (it.key().find(key_substr) != std::string::npos)
-            return true;
-    }
-    return false;
-}
-
-bool set_config_touched_key(const std::vector<nlohmann::json>& step_tool_results, const char* key_substr)
-{
-    for (const auto& step : step_tool_results) {
-        if (!step.is_array())
-            continue;
-        for (const auto& r : step) {
-            if (!r.is_object() || r.value("tool", "") != "set_config" || !r.value("ok", false)
-                || !r.value("changed", false))
-                continue;
-            if (r.contains("data") && options_contain_key_substr(r["data"], key_substr))
-                return true;
-            const std::string msg = r.value("message", "");
-            if (msg.find(key_substr) != std::string::npos)
-                return true;
-        }
-    }
-    return false;
-}
-
-nlohmann::json make_action_root(std::initializer_list<nlohmann::json> actions, const std::string& message)
-{
-    nlohmann::json arr = nlohmann::json::array();
-    for (const auto& a : actions)
-        arr.push_back(a);
-    return nlohmann::json{{"message", message}, {"done", false}, {"actions", std::move(arr)}};
 }
 
 } // namespace
 
-AgentGoalIntent OllamaAgentGoalPlanner::parse_goal_intent(const std::string& user_goal)
+GeometryGoalNeeds OllamaAgentGoalPlanner::parse_geometry_needs(const std::string& user_goal)
 {
-    AgentGoalIntent g;
+    GeometryGoalNeeds needs;
     if (user_goal.empty())
-        return g;
+        return needs;
 
-    if (contains_utf8(user_goal, "브림") || contains_ci(user_goal, "brim"))
-        g.wants_brim = true;
-    if (contains_utf8(user_goal, "서포트") || contains_utf8(user_goal, "받침") || contains_ci(user_goal, "support"))
-        g.wants_support = true;
-    if (contains_utf8(user_goal, "슬라이스") || contains_ci(user_goal, "slice") || contains_ci(user_goal, "slicing"))
-        g.wants_slice = true;
-    if (contains_utf8(user_goal, "보내") || contains_utf8(user_goal, "전송") || contains_ci(user_goal, "send to")
-        || contains_ci(user_goal, "send print"))
-        g.wants_send = true;
-    if (contains_ci(user_goal, "export") || contains_utf8(user_goal, "gcode") || contains_utf8(user_goal, "g-code")
-        || contains_utf8(user_goal, "G-code"))
-        g.wants_export = true;
-    if (contains_ci(user_goal, "arrange") || contains_utf8(user_goal, "정렬") || contains_utf8(user_goal, "배치"))
-        g.wants_arrange = true;
+    if (contains_utf8(user_goal, "돌려") || contains_utf8(user_goal, "회전") || contains_utf8(user_goal, "뒤집")
+        || contains_ci(user_goal, "rotate") || contains_ci(user_goal, "flip"))
+        needs.rotate = true;
 
-    if ((contains_ci(user_goal, "print") || contains_utf8(user_goal, "출력"))
-        && (contains_ci(user_goal, "send") || contains_utf8(user_goal, "프린터") || contains_utf8(user_goal, "보내")))
-        g.wants_send = true;
+    if (contains_utf8(user_goal, "크기") || contains_utf8(user_goal, "줄") || contains_utf8(user_goal, "늘")
+        || contains_utf8(user_goal, "축소") || contains_utf8(user_goal, "확대") || contains_utf8(user_goal, "키워")
+        || user_goal.find('%') != std::string::npos || contains_ci(user_goal, "scale")
+        || contains_ci(user_goal, "resize") || contains_ci(user_goal, "bigger") || contains_ci(user_goal, "smaller"))
+        needs.scale = true;
 
-    return g;
+    if (contains_utf8(user_goal, "이동") || contains_ci(user_goal, "translate") || contains_ci(user_goal, "move"))
+        needs.translate = true;
+
+    if ((contains_utf8(user_goal, "객체") || contains_utf8(user_goal, "물체 객체"))
+        && (contains_utf8(user_goal, "배치") || contains_utf8(user_goal, "재배치")))
+        needs.arrange_objects = true;
+    else if (contains_ci(user_goal, "by object") || contains_ci(user_goal, "by-object")
+             || contains_ci(user_goal, "print by object"))
+        needs.arrange_objects = true;
+    else if (contains_ci(user_goal, "arrange") || contains_utf8(user_goal, "정렬") || contains_utf8(user_goal, "배치"))
+        needs.arrange = true;
+
+    if (contains_utf8(user_goal, "분할") || contains_utf8(user_goal, "나누") || contains_ci(user_goal, "split"))
+        needs.split_object = true;
+
+    if ((contains_utf8(user_goal, "팔레트") || contains_utf8(user_goal, "플레이트"))
+        && (contains_utf8(user_goal, "추가") || contains_utf8(user_goal, "새")))
+        needs.add_plate = true;
+    else if (contains_ci(user_goal, "add plate") || contains_ci(user_goal, "new plate")
+             || contains_ci(user_goal, "add palette") || contains_ci(user_goal, "new palette"))
+        needs.add_plate = true;
+
+    if (contains_utf8(user_goal, "삭제") || contains_ci(user_goal, "delete"))
+        needs.delete_selection = true;
+
+    return needs;
+}
+
+bool OllamaAgentGoalPlanner::geometry_needs_met(const GeometryGoalNeeds& needs,
+                                                const std::vector<nlohmann::json>& step_tool_results)
+{
+    if (!needs.any())
+        return false;
+    if (needs.rotate && !tool_applied(step_tool_results, "rotate"))
+        return false;
+    if (needs.scale && !tool_applied(step_tool_results, "scale"))
+        return false;
+    if (needs.translate && !tool_applied(step_tool_results, "translate"))
+        return false;
+    if (needs.arrange_objects && !tool_applied(step_tool_results, "arrange_objects"))
+        return false;
+    if (needs.arrange && !tool_applied(step_tool_results, "arrange"))
+        return false;
+    if (needs.split_object && !tool_applied(step_tool_results, "split_object"))
+        return false;
+    if (needs.add_plate && !tool_applied(step_tool_results, "add_plate"))
+        return false;
+    if (needs.delete_selection && !tool_applied(step_tool_results, "delete_selection"))
+        return false;
+    return true;
+}
+
+bool OllamaAgentGoalPlanner::is_simple_geometry_apply(const std::string& user_goal)
+{
+    return OllamaRequestRouter::is_geometry_request(user_goal);
+}
+
+bool OllamaAgentGoalPlanner::is_single_shot_apply(const std::string& user_goal)
+{
+    return !goal_expects_multi_step(user_goal);
+}
+
+bool OllamaAgentGoalPlanner::goal_expects_multi_step(const std::string& /*user_goal*/)
+{
+    return false;
+}
+
+bool OllamaAgentGoalPlanner::should_auto_finish_after_apply(const std::string& user_goal, bool applied,
+                                                            const std::vector<nlohmann::json>& step_tool_results)
+{
+    if (!applied)
+        return false;
+    const GeometryGoalNeeds needs = parse_geometry_needs(user_goal);
+    if (needs.any())
+        return geometry_needs_met(needs, step_tool_results);
+    return !goal_expects_multi_step(user_goal);
 }
 
 nlohmann::json OllamaAgentGoalPlanner::build_plan_hint(const std::string& user_goal, bool korean)
 {
-    const AgentGoalIntent intent = parse_goal_intent(user_goal);
-    nlohmann::json        steps  = nlohmann::json::array();
-
-    if (intent.wants_arrange)
-        steps.push_back(korean ? "모델 자동 배치 (arrange)" : "Auto-arrange models (arrange)");
-    if (intent.wants_brim)
-        steps.push_back(korean ? "브림 켜기 (set_config)" : "Enable brim (set_config)");
-    if (intent.wants_support)
-        steps.push_back(korean ? "서포트 켜기 (set_config)" : "Enable supports (set_config)");
-    if (intent.wants_slice)
-        steps.push_back(korean ? "슬라이스 (slice)" : "Slice current plate (slice)");
-    if (intent.wants_send)
-        steps.push_back(korean ? "슬라이스 완료 확인 후 프린터 전송 (get_state → send_print)"
-                               : "Verify slice, then send_print");
-    if (intent.wants_export)
-        steps.push_back(korean ? "슬라이스 완료 후 G-code보내기 (export_gcode)" : "Export G-code after slice");
-
-    return nlohmann::json{
-        {"multi_step", steps.size() > 1},
-        {"suggested_steps", std::move(steps)},
+    nlohmann::json hint{
+        {"multi_step", false},
+        {"suggested_steps",
+         nlohmann::json::array({korean ? "요청에 맞는 변경을 확인하고 적용합니다"
+                                       : "Review context and apply the needed changes"})},
         {"hint",
-         korean ? "여러 단계 목표면 get_state로 확인한 뒤 순서대로 도구를 호출하세요."
-                : "For multi-step goals, call get_state between steps and proceed in order."},
+         korean ? "슬라이서 컨텍스트와 candidate_keys를 참고해 필요한 actions를 실행하고 done:true로 마무리하세요."
+                : "Use slicer context and candidate_keys; run the needed actions, then set done:true."},
     };
-}
+    const auto keys = OllamaSettingSearch::candidate_keys_for_request(user_goal, 3, 8);
+    if (!keys.empty())
+        hint["candidate_keys"] = keys;
 
-std::optional<nlohmann::json> OllamaAgentGoalPlanner::try_deterministic_follow_up(
-    const std::string& user_goal, const std::vector<nlohmann::json>& step_tool_results)
-{
-    const AgentGoalIntent intent = parse_goal_intent(user_goal);
-    if (!intent.wants_slice && !intent.wants_send && !intent.wants_export && !intent.wants_arrange)
-        return std::nullopt;
+    const GeometryGoalNeeds needs = parse_geometry_needs(user_goal);
+    nlohmann::json            tools = nlohmann::json::array();
+    if (needs.add_plate)
+        tools.push_back("add_plate");
+    if (needs.arrange_objects)
+        tools.push_back("arrange_objects");
+    else if (needs.arrange)
+        tools.push_back("arrange");
+    if (needs.split_object)
+        tools.push_back("split_object");
+    if (needs.scale)
+        tools.push_back("scale");
+    if (needs.rotate)
+        tools.push_back("rotate");
+    if (!tools.empty())
+        hint["suggested_tools"] = std::move(tools);
 
-    const bool brim_ready =
-        !intent.wants_brim || set_config_touched_key(step_tool_results, "brim")
-        || set_config_touched_key(step_tool_results, "enable_brim");
-    const bool support_ready =
-        !intent.wants_support || set_config_touched_key(step_tool_results, "support")
-        || set_config_touched_key(step_tool_results, "enable_support");
-    const bool config_ready = brim_ready && support_ready;
-
-    const bool slice_started = any_tool_ok(step_tool_results, "slice", true);
-    const bool send_done     = any_tool_ok(step_tool_results, "send_print", true);
-    const bool export_done   = any_tool_ok(step_tool_results, "export_gcode", true);
-    const bool arrange_done  = any_tool_ok(step_tool_results, "arrange", true);
-
-    const nlohmann::json state            = OllamaAgentStateService::snapshot();
-    const bool           plate_sliced     = state.contains("slice_state")
-        && state["slice_state"].value("current_plate_sliced", false);
-
-    if (intent.wants_arrange && !arrange_done)
-        return make_action_root({nlohmann::json{{"type", "arrange"}}}, "Auto-arranging models");
-
-    if (intent.wants_support && !support_ready)
-        return make_action_root({nlohmann::json{{"type", "set_config"},
-                                                {"preset", "print"},
-                                                {"options",
-                                                 {{"enable_support", true}, {"support_type", "tree(auto)"}}}}},
-                                "Enabling tree supports");
-
-    if (config_ready && intent.wants_slice && !slice_started)
-        return make_action_root({nlohmann::json{{"type", "slice"}, {"scope", "plate"}}}, "Slicing current plate");
-
-    if (intent.wants_send && !send_done) {
-        if (plate_sliced)
-            return make_action_root({nlohmann::json{{"type", "send_print"}}}, "Sending to printer");
-        if (slice_started && !any_tool_ok(step_tool_results, "get_state"))
-            return make_action_root({nlohmann::json{{"type", "get_state"}}}, "Checking slice state");
-    }
-
-    if (intent.wants_export && !export_done) {
-        if (plate_sliced)
-            return make_action_root({nlohmann::json{{"type", "export_gcode"}}}, "Exporting G-code");
-        if (slice_started && !any_tool_ok(step_tool_results, "get_state"))
-            return make_action_root({nlohmann::json{{"type", "get_state"}}}, "Checking slice state");
-    }
-
-    return std::nullopt;
+    return hint;
 }
 
 }} // namespace

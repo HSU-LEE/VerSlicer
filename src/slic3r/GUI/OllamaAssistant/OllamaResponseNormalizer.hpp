@@ -13,6 +13,12 @@ struct OllamaNormalizeResult
     std::vector<std::string> warnings;
 };
 
+enum class OllamaRuleFallbackScope
+{
+    AllEligible,
+    HighConfidenceOnly,
+};
+
 class OllamaResponseNormalizer
 {
 public:
@@ -27,6 +33,10 @@ public:
 
     /** Drop stringing misreads and ensure print-speed options when the user wants faster printing. */
     static void reconcile_speed_intent_actions(nlohmann::json& root, const std::string& user_request);
+
+    /** Inject set_config fallbacks from symptom / use-case / slice signals. */
+    static void inject_rule_fallbacks(nlohmann::json& root, const std::string& user_request,
+                                    OllamaRuleFallbackScope scope = OllamaRuleFallbackScope::AllEligible);
 };
 
 }} // namespace

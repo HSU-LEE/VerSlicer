@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 
 #include <string>
+#include <vector>
 
 namespace Slic3r { namespace GUI {
 
@@ -13,8 +14,11 @@ class OllamaAssistContextBuilder
 public:
     struct PrefetchBundle
     {
-        nlohmann::json wiki;
-        nlohmann::json settings_analysis;
+        nlohmann::json              wiki;
+        nlohmann::json              settings_analysis;
+        nlohmann::json              mesh_health;
+        nlohmann::json              mesh_summary;
+        std::vector<std::string>    candidate_keys;
     };
 
     static PrefetchBundle prefetch_for_goal(const std::string& user_goal, bool korean);

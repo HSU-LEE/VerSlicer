@@ -32,6 +32,12 @@ public:
                                                           const BambuSmartPrint::PrintPlan& plan);
     static SmartPrintWorkflowContent workflow_content_from_plan(const BambuSmartPrint::PrintPlan& plan);
 
+    /** Summary, gauge, and preview lines derived from pending setting changes. */
+    static void enrich_workflow_content(SmartPrintWorkflowContent& content,
+                                        const std::vector<BambuSmartPrint::SettingChange>& changes,
+                                        const BambuSmartPrint::ReadinessReport& readiness,
+                                        const std::string& fallback_message = {});
+
     static BambuSmartPrint::ApplyPolicy default_apply_policy();
 };
 

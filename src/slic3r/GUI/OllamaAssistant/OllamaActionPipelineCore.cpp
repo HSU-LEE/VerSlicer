@@ -19,7 +19,12 @@ std::string OllamaActionPipelineCore::action_fingerprint(const nlohmann::json& a
     }
     if (type == "rotate" || type == "translate" || type == "scale")
         return type + "|" + action.dump();
-    if (type == "arrange" || type == "clone_selection" || type == "delete_selection")
+    if (type == "repair_mesh" || type == "mirror_mesh")
+        return type;
+    if (type == "mesh_boolean")
+        return type + "|" + action.value("operation", "");
+    if (type == "arrange" || type == "arrange_objects" || type == "clone_selection" || type == "delete_selection"
+        || type == "split_object")
         return type;
     if (type == "makerworld_search")
         return type + "|" + action.value("query", "");

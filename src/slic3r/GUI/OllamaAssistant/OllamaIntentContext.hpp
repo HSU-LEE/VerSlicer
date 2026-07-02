@@ -50,17 +50,6 @@ public:
     static bool                     print_support_enabled();
     static double                   recommended_brim_width_mm();
 
-    static bool user_vague_fix_request(const std::string& user);
-    static bool user_wants_warp_relief(const std::string& user);
-    static bool user_complains_print_too_slow(const std::string& user);
-    static bool user_wants_faster_print(const std::string& user);
-    static bool user_wants_stringing_relief(const std::string& user);
-    /** Target retraction (mm); bumps above current when already at baseline. */
-    static double recommended_retraction_for_stringing();
-    static bool user_wants_top_surface_quality(const std::string& user);
-    static bool user_wants_first_layer_help(const std::string& user);
-    static bool user_wants_lay_flat(const std::string& user);
-
     static nlohmann::json build_intent_signals_json();
     /** Outcome-first guidance from live preset (compact JSON for LLM context). */
     static nlohmann::json build_engineering_hints_json();

@@ -69,6 +69,16 @@ wxColour Theme::success() { return c_primary(); }
 wxColour Theme::warning() { return StateColor::darkModeColorFor(wxColour("#E58600")); }
 wxColour Theme::danger() { return StateColor::darkModeColorFor(wxColour("#E14747")); }
 
+bool smart_print_locale_korean()
+{
+    const wxString code = wxGetApp().current_language_code();
+    wxString       lang = code.BeforeFirst('_').BeforeFirst('-').Lower();
+    if (lang == wxString("ko"))
+        return true;
+    lang = wxGetApp().current_language_code_safe().BeforeFirst('_').Lower();
+    return lang == wxString("ko");
+}
+
 void apply_dialog_chrome(wxWindow* dialog, const wxString& title)
 {
     if (!dialog)
@@ -448,7 +458,8 @@ wxPanel* create_readiness_hero(wxWindow* parent, bool compact,
     if (!body)
         body = card_body_panel(frame);
 
-    auto* cap = new wxStaticText(body, wxID_ANY, _L("Print readiness"));
+    auto* cap = new wxStaticText(body, wxID_ANY,
+        smart_print_locale_korean() ? wxString::FromUTF8("출력 준비도") : _L("Print readiness"));
     style_section_title(cap);
     inner->Add(cap, 0, wxEXPAND | wxBOTTOM, parent->FromDIP(8));
 
@@ -1122,7 +1133,8 @@ wxPanel* create_readiness_meter(wxWindow* parent, int score_percent, const wxStr
     const int m = parent->FromDIP(12);
     sz->AddSpacer(m);
 
-    auto* title = new wxStaticText(card, wxID_ANY, _L("Print readiness"));
+    auto* title = new wxStaticText(card, wxID_ANY,
+        smart_print_locale_korean() ? wxString::FromUTF8("출력 준비도") : _L("Print readiness"));
     style_section_title(title);
     sz->Add(title, 0, wxLEFT | wxRIGHT, m);
 
@@ -1170,10 +1182,17 @@ wxPanel* add_insight_list(wxPanel* card, wxBoxSizer* card_sz,
         default: break;
         }
         wxString sev_label;
+        const bool ko = smart_print_locale_korean();
         switch (ins.severity) {
-        case BambuSmartPrint::RiskSeverity::High:   sev_label = _L("High"); break;
-        case BambuSmartPrint::RiskSeverity::Medium: sev_label = _L("Med"); break;
-        case BambuSmartPrint::RiskSeverity::Low:    sev_label = _L("Low"); break;
+        case BambuSmartPrint::RiskSeverity::High:
+            sev_label = ko ? wxString::FromUTF8("높음") : _L("High");
+            break;
+        case BambuSmartPrint::RiskSeverity::Medium:
+            sev_label = ko ? wxString::FromUTF8("중간") : _L("Medium");
+            break;
+        case BambuSmartPrint::RiskSeverity::Low:
+            sev_label = ko ? wxString::FromUTF8("낮음") : _L("Low");
+            break;
         default: break;
         }
 
@@ -1311,7 +1330,9 @@ Button* find_primary_footer_button(wxWindow* root)
             if (!fallback)
                 fallback = btn;
             if (btn->GetLabel().Contains(_L("Apply")) || btn->GetLabel().Contains(_L("Approve"))
-                || btn->GetLabel().Contains(_L("Got it")) || btn->GetLabel().Contains(_L("OK")))
+                || btn->GetLabel().Contains(_L("Got it")) || btn->GetLabel().Contains(_L("OK"))
+                || btn->GetLabel().Contains(wxString::FromUTF8("알겠습니다"))
+                || btn->GetLabel().Contains(wxString::FromUTF8("적용")))
                 return btn;
         }
         const wxWindowList& kids = w->GetChildren();

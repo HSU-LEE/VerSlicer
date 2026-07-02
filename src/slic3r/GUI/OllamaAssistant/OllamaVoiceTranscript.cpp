@@ -1,6 +1,5 @@
 #include "OllamaVoiceTranscript.hpp"
 
-#include "OllamaIntentRules.hpp"
 #include "OllamaSettingSearch.hpp"
 
 #include <boost/algorithm/string.hpp>
@@ -10,8 +9,6 @@
 namespace Slic3r { namespace GUI {
 
 namespace {
-
-using namespace OllamaIntentRules;
 
 static bool utf8_advance(const std::string& s, size_t& i, uint32_t& cp)
 {
@@ -77,8 +74,6 @@ static bool locale_prefers_korean(const std::string& locale_id)
 
 static bool has_slicer_intent_hint(const std::string& text)
 {
-    if (OllamaIntentRules::parse_z_rotation_degrees(text).has_value())
-        return true;
     if (!OllamaSettingSearch::candidate_keys_for_request(text, 1, 3).empty())
         return true;
     if (text.find("슬라이스") != std::string::npos || boost::icontains(text, "slice"))

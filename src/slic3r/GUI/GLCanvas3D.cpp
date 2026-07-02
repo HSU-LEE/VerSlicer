@@ -1,6 +1,7 @@
 #include "libslic3r/libslic3r.h"
 #include "GLCanvas3D.hpp"
 #include "OllamaAssistant/OllamaChatDialog.hpp"
+#include "AIModelCreate/AIModelCreateDialog.hpp"
 #include "OllamaAssistant/OllamaVoiceInput.hpp"
 
 #include <igl/unproject.h>
@@ -2202,7 +2203,8 @@ void GLCanvas3D::render(bool only_init)
         }
         Plater* plater = wxGetApp().plater();
         float coach_bottom_reserve = 0.f;
-        if (plater && plater->get_current_canvas3D() == this)
+        if (plater && plater->get_current_canvas3D() == this
+            && AICoachController::is_enabled_for_current_mode())
             coach_bottom_reserve = AICoachController::instance().reserved_bottom_height(get_scale());
         wxGetApp().plater()->get_notification_manager()->render_notifications(
             *this, get_overlay_window_width(), bottom_margin + coach_bottom_reserve, right_margin);
@@ -2212,7 +2214,8 @@ void GLCanvas3D::render(bool only_init)
             && AIGuiOrchestrator::instance().should_render_beginner_journey()) {
             BeginnerJourney::render(*this);
         }
-        if (plater && plater->get_current_canvas3D() == this) {
+        if (plater && plater->get_current_canvas3D() == this
+            && AICoachController::is_enabled_for_current_mode()) {
             AICoachController::instance().render(*this, bottom_margin, right_margin);
         }
     }
@@ -3096,14 +3099,15 @@ void GLCanvas3D::load_gcode_preview(const GCodeProcessorResult& gcode_result, co
     PartPlate* plate = partplate_list.get_curr_plate();
     const std::vector<BoundingBoxf3>& exclude_bounding_box = plate->get_exclude_areas();
 
-    //BBS: init is called in GLCanvas3D.render()
-    //when load gcode directly, it is too late
-    m_gcode_viewer.init(wxGetApp().get_mode(), wxGetApp().preset_bundle);
+    // Init libvgcode only when the GL context is current (render() also calls init).
+    if (m_initialized && _set_current())
+        m_gcode_viewer.init(wxGetApp().get_mode(), wxGetApp().preset_bundle);
     m_gcode_viewer.enable_legend(true);
-
+    m_gcode_viewer.show_legend(true);
 
     m_gcode_viewer.load_as_gcode(gcode_result, *this->fff_print(), str_tool_colors, str_color_print_colors, wxGetApp().plater()->build_volume(), exclude_bounding_box,
         wxGetApp().get_mode(), only_gcode);
+    m_render_preview = true;
     m_gcode_layers_times_cache = m_gcode_viewer.get_layers_times();
 
     m_gcode_viewer.get_moves_slider()->SetHigherValue(m_gcode_viewer.get_moves_slider()->GetMaxValue());
@@ -3229,7 +3233,8 @@ void GLCanvas3D::on_idle(wxIdleEvent& evt)
         const int64_t now = GLCanvas3D::timestamp_now();
         const int64_t dt  = s_last_coach_tick ? (now - s_last_coach_tick) : 16;
         s_last_coach_tick = now;
-        m_dirty |= AICoachController::instance().update(*this, false, dt);
+        if (AICoachController::is_enabled_for_current_mode())
+            m_dirty |= AICoachController::instance().update(*this, false, dt);
         m_dirty |= BeginnerJourney::update(dt);
     }
     if (Plater* plater = wxGetApp().plater()) {
@@ -8917,6 +8922,15 @@ void GLCanvas3D::_render_canvas_toolbar()
             [this]{
                 wxGetApp().toggle_show_3d_navigator();
                 ImGui::CloseCurrentPopup(); // Close popup to show changes on UI
+            }
+        );
+
+        create_menu_item(_utf8(L("Create Model")),
+            m_canvas_type == ECanvasType::CanvasView3D,
+            true,
+            [this] {
+                if (m_canvas != nullptr && !wxGetApp().is_closing())
+                    m_canvas->CallAfter([]() { show_ai_model_create_dialog(); });
             }
         );
 

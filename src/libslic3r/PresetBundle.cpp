@@ -2,7 +2,6 @@
 #include <ctime>
 
 #include "PresetBundle.hpp"
-#include "SlicePilot/SlicePilotRestrictions.hpp"
 #include "PrintConfig.hpp"
 #include "libslic3r.h"
 #include "I18N.hpp"
@@ -538,8 +537,6 @@ PresetsConfigSubstitutions PresetBundle::load_presets(AppConfig &config, Forward
     this->load_selections(config, preferred_selection);
 
     set_calibrate_printer("");
-
-    SlicePilot::enforce_bbl_only_bundle(*this);
 
     //BBS: add config related logs
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(" finished, returned substitutions %1%")%substitutions.size();
@@ -2196,9 +2193,6 @@ std::pair<PresetsConfigSubstitutions, std::string> PresetBundle::load_system_pre
         if (vn == ORCA_FILAMENT_LIBRARY)
             orca_lib_vendor = vn;
         else if (!(validation_mode && !vendor_to_validate.empty() && vn != vendor_to_validate)) {
-            // SlicePilot: load Bambu Lab (BBL) vendor presets only.
-            if (!SlicePilot::is_vendor_allowed_for_slicepilot(vn))
-                continue;
             other_vendors.push_back(vn);
         }
     }
@@ -2300,8 +2294,6 @@ std::pair<PresetsConfigSubstitutions, std::string> PresetBundle::load_system_mod
             std::string vendor_name = dir_entry.path().filename().string();
             // Remove the .json suffix.
             vendor_name.erase(vendor_name.size() - 5);
-            if (!SlicePilot::is_vendor_allowed_for_slicepilot(vendor_name))
-                continue;
             try {
                 // Load the config bundle, flatten it.
                 append(substitutions, load_vendor_configs_from_json(dir.string(), vendor_name, PresetBundle::LoadVendorOnly, compatibility_rule).first);
@@ -2339,8 +2331,6 @@ std::pair<PresetsConfigSubstitutions, std::string> PresetBundle::load_system_fil
             continue;
         std::string vendor_name = dir_entry.path().filename().string();
         vendor_name.erase(vendor_name.size() - 5);
-        if (!SlicePilot::is_vendor_allowed_for_slicepilot(vendor_name))
-            continue;
         vendor_names.push_back(vendor_name);
     }
 

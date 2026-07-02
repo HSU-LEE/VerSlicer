@@ -58,10 +58,8 @@ public:
     /** Invalidate context cache and refresh intent signals; optionally clear coach dedup. */
     static void notify_plater_context_changed(bool clear_coach_dedup = false);
 
-    /** Fill/coerce set_config values using live preset + relative phrases in user text. */
+    /** Normalize LLM set_config options (keys/values); no rule-based injection. */
     static void augment_actions_from_user_text(nlohmann::json& root, const std::string& user_request);
-
-    /** Always-on apply pipeline boost (symptom rules + relative infill/layer phrases). */
     static void boost_actions_from_user_text(nlohmann::json& root, const std::string& user_request);
 
     /** Attach object_id to geometry actions when the target object is unambiguous. */
@@ -83,6 +81,20 @@ public:
     static std::string build_resolver_user_message(const std::string& user_request,
                                                    const std::vector<std::string>& candidate_keys,
                                                    const nlohmann::json& wiki_context = nlohmann::json::array());
+
+    /** Merge values/settings/params aliases into options on a set_config action. */
+    static void coalesce_set_config_action_options(nlohmann::json& action);
+
+    /** Options after brim/support expansion and alias normalization (same as apply). */
+    static nlohmann::json normalized_set_config_options_from_action(const nlohmann::json& action);
+
+    /** Compare live config to normalized set_config expectations; returns mismatch lines. */
+    static std::vector<std::string> verify_set_config_applied(const nlohmann::json& action,
+                                                              const DynamicPrintConfig* live_cfg = nullptr);
+
+    /** Live serialized values for keys touched by set_config actions in root. */
+    static nlohmann::json config_digest_for_set_config_actions(const nlohmann::json& root,
+                                                               const std::string& user_goal_hint = {});
 
     static std::vector<OllamaActionResult> execute(const nlohmann::json& root);
 };

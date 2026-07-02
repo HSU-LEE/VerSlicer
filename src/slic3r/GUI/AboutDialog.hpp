@@ -60,6 +60,7 @@ class AboutDialog : public DPIDialog
     ScalableBitmap  m_logo_bitmap;
     HyperLink*      m_github_link{nullptr};
     wxStaticBitmap* m_logo;
+    wxHtmlWindow*   m_html{nullptr};
     int             m_copy_rights_btn_id { wxID_ANY };
     int             m_copy_version_btn_id { wxID_ANY };
 public:

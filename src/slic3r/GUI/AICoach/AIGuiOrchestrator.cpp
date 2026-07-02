@@ -84,7 +84,7 @@ bool AIGuiOrchestrator::should_render_beginner_journey() const
 bool AIGuiOrchestrator::should_enqueue_beginner_tour() const
 {
     if (!AICoachController::is_enabled_for_current_mode())
-        return true;
+        return false;
     if (active_suppression(AICoachSuppression::BeginnerTourEnqueue))
         return false;
     if (defers_coach_cards())
@@ -105,7 +105,10 @@ void AIGuiOrchestrator::on_slice_completed(Plater* plater, const Print* print, b
         nlohmann::json payload = {{"success", success}};
         OllamaAgentEventBus::instance().publish(OllamaAgentEventKind::SliceDone, std::move(payload));
     }
-    if (!success && plater && AICoachController::is_enabled_for_current_mode()) {
+    if (!AICoachController::is_enabled_for_current_mode())
+        return;
+
+    if (!success && plater) {
         const bool ko = wxGetApp().current_language_code().StartsWith("ko");
         const std::string summary =
             ko ? "슬라이싱에 실패했습니다. 모델 배치, 서포트, 벽 두께를 확인해 보세요."
@@ -114,7 +117,7 @@ void AIGuiOrchestrator::on_slice_completed(Plater* plater, const Print* print, b
             ko ? "슬라이싱 실패 서포트 브림" : "slicing failed support brim", false);
         AICoachController::instance().on_print_failure_hint(plater, summary, apply_root);
     }
-    if (!plater || !success || !AICoachController::is_enabled_for_current_mode()) {
+    if (!plater || !success) {
         AICoachController::instance().on_slice_completed(plater, print, success);
         return;
     }
@@ -126,11 +129,15 @@ void AIGuiOrchestrator::on_slice_completed(Plater* plater, const Print* print, b
 void AIGuiOrchestrator::on_print_failure_hint(Plater* plater, const std::string& summary,
                                               const nlohmann::json& apply_root)
 {
+    if (!AICoachController::is_enabled_for_current_mode())
+        return;
     AICoachController::instance().on_print_failure_hint(plater, summary, apply_root);
 }
 
 void AIGuiOrchestrator::on_print_success(Plater* plater, const std::string& job_name)
 {
+    if (!AICoachController::is_enabled_for_current_mode())
+        return;
     AICoachController::instance().on_print_success(plater, job_name);
 }
 
@@ -157,11 +164,18 @@ void AIGuiOrchestrator::on_chat_apply_end(bool applied, const nlohmann::json& ro
         if (!root.empty() && dedup_source && dedup_source[0] != '\0')
             AICoachApplyDedup::instance().record_applied_root(root, dedup_source);
     }
-    flush_deferred_coach_cards();
+    if (AICoachController::is_enabled_for_current_mode())
+        flush_deferred_coach_cards();
+    else {
+        m_deferred_critical.clear();
+        m_deferred_cards.clear();
+    }
 }
 
 void AIGuiOrchestrator::defer_coach_cards(std::vector<AICoachCard> cards)
 {
+    if (!AICoachController::is_enabled_for_current_mode())
+        return;
     for (AICoachCard& c : cards) {
         if (c.importance == AICoachImportance::Critical)
             m_deferred_critical.insert(m_deferred_critical.begin(), std::move(c));
@@ -172,6 +186,8 @@ void AIGuiOrchestrator::defer_coach_cards(std::vector<AICoachCard> cards)
 
 void AIGuiOrchestrator::defer_coach_card(AICoachCard card)
 {
+    if (!AICoachController::is_enabled_for_current_mode())
+        return;
     if (card.importance == AICoachImportance::Critical)
         m_deferred_critical.insert(m_deferred_critical.begin(), std::move(card));
     else
@@ -180,6 +196,11 @@ void AIGuiOrchestrator::defer_coach_card(AICoachCard card)
 
 void AIGuiOrchestrator::flush_deferred_coach_cards()
 {
+    if (!AICoachController::is_enabled_for_current_mode()) {
+        m_deferred_critical.clear();
+        m_deferred_cards.clear();
+        return;
+    }
     if (m_deferred_critical.empty() && m_deferred_cards.empty())
         return;
     if (!m_deferred_critical.empty()) {

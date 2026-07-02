@@ -1729,8 +1729,13 @@ bool NotificationManager::OllamaProcessingNotification::update_state(bool paused
     PopNotification::update_state(paused, delta);
     if (m_state == EState::Finished || m_state == EState::ClosePending || m_state == EState::Hidden)
         return false;
+    if (wxGetApp().is_closing())
+        return false;
     m_next_render = std::min<int64_t>(m_next_render, 50);
-    if (GLCanvas3D* canvas = wxGetApp().plater() ? wxGetApp().plater()->get_current_canvas3D() : nullptr)
+    Plater* plater = wxGetApp().plater();
+    if (!plater)
+        return true;
+    if (GLCanvas3D* canvas = plater->get_current_canvas3D())
         canvas->schedule_extra_frame(50);
     return true;
 }

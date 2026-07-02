@@ -19,6 +19,13 @@ void PrintGoalSession::merge_goal(const PrintGoal& delta)
     m_goal = PrintGoalParser::merge(m_goal, delta);
 }
 
+void PrintGoalSession::merge_user_text(const std::string& user_text)
+{
+    if (user_text.empty())
+        return;
+    merge_goal(PrintGoalParser::parse(user_text));
+}
+
 void PrintGoalSession::set_last_plan(const PrintPlan& plan)
 {
     m_last_plan     = plan;

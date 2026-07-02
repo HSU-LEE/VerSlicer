@@ -333,7 +333,10 @@ PrintExplanation PrintPlanner::build_explanation(const PrintPlan& plan)
         ex.expected_effects.push_back("Surface quality should improve.");
 
     if (ex.summary.empty()) {
-        if (!plan.auto_result.summary.empty())
+        if (!plan.auto_result.changes.empty())
+            ex.summary.clear();
+        else if (!plan.auto_result.summary.empty()
+                 && plan.auto_result.summary.find("SlicePilot tuned") == std::string::npos)
             ex.summary = plan.auto_result.summary;
         else if (!plan.readiness.headline.empty())
             ex.summary = plan.readiness.headline;

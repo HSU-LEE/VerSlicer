@@ -24,6 +24,11 @@ endif()
 # using the above encoding-check binary
 
 if (ORCA_TOOLS)
+    # Headless Ollama tests — no verslicer.app required.
+    #   cmake --build build --target ollama_apply_golden_test ollama_pipeline_test
+    #   ctest -R 'ollama_(apply_golden|pipeline)_test' --output-on-failure
+    # macOS app bundle (manual QA only): build/<arch>/src/Release/verslicer.app
+
     add_executable(makerworld_search_test
         makerworld_search_test.cpp
         ../slic3r/GUI/MakerWorld/MakerWorldSearchCore.cpp
@@ -43,7 +48,6 @@ if (ORCA_TOOLS)
         ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionRegistry.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaIntentRules.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
     )
     target_include_directories(ollama_assistant_test PRIVATE
@@ -57,19 +61,26 @@ if (ORCA_TOOLS)
         ollama_pipeline_test.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionPipelineCore.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaIntentRules.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaBenchmarkScenarios.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaAgentGoalPlanner.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
     )
     target_include_directories(ollama_pipeline_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/..
         ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
     )
     target_link_libraries(ollama_pipeline_test libslic3r boost_headeronly)
-    target_compile_definitions(ollama_pipeline_test PRIVATE -DBOOST_ALL_NO_LIB)
+    target_compile_definitions(ollama_pipeline_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST)
+
+    add_executable(mesh_assist_test mesh_assist_test.cpp)
+    target_include_directories(mesh_assist_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+    target_link_libraries(mesh_assist_test libslic3r boost_headeronly)
+    target_compile_definitions(mesh_assist_test PRIVATE -DBOOST_ALL_NO_LIB)
 
     add_executable(print_planner_test print_planner_test.cpp)
     target_include_directories(print_planner_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
@@ -85,7 +96,6 @@ if (ORCA_TOOLS)
         ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaIntentRules.cpp
     )
     target_include_directories(ollama_apply_golden_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -102,7 +112,6 @@ if (ORCA_TOOLS)
         ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaIntentRules.cpp
     )
     target_include_directories(bambu_wiki_search_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -120,7 +129,6 @@ if (ORCA_TOOLS)
         ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaIntentRules.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
     )
     target_include_directories(ollama_benchmark_test PRIVATE
@@ -132,6 +140,7 @@ if (ORCA_TOOLS)
 
     add_test(NAME ollama_assistant_test COMMAND ollama_assistant_test)
     add_test(NAME ollama_pipeline_test COMMAND ollama_pipeline_test)
+    add_test(NAME mesh_assist_test COMMAND mesh_assist_test)
     add_test(NAME print_planner_test COMMAND print_planner_test)
     add_test(NAME ollama_benchmark_test COMMAND ollama_benchmark_test)
     add_test(NAME ollama_apply_golden_test COMMAND ollama_apply_golden_test)

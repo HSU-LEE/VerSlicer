@@ -21,6 +21,8 @@ struct OllamaPipelineOptions
     bool        include_makerworld{true};
     bool        advisor_filter{false};
     bool        question_mode_strip{false};
+    /** When true, skip mesh action reconciliation (assist loop after first apply). */
+    bool        mutations_already_applied{false};
     std::string user_request;
 };
 
@@ -31,20 +33,16 @@ struct OllamaPipelineResult
     bool                      actions_empty{true};
 };
 
-/** normalize → sanitize → dedupe (and optional advisor filter). */
+    /** normalize → sanitize → dedupe (and optional advisor filter). */
 class OllamaActionPipeline
 {
 public:
     static OllamaPipelineResult process_actions(nlohmann::json& root, const OllamaPipelineOptions& opt);
 
-    /** Rule-only recovery when LLM JSON parse fails. */
-    static nlohmann::json build_rule_only_root(const std::string& user_request, bool include_makerworld = true);
-
-    /** Symptom/heuristic fallback (always runs planner + normalize; not gated by OLLAMA_RULE_ONLY). */
     static nlohmann::json build_symptom_fallback_root(const std::string& user_request,
                                                       bool include_makerworld = true);
 
-    /** Salvage plain-text settings and/or infer actions from user intent after parse failure. */
+    /** Salvage JSON from assistant text and normalize (no rule-based action injection). */
     static nlohmann::json build_recovery_root(const std::string& assistant_text, const std::string& user_request,
                                               bool include_makerworld = true);
 
@@ -58,10 +56,12 @@ public:
     static bool prepare_apply_root(nlohmann::json& root, const std::string& user_request,
                                    bool include_makerworld = false);
 
-    /** Rule/symptom fallback apply (no LLM). Returns true when at least one action succeeded. */
-    static bool try_symptom_fallback_apply(const std::string& user_request, wxWindow* parent,
-                                           OllamaExecutionPolicy policy,
-                                           std::vector<OllamaActionResult>* results = nullptr);
+    /** Intents safe to apply without LLM when rule_only_fallback is enabled. */
+    static bool high_confidence_rule_only_intent(const std::string& user_request);
+
+    /** Build and validate a rule-only apply root (no LLM). */
+    static nlohmann::json build_rule_only_apply_root(const std::string& user_request,
+                                                     bool include_makerworld = true);
 };
 
 }} // namespace

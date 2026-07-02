@@ -10,6 +10,7 @@ class OllamaSystemPrompts
 {
 public:
     static std::string apply_system_prompt(bool korean);
+    static std::string question_system_prompt(bool korean);
     static std::string question_mode_suffix(bool korean);
     static std::string diagnostic_system_prompt(bool korean);
     static std::string proposal_turn_instructions(bool korean);

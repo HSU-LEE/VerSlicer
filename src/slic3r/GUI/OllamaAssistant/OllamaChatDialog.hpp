@@ -11,6 +11,7 @@ class OllamaChatDialog : public DPIDialog
 {
 public:
     explicit OllamaChatDialog(wxWindow* parent);
+    ~OllamaChatDialog() override;
 
     void on_dpi_changed(const wxRect& suggested_rect) override;
 

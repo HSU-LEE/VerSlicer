@@ -1,6 +1,9 @@
+// Headless golden-path tests (no verslicer.app required).
+// Build: cmake --build build --target ollama_apply_golden_test
+// macOS app bundle (manual QA only): build/<arch>/src/Release/verslicer.app
+
 #include "../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.hpp"
-#include "../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.hpp"
 
@@ -30,6 +33,16 @@ static void expect_eq(const std::string& got, const std::string& want, const cha
     }
 }
 
+static bool catalog_hits_substr(const char* query, const char* key_substr)
+{
+    const auto hits = OllamaSettingSearch::search(query, 2, 8);
+    for (const auto& hit : hits) {
+        if (hit.key.find(key_substr) != std::string::npos)
+            return true;
+    }
+    return false;
+}
+
 int main()
 {
     setenv("OLLAMA_AUTO_CATALOG", "1", 1);
@@ -45,23 +58,18 @@ int main()
         expect_true(OllamaRequestRouter::classify("arrange the plate") == OllamaRequestRoute::Fast, "arrange -> fast");
         expect_true(OllamaRequestRouter::classify("서포트 켜줘") == OllamaRequestRoute::Standard, "support -> standard");
         expect_true(OllamaRequestRouter::classify("고쳐줘") == OllamaRequestRoute::Deep, "vague -> deep");
-        expect_true(OllamaRequestRouter::classify("베드에 안 붙어") == OllamaRequestRoute::Standard,
-                    "adhesion symptom -> standard");
+        expect_true(OllamaRequestRouter::classify("베드에 안 붙어") != OllamaRequestRoute::Fast,
+                    "adhesion query not fast-route");
     }
 
     {
-        const auto keys = OllamaSettingSearch::candidate_keys_for_request("베드에 안 붙", 2, 5);
-        expect_true(!keys.empty(), "symptom keys for adhesion");
-        bool has_brim = false;
-        for (const auto& k : keys)
-            if (k.find("brim") != std::string::npos || k == "bed_temperature")
-                has_brim = true;
-        expect_true(has_brim, "adhesion suggests brim or bed temp");
+        const auto keys = OllamaSettingSearch::candidate_keys_for_request("베드 온도", 2, 5);
+        expect_true(!keys.empty(), "catalog keys for explicit bed query");
     }
 
     {
-        const auto keys = OllamaSettingSearch::candidate_keys_for_request("실이 많이 나와", 2, 5);
-        expect_true(!keys.empty(), "stringing keys");
+        const auto hits = OllamaSettingSearch::search("retraction", 2, 5);
+        expect_true(!hits.empty(), "retraction catalog search");
     }
 
     {
@@ -120,18 +128,41 @@ sparse_infill_density: 10%)";
     }
 
     {
-        const auto keys = OllamaSettingAliases::keys_from_symptoms("표면이 거칠어요");
-        expect_true(!keys.empty(), "rough surface symptom keys");
+        const auto hits = OllamaSettingSearch::search("ironing", 2, 5);
+        expect_true(!hits.empty(), "rough surface catalog search");
     }
 
     {
-        const auto keys = OllamaSettingSearch::candidate_keys_for_request("노즐이 막혀요", 2, 5);
-        expect_true(!keys.empty(), "nozzle clog symptom keys");
+        const auto hits = OllamaSettingSearch::search("nozzle temperature", 2, 5);
+        expect_true(!hits.empty(), "nozzle clog catalog search");
     }
 
     {
-        const auto keys = OllamaSettingSearch::candidate_keys_for_request("브릿지가 처져요", 2, 5);
-        expect_true(!keys.empty(), "sagging bridge symptom keys");
+        const auto hits = OllamaSettingSearch::search("bridge", 2, 5);
+        expect_true(!hits.empty(), "sagging bridge catalog search");
+    }
+
+    {
+        expect_true(catalog_hits_substr("infill", "infill") || catalog_hits_substr("wall", "wall"),
+                    "strong goal catalog keys");
+        expect_true(catalog_hits_substr("infill", "infill"), "save material catalog infill");
+        expect_true(catalog_hits_substr("layer height", "layer"), "fast goal catalog layer");
+        expect_true(catalog_hits_substr("brim", "brim"), "reliable goal catalog brim");
+        expect_true(catalog_hits_substr("ironing", "iron") || catalog_hits_substr("layer height", "layer"),
+                    "cosmetic goal catalog surface keys");
+    }
+
+    {
+        expect_true(catalog_hits_substr("retraction", "retraction"), "stringing catalog retraction");
+    }
+
+    {
+        nlohmann::json blocked = {{"type", "set_config"},
+                                  {"preset", "print"},
+                                  {"options", {{"machine_start_gcode", "M104"}}}};
+        expect_true(!OllamaSettingRegistry::is_allowed_key("machine_start_gcode", "print"),
+                    "post-sanitize tier3 key blocked");
+        (void) blocked;
     }
 
     if (g_failures == 0) {

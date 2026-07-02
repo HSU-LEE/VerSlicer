@@ -84,10 +84,10 @@ public:
     static bool try_activate_bbl_printer_profile(Plater* plater);
     static void on_first_guide_completed();
     void        show_pending_failure_notification(Plater* plater);
-    void        flush_pending_failure_dialog();
+    /** Show queued failure workflow UI only when the user explicitly opens it. */
+    void        flush_pending_failure_dialog(bool user_initiated = false);
     void show_history_dialog(wxWindow* parent);
     void show_privacy_dialog(wxWindow* parent);
-    void schedule_auto_workflow_after_load(Plater* plater);
     void open_full_workflow_for_current_plate(Plater* plater);
 
     bool is_bambu_account_logged_in() const;
@@ -136,6 +136,13 @@ public:
     void refresh_post_slice_assessment(Plater* plater);
     /** Sync cached mesh/readiness/config from a PrintPlanner result. */
     void sync_from_plan(const BambuSmartPrint::PrintPlan& plan);
+    /** Parse + merge user text into PrintGoalSession (unified goal entry). */
+    void merge_print_goal(const std::string& user_text);
+    /** Replan from session goal and refresh readiness cache + panels. */
+    void refresh_from_goal_session(Plater* plater);
+
+    /** Non-blocking toast when readiness suggestions exist but no modal was shown. */
+    static void notify_readiness_suggestions(Plater* plater, int score_percent, size_t change_count);
 
 private:
     BambuSmartPrintService() = default;
@@ -143,11 +150,10 @@ private:
     bool show_workflow_dialog(Plater* plater, const SmartPrintWorkflowContent& content,
                               const DynamicPrintConfig& before, const DynamicPrintConfig& proposed,
                               const std::string& compare_title, const std::string& filament_name,
-                              const std::vector<BambuSmartPrint::SettingChange>* change_reasons = nullptr);
+                              const std::vector<BambuSmartPrint::SettingChange>* change_reasons = nullptr,
+                              bool user_initiated = true);
 
-    void run_auto_workflow(Plater* plater);
-    void auto_prepare_safe_on_load(Plater* plater);
-    void notify_model_load_summary(Plater* plater);
+    void run_auto_workflow(Plater* plater, bool user_initiated = false);
     void handle_print_failed(MachineObject* obj);
     void handle_print_cancelled(MachineObject* obj);
     void handle_print_success(MachineObject* obj);
@@ -160,6 +166,7 @@ private:
     void capture_active_print_config(MachineObject* obj);
     void clear_active_print_config();
     DynamicPrintConfig config_for_print_record(MachineObject* obj) const;
+    BambuSmartPrint::PlateContext plate_context_from_cache(Plater* plater) const;
 
     DynamicPrintConfig m_last_baseline;
     DynamicPrintConfig m_last_applied;

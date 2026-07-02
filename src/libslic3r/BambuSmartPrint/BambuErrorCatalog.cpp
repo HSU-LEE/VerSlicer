@@ -130,7 +130,7 @@ static void merge_catalog_json(CatalogData& data, const fs::path& p)
     } catch (...) {}
 }
 
-static bool& prefer_korean_ui()
+static bool& prefer_korean_ui_flag()
 {
     static bool v = false;
     return v;
@@ -138,20 +138,25 @@ static bool& prefer_korean_ui()
 
 void BambuErrorCatalog::set_prefer_korean_ui(bool prefer_ko)
 {
-    prefer_korean_ui() = prefer_ko;
+    prefer_korean_ui_flag() = prefer_ko;
+}
+
+bool BambuErrorCatalog::prefer_korean_ui()
+{
+    return prefer_korean_ui_flag();
 }
 
 static void localize_diagnosis(FailureDiagnosis& d, const McErrorEntry& e)
 {
-    if (prefer_korean_ui() && !e.title_ko.empty())
+    if (prefer_korean_ui_flag() && !e.title_ko.empty())
         d.title = e.title_ko;
     else if (!e.title.empty())
         d.title = e.title;
-    if (prefer_korean_ui() && !e.description_ko.empty())
+    if (prefer_korean_ui_flag() && !e.description_ko.empty())
         d.description = e.description_ko;
     else if (!e.description.empty())
         d.description = e.description;
-    if (prefer_korean_ui() && !e.action_line_ko.empty())
+    if (prefer_korean_ui_flag() && !e.action_line_ko.empty())
         d.action_line = e.action_line_ko;
     else if (!e.action_line.empty())
         d.action_line = e.action_line;
@@ -163,27 +168,27 @@ static void fill_default_action_line(FailureDiagnosis& d)
         return;
     switch (d.category) {
     case FailureCategory::Adhesion:
-        d.action_line = prefer_korean_ui()
+        d.action_line = prefer_korean_ui_flag()
             ? "베드 온도·브림을 확인한 뒤 Reprint"
             : "Check bed temp and brim, then Reprint";
         break;
     case FailureCategory::Filament:
-        d.action_line = prefer_korean_ui()
+        d.action_line = prefer_korean_ui_flag()
             ? "AMS 슬롯·필라멘트를 확인한 뒤 Reprint"
             : "Check AMS slot and filament, then Reprint";
         break;
     case FailureCategory::Temperature:
-        d.action_line = prefer_korean_ui()
+        d.action_line = prefer_korean_ui_flag()
             ? "노즐·베드 온도를 확인한 뒤 Reprint"
             : "Verify nozzle and bed temps, then Reprint";
         break;
   case FailureCategory::Network:
-        d.action_line = prefer_korean_ui()
+        d.action_line = prefer_korean_ui_flag()
             ? "네트워크 연결 후 Reprint"
             : "Restore network connection, then Reprint";
         break;
     default:
-        d.action_line = prefer_korean_ui()
+        d.action_line = prefer_korean_ui_flag()
             ? "조치 후 Reprint"
             : "Apply fixes, then Reprint";
         break;

@@ -95,13 +95,13 @@ set(SLIC3R_GUI_SOURCES
     GUI/AICoach/AICoachTrustBuilder.cpp
     GUI/AICoach/AICoachFinishingBuilder.cpp
     GUI/OllamaAssistant/OllamaActionPipeline.cpp
+    GUI/OllamaAssistant/OllamaMeshOps.cpp
+    GUI/OllamaAssistant/OllamaMeshOps.hpp
     GUI/OllamaAssistant/OllamaActionPipeline.hpp
     GUI/OllamaAssistant/OllamaActionPipelineCore.cpp
     GUI/OllamaAssistant/OllamaActionPipelineCore.hpp
     GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
     GUI/OllamaAssistant/OllamaActionJsonExtract.hpp
-    GUI/OllamaAssistant/OllamaIntentRules.cpp
-    GUI/OllamaAssistant/OllamaIntentRules.hpp
     GUI/OllamaAssistant/OllamaActionExecutor.cpp
     GUI/OllamaAssistant/OllamaActionExecutor.hpp
     GUI/OllamaAssistant/OllamaSystemPrompts.cpp
@@ -134,6 +134,12 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaToolResult.hpp
     GUI/OllamaAssistant/OllamaChatDialog.cpp
     GUI/OllamaAssistant/OllamaChatDialog.hpp
+    GUI/AIModelCreate/AIModelCreateDialog.cpp
+    GUI/AIModelCreate/AIModelCreateDialog.hpp
+    GUI/AIModelCreate/AIModelCreateEngine.cpp
+    GUI/AIModelCreate/AIModelCreateEngine.hpp
+    GUI/AIModelCreate/AIModelCreateSketchPanel.cpp
+    GUI/AIModelCreate/AIModelCreateSketchPanel.hpp
     GUI/OllamaAssistant/OllamaChatPanel.cpp
     GUI/OllamaAssistant/OllamaChatPanel.hpp
     GUI/OllamaAssistant/OllamaClient.cpp

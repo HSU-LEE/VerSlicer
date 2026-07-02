@@ -63,6 +63,7 @@ bool View3D::init(wxWindow* parent, Bed3D& bed, Model* model, DynamicPrintConfig
     m_canvas_widget = OpenGLManager::create_wxglcanvas(*this, (init_params != nullptr) ? init_params->opengl_aa : false);
 #else
     m_canvas_widget = OpenGLManager::create_wxglcanvas(*this);
+#endif // ENABLE_OPENGL_AUTO_AA_SAMPLES
     if (m_canvas_widget == nullptr)
         return false;
 
@@ -260,6 +261,10 @@ bool Preview::init(wxWindow* parent, Bed3D& bed, Model* model)
     SetBackgroundColour(GetParent()->GetBackgroundColour());
 #endif // _WIN32
 
+#if ENABLE_OPENGL_AUTO_AA_SAMPLES
+    const GUI_InitParams* const init_params = wxGetApp().init_params;
+    m_canvas_widget = OpenGLManager::create_wxglcanvas(*this, (init_params != nullptr) ? init_params->opengl_aa : false);
+#else
     m_canvas_widget = OpenGLManager::create_wxglcanvas(*this);
 #endif // ENABLE_OPENGL_AUTO_AA_SAMPLES
     if (m_canvas_widget == nullptr)
@@ -273,6 +278,7 @@ bool Preview::init(wxWindow* parent, Bed3D& bed, Model* model)
     m_canvas->set_process(m_process);
     m_canvas->set_type(GLCanvas3D::ECanvasType::CanvasPreview);
     m_canvas->get_gcode_viewer().enable_legend(true);
+    m_canvas->get_gcode_viewer().show_legend(true);
     //BBS: GUI refactor: GLToolbar
     if (wxGetApp().is_editor()) {
         m_canvas->enable_select_plate_toolbar(true);
@@ -634,8 +640,15 @@ void Preview::load_print_as_fff(bool keep_z_range, bool only_gcode)
     //BBS: add m_loaded_print logic
     const Print *print = m_process->fff_print();
     BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(" %1%: previous print %2%, new print %3%")%__LINE__ %m_loaded_print %print;
-    if ((m_loaded_print&&(m_loaded_print == print)) || m_process->current_printer_technology() != ptFFF) {
+    if ((m_loaded_print && m_loaded_print == print && m_canvas->get_gcode_viewer().has_data())
+        || m_process->current_printer_technology() != ptFFF) {
         BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(" %1%: already loaded before, return directly")%__LINE__;
+        if (IsShown()) {
+            const std::vector<double> zs = m_canvas->get_gcode_layers_zs();
+            if (!zs.empty())
+                update_layers_slider(zs, keep_z_range);
+            m_canvas->set_as_dirty();
+        }
         return;
     }
 
@@ -689,28 +702,25 @@ void Preview::load_print_as_fff(bool keep_z_range, bool only_gcode)
 
     std::vector<double> zs;
 
-    if (IsShown()) {
-        m_canvas->set_selected_extruder(0);
-        bool is_slice_result_valid = wxGetApp().plater()->get_partplate_list().get_curr_plate()->is_slice_result_valid();
-        if (gcode_preview_data_valid && (is_slice_result_valid || only_gcode)) {
-            // Load the real G-code preview.
-            //BBS: add more log
-            BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(": will load gcode_preview from result, moves count %1%") % m_gcode_result->moves.size();
-            //BBS: add only gcode mode
-            m_canvas->load_gcode_preview(*m_gcode_result, tool_colors, color_print_colors, only_gcode);
-            // the view type may have been changed by the call m_canvas->load_gcode_preview()
-            gcode_view_type = m_canvas->get_gcode_view_type();
-            //BBS show sliders
-            show_moves_sliders();
+    m_canvas->set_selected_extruder(0);
+    const bool is_slice_result_valid = wxGetApp().plater()->get_partplate_list().get_curr_plate()->is_slice_result_valid();
+    if (gcode_preview_data_valid && (is_slice_result_valid || only_gcode || directly_preview)) {
+        // Load the real G-code preview even when the preview panel is hidden (e.g. slice finished on Prepare tab).
+        BOOST_LOG_TRIVIAL(debug) << __FUNCTION__ << boost::format(": will load gcode_preview from result, moves count %1%") % m_gcode_result->moves.size();
+        m_canvas->load_gcode_preview(*m_gcode_result, tool_colors, color_print_colors, only_gcode);
+        gcode_view_type = m_canvas->get_gcode_view_type();
+        m_canvas->set_shells_on_previewing(true);
+        m_canvas->set_shell_transparence();
+        zs = m_canvas->get_gcode_layers_zs();
+        m_loaded_print = print;
+        m_canvas->set_as_dirty();
+        m_canvas->request_extra_frame();
+    }
 
-            //Orca: keep shell preview on but make it more transparent
-            m_canvas->set_shells_on_previewing(true);
-            m_canvas->set_shell_transparence();
+    if (IsShown()) {
+        if (gcode_preview_data_valid && (is_slice_result_valid || only_gcode || directly_preview)) {
+            show_moves_sliders();
             Refresh();
-            zs = m_canvas->get_gcode_layers_zs();
-            //BBS: add m_loaded_print logic
-            //m_loaded = true;
-            m_loaded_print = print;
         }
         else if (is_pregcode_preview) {
             // Load the initial preview based on slices, not the final G-code.

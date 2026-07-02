@@ -75,13 +75,13 @@ private:
     void trim_history_display();
     void reset_conversation();
     void set_assistant_mode(bool apply_mode);
+    void update_system_welcome_in_chat();
     bool apply_mode() const { return m_apply_mode; }
     void refresh_mode_ui();
     wxString system_welcome_message() const;
     void set_status_text(const wxString& text);
     MakerWorldFlowUiCallbacks makerworld_flow_callbacks();
     void retry_last_chat_simple();
-    bool run_symptom_fallback_turn(const std::string& user_utf8);
     void update_model_label_ui();
     std::string resolve_installed_model(const std::vector<std::string>& models, const std::string& want) const;
 

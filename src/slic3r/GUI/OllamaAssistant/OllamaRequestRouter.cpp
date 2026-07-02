@@ -1,12 +1,10 @@
 #include "OllamaRequestRouter.hpp"
 
-#include "OllamaIntentRules.hpp"
 #include "OllamaSettingSearch.hpp"
 
 #include <boost/algorithm/string.hpp>
 
 #include <cctype>
-#include <cstring>
 
 namespace Slic3r { namespace GUI {
 
@@ -58,9 +56,6 @@ bool looks_like_placement_request(const std::string& user)
 
 bool OllamaRequestRouter::is_geometry_request(const std::string& user)
 {
-    if (OllamaIntentRules::parse_z_rotation_degrees(user).has_value())
-        return true;
-
     if (contains_word_ci(user, "rotate") || contains_word_ci(user, "flip")
         || contains_word_ci(user, "translate") || contains_word_ci(user, "scale")
         || contains_word_ci(user, "delete"))
@@ -69,6 +64,9 @@ bool OllamaRequestRouter::is_geometry_request(const std::string& user)
     if (user.find("회전") != std::string::npos || user.find("돌려") != std::string::npos
         || user.find("뒤집") != std::string::npos || user.find("삭제") != std::string::npos
         || user.find("이동") != std::string::npos || user.find("크기") != std::string::npos)
+        return true;
+
+    if (user.find('%') != std::string::npos)
         return true;
 
     if (looks_like_placement_request(user) && !looks_like_quality_not_placement(user))

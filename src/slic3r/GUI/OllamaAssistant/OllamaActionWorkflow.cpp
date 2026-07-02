@@ -70,7 +70,7 @@ static bool is_workflow_only_action(const std::string& type)
 static bool is_geometry_action(const std::string& type)
 {
     return type == "rotate" || type == "translate" || type == "scale" || type == "clone_selection"
-        || type == "arrange" || type == "delete_selection";
+        || type == "arrange" || type == "arrange_objects" || type == "split_object" || type == "delete_selection";
 }
 
 std::string describe_action(const nlohmann::json& action, bool ko)
@@ -119,6 +119,12 @@ std::string describe_action(const nlohmann::json& action, bool ko)
         return ko ? "선택 영역 복제" : "copy (duplicate) selection";
     if (type == "arrange")
         return ko ? "판 위 객체 자동 배치" : "auto-arrange objects on plate";
+    if (type == "arrange_objects")
+        return ko ? "객체 단위 재배치" : "arrange by object";
+    if (type == "split_object")
+        return ko ? "모델 분할" : "split to objects";
+    if (type == "add_plate")
+        return ko ? "플레이트 추가" : "add build plate";
     if (type == "slice")
         return ko ? (action.value("scope", "plate") == "all" ? "모든 판 슬라이스" : "현재 판 슬라이스")
                   : (action.value("scope", "plate") == "all" ? "slice all plates" : "slice current plate");
@@ -239,7 +245,7 @@ SmartPrintWorkflowContent build_workflow_content(const nlohmann::json& root)
 
     if (!readiness.headline.empty() || readiness.score > 0.f) {
         content.readiness_headline = readiness.headline;
-        content.success_rate       = readiness.success_rate > 0.f ? readiness.success_rate : readiness.score;
+        content.success_rate       = readiness.score > 0.f ? readiness.score : readiness.success_rate;
         content.insights           = readiness.insights;
         content.filament_mismatch  = readiness.filament_mismatch;
         content.active_filament    = readiness.active_filament_hint;

@@ -39,7 +39,7 @@ BambuSmartPrintDeviceSummary::BambuSmartPrintDeviceSummary(wxWindow* parent)
     if (wxSizer* fail_sz = m_failure_banner->GetSizer())
         fail_sz->Add(m_failure_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(12));
     m_failure_btn->Bind(wxEVT_BUTTON, [](wxCommandEvent&) {
-        BambuSmartPrintService::instance().flush_pending_failure_dialog();
+        BambuSmartPrintService::instance().flush_pending_failure_dialog(true);
         wxGetApp().open_smart_print();
     });
     m_failure_banner->Hide();

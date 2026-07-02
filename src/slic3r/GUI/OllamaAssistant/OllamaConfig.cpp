@@ -54,10 +54,7 @@ std::string normalize_ollama_model_tag(std::string model)
     if (model.empty())
         model = kOllamaDefaultModel;
     if (model == "qwen2.5")
-        model = "qwen2.5:3b";
-    // Prefer the faster default when an older 7b tag is still saved in config.
-    if (model == "qwen2.5:7b")
-        model = "qwen2.5:3b";
+        model = "qwen2.5:7b";
     return model;
 }
 
@@ -93,16 +90,6 @@ bool ollama_auto_catalog_enabled()
 bool ollama_two_hop_enabled()
 {
     return pipeline_flag(kOllamaTwoHopKey, "OLLAMA_TWO_HOP", false);
-}
-
-bool ollama_keyword_inject_enabled()
-{
-    return pipeline_flag(kOllamaKeywordInjectKey, "OLLAMA_KEYWORD_INJECT", false);
-}
-
-bool ollama_rule_only_fallback_enabled()
-{
-    return pipeline_flag(kOllamaRuleOnlyKey, "OLLAMA_RULE_ONLY", false);
 }
 
 bool ollama_adaptive_routing_enabled()
@@ -151,7 +138,7 @@ int ollama_assist_max_steps()
         } catch (...) {
         }
     }
-    return std::max(1, config_int(kOllamaAssistMaxStepsKey, 8));
+    return std::max(1, config_int(kOllamaAssistMaxStepsKey, 12));
 }
 
 }} // namespace

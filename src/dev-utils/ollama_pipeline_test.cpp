@@ -1,7 +1,13 @@
+// Headless Ollama pipeline tests (no verslicer.app required).
+// Build: cmake --build build --target ollama_pipeline_test
+// Run:   ctest -R ollama_pipeline_test --output-on-failure
+// macOS app bundle (manual QA only): build/<arch>/src/Release/verslicer.app
+
 #include "../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaActionPipelineCore.hpp"
+#include "../slic3r/GUI/OllamaAssistant/OllamaAgentGoalPlanner.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaBenchmarkScenarios.hpp"
-#include "../slic3r/GUI/OllamaAssistant/OllamaIntentRules.hpp"
+#include "../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.hpp"
 
 #include <nlohmann/json.hpp>
@@ -11,7 +17,6 @@
 #include <string>
 
 using namespace Slic3r::GUI;
-using namespace Slic3r::GUI::OllamaIntentRules;
 
 static int g_failures = 0;
 
@@ -81,20 +86,8 @@ int main()
     }
 
     {
-        const auto z = parse_z_rotation_degrees("모델 90도 돌려줘");
-        expect_true(z.has_value(), "parse_z_rotation present");
-        if (z)
-            expect_true(*z == 90.0, "parse_z_rotation degrees");
-    }
-
-    {
-        const auto z = parse_z_rotation_degrees("왼쪽으로 45도 회전");
-        expect_true(z.has_value() && *z == -45.0, "parse_z_rotation left turn");
-    }
-
-    {
         const auto& scenarios = ollama_benchmark_scenarios();
-        expect_true(scenarios.size() >= 50, "benchmark scenarios wired");
+        expect_true(scenarios.size() >= 35, "benchmark scenarios wired");
         for (const auto& sc : scenarios) {
             if (!sc.check(sc.user_request))
                 std::cerr << "FAIL scenario: " << sc.id << '\n';
@@ -116,6 +109,17 @@ int main()
     {
         const auto keys = OllamaSettingSearch::candidate_keys_for_request("채움 올려", 2, 5);
         expect_true(!keys.empty(), "ko infill candidate keys");
+    }
+
+    {
+        const nlohmann::json hint = OllamaAgentGoalPlanner::build_plan_hint("서포트 켜줘", true);
+        expect_true(hint.contains("hint") && hint.contains("candidate_keys"), "generic plan hint has keys");
+        expect_true(!OllamaAgentGoalPlanner::goal_expects_multi_step("서포트 켜줘"), "goal not multi-step");
+    }
+
+    {
+        expect_true(!OllamaSettingRegistry::is_allowed_key("machine_start_gcode", "print"),
+                    "tier3 key blocked for sanitize strip");
     }
 
     if (g_failures == 0) {

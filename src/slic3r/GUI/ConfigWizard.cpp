@@ -1,7 +1,6 @@
 // FIXME: extract absolute units -> em
 
 #include "ConfigWizard_private.hpp"
-#include "libslic3r/SlicePilot/SlicePilotRestrictions.hpp"
 
 #include <algorithm>
 #include <numeric>
@@ -149,10 +148,6 @@ BundleMap BundleMap::load()
 
                 // Don't load this bundle if we've already loaded it.
                 if (res.find(id) != res.end()) { continue; }
-
-                // SlicePilot: Bambu Lab vendor only.
-                if (!Slic3r::SlicePilot::is_vendor_allowed_for_slicepilot(id))
-                    continue;
 
                 Bundle bundle;
                 if (bundle.load(dir_entry.path(), is_in_resources))
@@ -516,9 +511,7 @@ PageWelcome::PageWelcome(ConfigWizard *parent)
 #endif
             ) % SLIC3R_APP_NAME).str()), _L("Welcome"))
     , welcome_text(append_text(from_u8((boost::format(
-        _utf8(L("Hello, welcome to %s! This %s helps you with the initial configuration; just a few settings and you will be ready to print.\n\n"
-               "Smart Print (Bambu Lab printers): suggests settings when you load models "
-               "(enable under Preferences → Smart Print); when your printer reports a failed job, it learns and offers fixes.")))
+        _utf8(L("Hello, welcome to %s! This %s helps you with the initial configuration; just a few settings and you will be ready to print.")))
         % SLIC3R_APP_NAME
         % _utf8(ConfigWizard::name())).str())
     ))
@@ -1491,7 +1484,7 @@ void PageTemperatures::apply_custom_config(DynamicPrintConfig& config)
 
 ConfigWizardIndex::ConfigWizardIndex(wxWindow *parent)
     : wxPanel(parent)
-    , bg(ScalableBitmap(parent, "Verslicer_192px_transparent.png", 192))
+    , bg(ScalableBitmap(parent, "OrcaSlicer_192px_transparent.png", 192))
     , bullet_black(ScalableBitmap(parent, "bullet_black.png"))
     , bullet_blue(ScalableBitmap(parent, "bullet_blue.png"))
     , bullet_white(ScalableBitmap(parent, "bullet_white.png"))
@@ -1883,12 +1876,6 @@ void ConfigWizard::priv::load_vendors()
 				    for (auto &bundle : bundles) {
 				    	const PresetCollection &materials = bundle.second.preset_bundle->materials(technology);
 				    	const Preset           *preset    = materials.find_preset(material_name);
-				    	if (preset == nullptr) {
-				    		// Not found. Maybe the material preset is there, bu it was was renamed?
-							const std::string *new_name = materials.get_preset_name_renamed(material_name);
-							if (new_name != nullptr)
-								preset = materials.find_preset(*new_name);
-				    	}
                         if (preset != nullptr) {
                             // Materal preset was found, mark it as installed.
                             section_new[preset->name] = "true";
@@ -2581,16 +2568,33 @@ bool ConfigWizard::priv::apply_config(AppConfig *app_config, PresetBundle *prese
 
     app_config->set_vendors(appconfig_new);
 
-    if (check_unsaved_preset_changes) {
-        preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSilentDisableSystem,
+    if (check_unsaved_preset_changes)
+        preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSilentDisableSystem, 
                                     {preferred_model, preferred_variant, first_added_filament, first_added_sla_material});
-        Slic3r::SlicePilot::enforce_bbl_only_bundle(*preset_bundle);
-    }
 
     if (!only_sla_mode && page_custom->custom_wanted()) {
-        wxMessageBox(
-            _L("Verslicer supports Bambu Lab printers only. Custom printer profiles cannot be added."),
-            caption, wxOK | wxICON_INFORMATION, q);
+        // if unsaved changes was not cheched till this moment
+        if (!check_unsaved_preset_changes && 
+            !wxGetApp().check_and_keep_current_preset_changes(caption, _L("Custom printer was installed and it will be activated."), act_btns, &apply_keeped_changes))
+            return false;
+
+        page_firmware->apply_custom_config(*custom_config);
+        page_bed->apply_custom_config(*custom_config);
+        page_diams->apply_custom_config(*custom_config);
+        //page_temps->apply_custom_config(*custom_config);
+
+#if ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
+        copy_bed_model_and_texture_if_needed(*custom_config);
+#endif // ENABLE_COPY_CUSTOM_BED_MODEL_AND_TEXTURE
+
+        custom_config->set_key_value("filament_colour", wxGetApp().preset_bundle->project_config.option("filament_colour"));
+        const std::string profile_name = page_custom->profile_name();
+        Semver semver(SLIC3R_VERSION);
+        preset_bundle->load_config_from_wizard(profile_name, *custom_config, semver);
+
+        wxGetApp().plater()->sidebar().update_presets(Slic3r::Preset::Type::TYPE_PRINTER);
+        wxGetApp().plater()->sidebar().update_presets(Slic3r::Preset::Type::TYPE_FILAMENT);
+        wxGetApp().plater()->sidebar().update_presets(Slic3r::Preset::Type::TYPE_PRINT);
     }
 
     // Update the selections from the compatibilty.

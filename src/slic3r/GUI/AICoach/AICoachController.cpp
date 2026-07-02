@@ -64,19 +64,7 @@ AICoachController& AICoachController::instance()
 
 bool AICoachController::is_enabled_for_current_mode()
 {
-    if (!wxGetApp().app_config)
-        return true;
-
-    const ConfigOptionMode mode = wxGetApp().get_mode();
-    if (mode == comExpert) {
-        if (!wxGetApp().app_config->has(kEnabledKey))
-            return false;
-        return app_config_bool(kEnabledKey, false);
-    }
-    if (mode == comAdvanced && !app_config_bool(kBedHintsKey, true)) {
-        // Advanced still enabled; bed hints filtered in should_show_trigger
-    }
-    return true;
+    return false;
 }
 
 bool AICoachController::should_show_trigger(AICoachTriggerId id, AICoachImportance imp)
@@ -126,6 +114,10 @@ void AICoachController::mark_shown(AICoachTriggerId id)
 
 void AICoachController::enqueue_cards(std::vector<AICoachCard> cards)
 {
+    if (!is_enabled_for_current_mode()) {
+        m_queue.clear();
+        return;
+    }
     if (AIGuiOrchestrator::instance().defers_coach_cards()) {
         AIGuiOrchestrator::instance().defer_coach_cards(std::move(cards));
         return;
@@ -153,6 +145,10 @@ void AICoachController::enqueue_card(AICoachCard card)
 
 void AICoachController::show_next_if_idle()
 {
+    if (!is_enabled_for_current_mode()) {
+        m_queue.clear();
+        return;
+    }
     if (m_overlay.has_card() || m_queue.empty())
         return;
     AICoachCard next = std::move(m_queue.front());
@@ -346,6 +342,8 @@ void AICoachController::on_print_success(Plater* plater, const std::string& job_
 
 void AICoachController::show_card(AICoachCard card)
 {
+    if (!is_enabled_for_current_mode())
+        return;
     if (AIGuiOrchestrator::instance().defers_coach_cards()
         && card.importance != AICoachImportance::Critical) {
         AIGuiOrchestrator::instance().defer_coach_card(std::move(card));
@@ -377,8 +375,12 @@ void AICoachController::render(GLCanvas3D& canvas, float bottom_margin, float ri
 bool AICoachController::update(GLCanvas3D& canvas, bool paused, int64_t delta_ms)
 {
     (void) canvas;
-    if (!is_enabled_for_current_mode())
+    if (!is_enabled_for_current_mode()) {
+        if (m_overlay.has_card())
+            m_overlay.dismiss();
+        m_queue.clear();
         return false;
+    }
 
     const bool need = m_overlay.update_state(paused, delta_ms);
 

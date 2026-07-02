@@ -1,5 +1,4 @@
 #include "MultiMachinePage.hpp"
-#include "BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "GUI_App.hpp"
 #include "MainFrame.hpp"
 
@@ -12,7 +11,6 @@ namespace GUI {
 MultiMachinePage::MultiMachinePage(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, long style)
     : wxPanel(parent, id, pos, size, style)
 {
-    SlicePilotUi::apply_panel_chrome(this);
     init_tabpanel();
     m_main_sizer = new wxBoxSizer(wxHORIZONTAL);
     m_main_sizer->Add(m_tabpanel, 1, wxEXPAND | wxLEFT, 0);
@@ -81,7 +79,7 @@ void MultiMachinePage::init_tabpanel()
     wxBoxSizer* sizer_side_tools = new wxBoxSizer(wxHORIZONTAL);
     sizer_side_tools->Add(m_side_tools, 1, wxEXPAND, 0);
     m_tabpanel = new Tabbook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, sizer_side_tools, wxNB_LEFT | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME);
-    m_tabpanel->SetBackgroundColour(SlicePilotUi::Theme::background());
+    m_tabpanel->SetBackgroundColour(wxColour("#FEFFFF"));
     m_tabpanel->Bind(wxEVT_BOOKCTRL_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {; });
 
     m_local_task_manager = new LocalTaskManagerPage(m_tabpanel);
@@ -310,25 +308,28 @@ MultiMachinePickPage::MultiMachinePickPage(Plater* plater /*= nullptr*/)
 
     app_config = get_app_config();
 
-    SlicePilotUi::apply_dialog_chrome(this, _L("Edit Printers"));
+    SetBackgroundColour(*wxWHITE);
 
     wxBoxSizer* main_sizer = new wxBoxSizer(wxVERTICAL);
 
+    auto line_top = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(-1, 1), wxTAB_TRAVERSAL);
+    line_top->SetBackgroundColour(wxColour(166, 169, 170));
+
     m_label = new Label(this, _L("Select connected printers (0/6)"));
-    m_label->SetForegroundColour(SlicePilotUi::Theme::text());
 
     scroll_macine_list = new wxScrolledWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL);
     scroll_macine_list->SetSize(wxSize(FromDIP(400), FromDIP(10 * 30)));
     scroll_macine_list->SetMinSize(wxSize(FromDIP(400), FromDIP(10 * 30)));
     scroll_macine_list->SetMaxSize(wxSize(FromDIP(400), FromDIP(10 * 30)));
-    scroll_macine_list->SetBackgroundColour(SlicePilotUi::Theme::surface());
+    scroll_macine_list->SetBackgroundColour(*wxWHITE);
     scroll_macine_list->SetScrollRate(0, 5);
 
     sizer_machine_list = new wxBoxSizer(wxVERTICAL);
     scroll_macine_list->SetSizer(sizer_machine_list);
     scroll_macine_list->Layout();
 
-    main_sizer->AddSpacer(FromDIP(12));
+    main_sizer->Add(line_top, 0, wxEXPAND, 0);
+    main_sizer->AddSpacer(FromDIP(10));
     main_sizer->Add(m_label, 0, wxLEFT, FromDIP(20));
     main_sizer->Add(scroll_macine_list, 0, wxLEFT|wxRIGHT, FromDIP(20));
     main_sizer->AddSpacer(FromDIP(10));

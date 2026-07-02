@@ -4,6 +4,7 @@
 #include "../BambuSmartPrint/BambuSmartPrintService.hpp"
 #include "../BambuSmartPrint/PrintReadinessGate.hpp"
 #include "../BambuSmartPrint/SlicePilotSetupHub.hpp"
+#include "libslic3r/BambuSmartPrint/PrintGoalSession.hpp"
 #include "../GLToolbar.hpp"
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
@@ -130,8 +131,14 @@ OllamaFlowDispatchResult run_flow_actions(const nlohmann::json& root)
     return out;
 }
 
+void refresh_smart_print_from_goal_session(Plater* plater)
+{
+    BambuSmartPrintService::instance().refresh_from_goal_session(plater);
+}
+
 OllamaFlowDispatchResult open_setup_flow(Plater* plater)
 {
+    refresh_smart_print_from_goal_session(plater);
     wxGetApp().open_smart_print();
     if (const SetupHubStep step = first_incomplete_setup_step(); step != SetupHubStep::Count)
         SlicePilotSetupHub::activate_step(step, plater);
@@ -149,6 +156,8 @@ OllamaFlowDispatchResult send_print_flow(Plater* plater)
         out.handled = true;
         return out;
     }
+
+    BambuSmartPrintService::instance().refresh_from_goal_session(plater);
 
     MainFrame* mf = wxGetApp().mainframe;
     if (PrintReadinessGate::run(plater, mf) != PrintGateResult::Proceed) {
@@ -195,8 +204,22 @@ nlohmann::json OllamaUserFlow::build_flow_context_json()
     }
 
     const auto& readiness = BambuSmartPrintService::instance().last_readiness_report();
-    if (readiness.score > 0.f)
+    const auto& session   = BambuSmartPrint::PrintGoalSession::instance();
+    if (session.has_last_plan()) {
+        const auto& plan = session.last_plan();
+        if (plan.readiness.score > 0.f)
+            flow["readiness_score"] = plan.readiness.score;
+        if (!plan.readiness.headline.empty())
+            flow["readiness_headline"] = plan.readiness.headline;
+        if (!plan.goal.user_text.empty())
+            flow["print_goal"] = plan.goal.user_text;
+    } else if (readiness.score > 0.f) {
         flow["readiness_score"] = readiness.score;
+        if (!readiness.headline.empty())
+            flow["readiness_headline"] = readiness.headline;
+    }
+    if (!flow.contains("print_goal") && !session.goal().user_text.empty())
+        flow["print_goal"] = session.goal().user_text;
 
     flow["network_plugin_ready"]  = PrintReadinessGate::network_plugin_ready();
     flow["printer_connected"]   = PrintReadinessGate::has_bound_printer();
@@ -292,6 +315,7 @@ OllamaFlowDispatchResult OllamaUserFlow::dispatch_coach_action(const std::string
     if (action_id == "open_settings" || action_id == "open_setup")
         return open_setup_flow(plater);
     if (action_id == "open_smart_print") {
+        refresh_smart_print_from_goal_session(plater);
         wxGetApp().open_smart_print();
         OllamaFlowDispatchResult out;
         out.handled = true;
@@ -352,6 +376,15 @@ OllamaActionResult OllamaUserFlow::apply_flow_action(const nlohmann::json& actio
     const std::string  type = action.value("type", "");
 
     if (type == "open_smart_print" || type == "run_smart_print") {
+        refresh_smart_print_from_goal_session(plater);
+        if (type == "run_smart_print" && plater && BambuSmartPrintService::is_enabled()
+            && BambuSmartPrintService::is_bbl_printer_active()) {
+            BambuSmartPrintService::instance().run_one_click_print(plater);
+            result.success          = true;
+            result.effective_change = true;
+            result.message          = "Started Smart Print one-click workflow";
+            return result;
+        }
         wxGetApp().open_smart_print();
         result.success          = true;
         result.effective_change = true;
@@ -391,6 +424,7 @@ OllamaActionResult OllamaUserFlow::apply_flow_action(const nlohmann::json& actio
             return result;
         }
         if (BambuSmartPrintService::instance().rollback_last_apply(plater)) {
+            refresh_smart_print_from_goal_session(plater);
             result.success          = true;
             result.effective_change = true;
             result.message          = "Reverted last AI settings change";

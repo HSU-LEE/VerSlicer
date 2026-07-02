@@ -1007,12 +1007,11 @@ void GCodeViewer::init(ConfigOptionMode mode, PresetBundle* preset_bundle)
 
     m_layers_slider->init_texture();
 
-    m_gl_data_initialized = true;
-
     try
     {
         m_viewer.init(reinterpret_cast<const char*>(glGetString(GL_VERSION)));
         glcheck();
+        m_gl_data_initialized = true;
     }
     catch (const std::exception& e)
     {
@@ -1110,8 +1109,8 @@ void GCodeViewer::load_as_gcode(const GCodeProcessorResult& gcode_result, const 
     if (current_top_layer_only != required_top_layer_only)
         m_viewer.toggle_top_layer_only_view_range();
 
-    // avoid processing if called with the same gcode_result
-    if (m_last_result_id == gcode_result.id && wxGetApp().is_editor()) {
+    // avoid processing if called with the same gcode_result and viewer still has data
+    if (m_last_result_id == gcode_result.id && wxGetApp().is_editor() && has_data()) {
         //BBS: add logs
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": the same id %1%, return directly, result %2% ") % m_last_result_id % (&gcode_result);
 
@@ -1137,13 +1136,10 @@ void GCodeViewer::load_as_gcode(const GCodeProcessorResult& gcode_result, const 
     //BBS: add logs
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(": gcode result %1%, new id %2%, gcode file %3% ") % (&gcode_result) % m_last_result_id % gcode_result.filename;
 
-    // release gpu memory, if used
-    reset();
-
     //BBS: add mutex for protection of gcode result
     wxGetApp().plater()->suppress_background_process(true);
     gcode_result.lock();
-    //BBS: add safe check
+    //BBS: add safe check — do not reset viewer data until we know the result has moves
     if (gcode_result.moves.size() == 0) {
         //result cleaned before slicing ,should return here
         BOOST_LOG_TRIVIAL(warning) << __FUNCTION__ << boost::format(": gcode result reset before, return directly!");
@@ -1151,6 +1147,9 @@ void GCodeViewer::load_as_gcode(const GCodeProcessorResult& gcode_result, const 
         wxGetApp().plater()->schedule_background_process();
         return;
     }
+
+    // release gpu memory, if used
+    reset();
 
     // convert data from PrusaSlicer format to libvgcode format
     libvgcode::GCodeInputData data = libvgcode::convert(gcode_result, str_tool_colors, str_color_print_colors, m_viewer);
@@ -1514,8 +1513,10 @@ void GCodeViewer::render(int canvas_width, int canvas_height, int right_margin)
     glsafe(::glEnable(GL_DEPTH_TEST));
     render_shells(canvas_width, canvas_height);
 
-    if (m_viewer.get_extrusion_roles().empty())
+    if (m_viewer.get_extrusion_roles().empty()) {
+        render_slider(canvas_width, canvas_height);
         return;
+    }
 
     render_toolpaths();
 
@@ -3393,6 +3394,10 @@ void GCodeViewer::render_legend(float &legend_height, int canvas_width, int canv
     ImGui::Dummy({ window_padding, window_padding });
     ImGui::Dummy({ window_padding, window_padding }); // ORCA Matches top-bottom window paddings
     float window_width = ImGui::GetWindowWidth();     // ORCA Store window width
+
+    ImGui::Dummy({ window_padding, window_padding });
+    ImGui::SameLine(window_padding * 2);
+    imgui.bold_text(_u8L("Slicing results"));
 
     if (m_fold) {
         legend_height = ImGui::GetFrameHeight() + window_padding * 4; // ORCA using 4 instead 2 gives correct toolbar margins while its folded

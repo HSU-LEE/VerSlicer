@@ -17,6 +17,32 @@ namespace Slic3r { namespace GUI {
 
 namespace {
 
+std::string lower_trim(std::string s)
+{
+    boost::algorithm::trim(s);
+    boost::algorithm::to_lower(s);
+    return s;
+}
+
+} // namespace
+
+std::string OllamaActionValidator::canonical_action_type(std::string type)
+{
+    const std::string t = lower_trim(std::move(type));
+    if (t == "split_mesh" || t == "split_objects" || t == "split")
+        return "split_object";
+    if (t == "add_palette" || t == "new_palette" || t == "new_plate" || t == "add_build_plate")
+        return "add_plate";
+    if (t == "arrange_by_object" || t == "arrange_by_objects" || t == "arrange-by-object"
+        || t == "arrange_byobject" || t == "print_by_object" || t == "by_object")
+        return "arrange_objects";
+    if (t == "resize")
+        return "scale";
+    return t;
+}
+
+namespace {
+
 static bool user_allows_delete(const std::string& user)
 {
     return user.find("delete") != std::string::npos || user.find("remove") != std::string::npos
@@ -63,7 +89,50 @@ bool is_blocked_action_type(const std::string& type)
 
 bool is_allowed_action_type(const std::string& type)
 {
-    return OllamaActionRegistry::is_allowed_type(type);
+    return OllamaActionRegistry::is_allowed_type(OllamaActionValidator::canonical_action_type(type));
+}
+
+bool is_model_shape_action_type(const std::string& type)
+{
+    return type == "scale" || type == "rotate" || type == "translate" || type == "mesh_boolean"
+        || type == "mirror_mesh" || type == "repair_mesh" || type == "split_object" || type == "clone_selection";
+}
+
+void warn(OllamaActionSanitizeResult& out, std::string msg);
+void block_action(OllamaActionSanitizeResult& out, const std::string& reason, bool quiet);
+
+void prune_set_config_and_slice_for_model_shape_turn(nlohmann::json& root, OllamaActionSanitizeResult& out)
+{
+    if (!root.contains("actions") || !root["actions"].is_array())
+        return;
+
+    bool has_shape = false;
+    for (const auto& a : root["actions"]) {
+        if (!a.is_object())
+            continue;
+        const std::string type = OllamaActionValidator::canonical_action_type(a.value("type", ""));
+        if (is_model_shape_action_type(type)) {
+            has_shape = true;
+            break;
+        }
+    }
+    if (!has_shape)
+        return;
+
+    nlohmann::json kept = nlohmann::json::array();
+    for (const auto& a : root["actions"]) {
+        if (!a.is_object()) {
+            kept.push_back(a);
+            continue;
+        }
+        const std::string type = OllamaActionValidator::canonical_action_type(a.value("type", ""));
+        if (type == "set_config" || type == "slice") {
+            block_action(out, "Dropped " + type + " — model-shape turn uses geometry/mesh tools only", /*quiet*/ true);
+            continue;
+        }
+        kept.push_back(a);
+    }
+    root["actions"] = std::move(kept);
 }
 
 void warn(OllamaActionSanitizeResult& out, std::string msg)
@@ -110,7 +179,7 @@ bool sanitize_set_config(nlohmann::json& action, OllamaActionSanitizeResult& out
         int fidx = action.value("filament_index", 0);
         if (auto* bundle = wxGetApp().preset_bundle) {
             const int max_slots = static_cast<int>(bundle->filament_presets.size());
-            fidx                  = OllamaIntentContext::clamp_filament_index(fidx, max_slots);
+            fidx                     = OllamaIntentContext::clamp_filament_index(fidx, max_slots);
             action["filament_index"] = fidx;
         } else {
             action["filament_index"] = 0;
@@ -249,7 +318,9 @@ bool sanitize_one_action(nlohmann::json& action, const std::string& user, Ollama
     if (!action.is_object() || !action.contains("type") || !action["type"].is_string())
         return false;
 
-    const std::string type = action["type"].get<std::string>();
+    std::string type = action["type"].get<std::string>();
+    type               = OllamaActionValidator::canonical_action_type(type);
+    action["type"]     = type;
     if (is_blocked_action_type(type) || !is_allowed_action_type(type)) {
         block_action(out, "Blocked disallowed action: " + type);
         return false;
@@ -269,6 +340,23 @@ bool sanitize_one_action(nlohmann::json& action, const std::string& user, Ollama
         return false;
     if ((type == "translate" || type == "rotate" || type == "scale") && !sanitize_transform(action, type, out))
         return false;
+    if (type == "mesh_boolean") {
+        const std::string op = action.value("operation", "");
+        static const std::unordered_set<std::string> kOps = {
+            "subtract_cylinder", "drill_hole", "union_box", "add_handle", "add_rib",
+        };
+        if (kOps.find(op) == kOps.end()) {
+            block_action(out, "mesh_boolean: unknown operation");
+            return false;
+        }
+    }
+    if (type == "mirror_mesh") {
+        const std::string axis = action.value("axis", "x");
+        if (axis != "x" && axis != "y" && axis != "z" && axis != "X" && axis != "Y" && axis != "Z") {
+            block_action(out, "mirror_mesh: axis must be x, y, or z");
+            return false;
+        }
+    }
 
     if (type == "ui_select_tab") {
         static const std::unordered_set<std::string> tabs = {
@@ -350,6 +438,7 @@ OllamaActionSanitizeResult OllamaActionValidator::sanitize(nlohmann::json& root,
             kept.push_back(std::move(action));
     }
     root["actions"] = std::move(kept);
+    prune_set_config_and_slice_for_model_shape_turn(root, result);
     return result;
 }
 

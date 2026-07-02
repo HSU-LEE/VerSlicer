@@ -19,6 +19,10 @@ class wxWindow;
 
 namespace Slic3r { namespace GUI {
 
+struct OllamaWorkflowRun;
+struct OllamaPipelineOptions;
+struct OllamaConfigVerifyReport;
+
 struct OllamaAgentRunResult
 {
     bool                             completed{false};
@@ -60,8 +64,6 @@ private:
     void on_llm_response(const std::string& text, const std::string& error);
     void finish(OllamaAgentRunResult result);
     bool execute_agent_root(const nlohmann::json& root);
-    void run_deterministic_follow_ups();
-    bool try_rule_fallback_finish();
     void continue_after_slice(bool slice_ok);
     void proceed_after_tool_execution(const nlohmann::json& executed_root, const std::string& assistant_msg,
                                       const std::string& raw_text);
@@ -85,6 +87,20 @@ private:
     std::string                    m_pending_assistant_msg;
     std::string                    m_pending_raw_text;
     nlohmann::json                 m_pending_executed_root;
+    bool                           m_mutations_applied{false};
+
+    void note_workflow_mutations(const OllamaWorkflowRun& workflow);
+    OllamaPipelineOptions          pipeline_options() const;
+
+    void schedule_post_apply_verification(const nlohmann::json& root, const std::string& assistant_msg,
+                                          const std::string& raw_text, bool applied,
+                                          OllamaWorkflowRun workflow);
+    void handle_post_apply_verification(const nlohmann::json& root, const std::string& assistant_msg,
+                                        const std::string& raw_text, bool applied,
+                                        const OllamaWorkflowRun& workflow);
+    bool handle_verify_report(const OllamaConfigVerifyReport& report, const std::string& assistant_msg,
+                              const nlohmann::json& root, const std::string& raw_text, bool applied,
+                              const OllamaWorkflowRun& workflow);
 };
 
 }} // namespace

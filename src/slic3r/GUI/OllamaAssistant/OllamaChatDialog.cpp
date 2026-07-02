@@ -1,5 +1,6 @@
 #include "OllamaChatDialog.hpp"
 #include "OllamaChatPanel.hpp"
+#include "OllamaProcessingNotice.hpp"
 
 #include "../BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "../GUI_App.hpp"
@@ -12,12 +13,22 @@
 
 namespace Slic3r { namespace GUI {
 
+namespace {
+
+wxString assistant_dialog_title()
+{
+    return wxGetApp().current_language_code().StartsWith("ko") ? wxString::FromUTF8("AI 도우미")
+                                                               : _L("AI Assistant");
+}
+
+} // namespace
+
 OllamaChatDialog::OllamaChatDialog(wxWindow* parent)
-    : DPIDialog(parent, wxID_ANY, _L("Ollama Assistant"),
+    : DPIDialog(parent, wxID_ANY, assistant_dialog_title(),
                 wxDefaultPosition, wxDefaultSize,
                 wxCAPTION | wxCLOSE_BOX | wxSYSTEM_MENU | wxRESIZE_BORDER)
 {
-    SlicePilotUi::apply_dialog_chrome(this, _L("Ollama Assistant"));
+    SlicePilotUi::apply_dialog_chrome(this, assistant_dialog_title());
 
 #ifdef __APPLE__
     // In macOS native fullscreen (Spaces), non-stay-on-top dialogs may be pushed behind
@@ -40,6 +51,17 @@ OllamaChatDialog::OllamaChatDialog(wxWindow* parent)
     CenterOnParent();
 
     wxGetApp().UpdateDlgDarkUI(this);
+}
+
+OllamaChatDialog::~OllamaChatDialog()
+{
+    if (m_panel) {
+        m_panel->SetEvtHandlerEnabled(false);
+        m_panel = nullptr;
+    }
+    if (!wxTheApp || wxGetApp().is_closing())
+        return;
+    OllamaProcessingNotice::hide(wxGetApp().plater());
 }
 
 void OllamaChatDialog::on_dpi_changed(const wxRect& /*suggested_rect*/)

@@ -2,20 +2,22 @@
 
 #include "BambuSmartPrintService.hpp"
 #include "BambuSmartPrintWorkflowDialog.hpp"
-#include "../AICoach/AICoachTrustBuilder.hpp"
-#include "../AICoach/AICoachTriggerPolicy.hpp"
-#include "../AICoach/AICoachTypes.hpp"
-#include "../AICoach/AICoachController.hpp"
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
 #include "../MainFrame.hpp"
 #include "../NotificationManager.hpp"
-#include "../OllamaAssistant/OllamaModelLoadAdvisor.hpp"
 #include "../Plater.hpp"
+#include "../OllamaAssistant/OllamaSettingDescriptions.hpp"
+
+#include "../AICoach/AICoachTrustBuilder.hpp"
+#include "../AICoach/AICoachTriggerPolicy.hpp"
+#include "../AICoach/AICoachTypes.hpp"
 
 #include "libslic3r/BambuSmartPrint/MeshAnalysisCache.hpp"
 #include "libslic3r/SlicePilot/SlicePilotRestrictions.hpp"
 #include "../DeviceCore/DevManager.h"
+
+#include <boost/algorithm/string.hpp>
 
 #include <set>
 
@@ -60,6 +62,55 @@ void enrich_cards(std::vector<AICoachCard>& cards, Plater* plater)
         if (!c.apply_root.empty())
             AICoachTrustBuilder::enrich_recommendation_card(c, plater);
     }
+}
+
+static bool smart_print_ui_korean()
+{
+    const wxString code = wxGetApp().current_language_code();
+    wxString       lang = code.BeforeFirst('_').BeforeFirst('-').Lower();
+    if (lang == wxString("ko"))
+        return true;
+    lang = wxGetApp().current_language_code_safe().BeforeFirst('_').Lower();
+    return lang == wxString("ko");
+}
+
+static bool is_generic_workflow_summary(const std::string& summary)
+{
+    if (summary.empty())
+        return true;
+    static const char* patterns[] = {
+        "SlicePilot tuned",
+        "tree supports, no raft",
+        "Applying settings matched",
+        "Suggested settings for your print goal",
+        "Estimated success rate:",
+        "adjustments are pending",
+        "모델이 잘 붙는지",
+        "오버행 부분을 서포트",
+    };
+    for (const char* p : patterns) {
+        if (summary.find(p) != std::string::npos)
+            return true;
+    }
+    return false;
+}
+
+static std::string workflow_summary_from_changes(const std::vector<SettingChange>& changes,
+                                                 const std::string& fallback_message)
+{
+    const bool ko = smart_print_ui_korean();
+    std::string fallback = fallback_message;
+    if (is_generic_workflow_summary(fallback))
+        fallback.clear();
+    if (!changes.empty())
+        return OllamaSettingDescriptions::build_summary(changes, fallback, ko);
+
+    if (!fallback.empty())
+        return fallback;
+
+    if (ko)
+        return "추가 설정 변경은 없습니다. 아래 모델 인사이트를 확인해 주세요.";
+    return "No setting changes are pending — review model insights below.";
 }
 
 } // namespace
@@ -150,26 +201,16 @@ void PrintPlannerGui::dispatch_model_loaded(Plater* plater)
 
     const auto load_mode = BambuSmartPrintService::auto_load_mode();
 
-    if (load_mode == BambuSmartPrintService::AutoLoadMode::FullDialog
-        && !AICoachController::is_enabled_for_current_mode()) {
-        OllamaModelLoadAdvisor::schedule_after_model_load(plater);
-        return;
-    }
-
-    if (AICoachController::is_enabled_for_current_mode())
-        AICoachController::instance().enqueue_cards(coach_cards_from_plan(plater, plan));
-
     if (load_mode == BambuSmartPrintService::AutoLoadMode::Off)
         return;
 
-    if (plan.apply_policy == ApplyPolicy::SilentSafe && plan.has_actions()) {
-        BambuSmartPrintService::instance().apply_config_to_plater(
-            plater, plan.base_config, plan.proposed_config, false, false);
-    } else if (load_mode == BambuSmartPrintService::AutoLoadMode::Notify) {
-        const int rate = int(std::round(plan.success_estimate));
-        wxString  msg  = wxString::Format(
-            _L("Smart Print: %d%% estimated ready — %zu suggested change(s). Open Smart Print for details."),
-            rate, plan.change_count);
+    if (plan.change_count > 0) {
+        BambuSmartPrintService::notify_readiness_suggestions(
+            plater, int(std::round(plan.success_estimate)), plan.change_count);
+    } else if (load_mode == BambuSmartPrintService::AutoLoadMode::Notify && plan.readiness.score > 0.f) {
+        wxString msg = wxString::Format(
+            _L("Smart Print: %d%% estimated ready. Open Smart Print for details."),
+            int(std::round(plan.success_estimate)));
         if (NotificationManager* nm = plater->get_notification_manager()) {
             nm->push_notification(NotificationType::CustomNotification,
                 NotificationManager::NotificationLevel::RegularNotificationLevel,
@@ -181,6 +222,11 @@ void PrintPlannerGui::dispatch_model_loaded(Plater* plater)
                     return false;
                 });
         }
+    }
+
+    if (plan.apply_policy == ApplyPolicy::SilentSafe && plan.has_actions()) {
+        BambuSmartPrintService::instance().apply_config_to_plater(
+            plater, plan.base_config, plan.proposed_config, false, false);
     }
 
     wxGetApp().CallAfter([]() { BambuSmartPrintService::instance().refresh_all_panels(); });
@@ -247,11 +293,11 @@ std::vector<AICoachCard> PrintPlannerGui::coach_cards_from_plan(Plater* plater, 
             if (!risk.detail.empty())
                 bullets.push_back(risk.detail);
             out.push_back(make_plan_card(
-                AICoachTriggerId::AdhesionRisk, AICoachImportance::Critical,
+                AICoachTriggerId::AdhesionRisk, AICoachImportance::Normal,
                 _u8L("The first layer may not stick well with the current settings. I can suggest safer values."),
                 {
                     {_u8L("Apply suggestions"), AICoachButtonRole::Primary, "apply_actions", root},
-                    {_u8L("Adjust manually"), AICoachButtonRole::Secondary, "open_settings", {}},
+                    {_u8L("Not now"), AICoachButtonRole::Secondary, "dismiss", {}},
                 },
                 root, std::move(bullets)));
             break;
@@ -268,18 +314,18 @@ std::vector<AICoachCard> PrintPlannerGui::coach_cards_from_plan(Plater* plater, 
 SmartPrintWorkflowContent PrintPlannerGui::workflow_content_from_plan(const PrintPlan& plan)
 {
     SmartPrintWorkflowContent content;
-    content.summary             = plan.explanation.summary.empty() ? plan.message() : plan.explanation.summary;
     content.suggested_material  = plan.mesh.suggested_material;
     content.prediction_summary  = plan.prediction.summary;
-    content.readiness_headline  = plan.readiness.headline;
     content.active_filament     = plan.readiness.active_filament_hint;
     content.filament_mismatch   = plan.readiness.filament_mismatch;
-    content.success_rate        = plan.success_estimate;
     content.complexity_score    = plan.mesh.complexity_score;
     content.change_count        = plan.change_count;
     content.insights            = plan.readiness.insights;
     content.show_success_gauge  = true;
     content.is_failure_workflow = false;
+
+    const std::string fallback = plan.explanation.summary.empty() ? plan.message() : plan.explanation.summary;
+    enrich_workflow_content(content, plan.auto_result.changes, plan.readiness, fallback);
 
     for (const PrintRisk& r : plan.risks) {
         if (!r.recommended_action_text.empty())
@@ -292,15 +338,28 @@ SmartPrintWorkflowContent PrintPlannerGui::workflow_content_from_plan(const Prin
             break;
         content.risk_factors.push_back(rf);
     }
-    for (const SettingChange& ch : plan.auto_result.changes) {
-        if (content.change_preview.size() >= 8)
-            break;
-        content.change_preview.push_back(ch.key + ": " + (ch.reason.empty() ? ch.new_value : ch.reason));
-    }
     if (!plan.explanation.tradeoff_note.empty())
         content.change_preview.insert(content.change_preview.begin(), plan.explanation.tradeoff_note);
 
     return content;
+}
+
+void PrintPlannerGui::enrich_workflow_content(SmartPrintWorkflowContent& content,
+                                              const std::vector<SettingChange>& changes,
+                                              const ReadinessReport& readiness,
+                                              const std::string& fallback_message)
+{
+    content.summary = workflow_summary_from_changes(changes, fallback_message);
+    content.readiness_headline = readiness.headline;
+    content.success_rate       = readiness.score > 0.f ? readiness.score : content.success_rate;
+    content.change_count       = changes.empty() ? content.change_count : changes.size();
+    content.change_preview.clear();
+    const bool ko = smart_print_ui_korean();
+    for (const SettingChange& ch : changes) {
+        if (content.change_preview.size() >= 8)
+            break;
+        content.change_preview.push_back(OllamaSettingDescriptions::preview_line(ch, ko));
+    }
 }
 
 }} // namespace

@@ -1,4 +1,5 @@
 #include "OllamaAgentStateService.hpp"
+#include "OllamaMeshOps.hpp"
 
 #include "OllamaActionExecutor.hpp"
 #include "OllamaUserFlow.hpp"
@@ -148,6 +149,8 @@ nlohmann::json OllamaAgentStateService::snapshot()
         });
     }
 
+    state["mesh_health"] = OllamaMeshOps::mesh_health_for_plate(plater);
+
     return state;
 }
 
@@ -187,34 +190,92 @@ nlohmann::json OllamaAgentStateService::config_digest(const std::string& user_go
 std::vector<std::string> OllamaAgentStateService::verify_config_applied(const nlohmann::json& expected_options,
                                                                         const std::string& preset)
 {
-    std::vector<std::string> mismatches;
-    if (!expected_options.is_object() || !wxGetApp().preset_bundle)
-        return mismatches;
+    nlohmann::json action = nlohmann::json::object({
+        {"type", "set_config"},
+        {"preset", preset},
+        {"options", expected_options},
+    });
+    return OllamaActionExecutor::verify_set_config_applied(action);
+}
 
-    const DynamicPrintConfig cfg = wxGetApp().preset_bundle->full_config(false);
-    for (auto it = expected_options.begin(); it != expected_options.end(); ++it) {
-        const std::string key = OllamaActionExecutor::normalize_config_key(it.key());
-        if (!cfg.has(key))
-            continue;
-        const ConfigOption* opt = cfg.option(key);
-        if (!opt)
-            continue;
-        const std::string live = opt->serialize();
-        std::string       expected;
-        if (it.value().is_string())
-            expected = it.value().get<std::string>();
-        else if (it.value().is_boolean())
-            expected = it.value().get<bool>() ? "1" : "0";
-        else if (it.value().is_number())
-            expected = std::to_string(it.value().get<double>());
-        else
-            expected = it.value().dump();
+OllamaConfigVerifyReport OllamaAgentStateService::verify_set_config_actions(const nlohmann::json& root,
+                                                                            const std::string& user_goal_hint)
+{
+    OllamaConfigVerifyReport report;
+    report.config_digest = OllamaActionExecutor::config_digest_for_set_config_actions(root, user_goal_hint);
 
-        if (live != expected && !(live == "1" && expected == "true") && !(live == "0" && expected == "false"))
-            mismatches.push_back(key + " (expected " + expected + ", got " + live + ")");
+    if (!root.contains("actions") || !root["actions"].is_array())
+        return report;
+
+    bool had_set_config = false;
+    for (const auto& action : root["actions"]) {
+        if (!action.is_object() || action.value("type", "") != "set_config")
+            continue;
+        nlohmann::json work = action;
+        OllamaActionExecutor::coalesce_set_config_action_options(work);
+        if (!work.contains("options") || !work["options"].is_object())
+            continue;
+
+        had_set_config = true;
+        const auto mismatches = OllamaActionExecutor::verify_set_config_applied(work);
+        if (mismatches.empty()) {
+            report.tool_results.push_back(nlohmann::json::object({
+                {"tool", "verify_config"},
+                {"ok", true},
+                {"changed", false},
+                {"message", "Config verified"},
+                {"data", nlohmann::json::object({
+                             {"preset", work.value("preset", "print")},
+                             {"options", OllamaActionExecutor::normalized_set_config_options_from_action(work)},
+                             {"config_digest", report.config_digest},
+                         })},
+            }));
+            continue;
+        }
+
+        report.all_ok = false;
+        report.mismatches.insert(report.mismatches.end(), mismatches.begin(), mismatches.end());
+        nlohmann::json mismatch_arr = nlohmann::json::array();
+        for (const std::string& m : mismatches)
+            mismatch_arr.push_back(m);
+        report.tool_results.push_back(nlohmann::json::object({
+            {"tool", "verify_config"},
+            {"ok", false},
+            {"changed", false},
+            {"message", "Config verification failed"},
+            {"blocker", mismatches.front()},
+            {"data", nlohmann::json::object({
+                         {"preset", work.value("preset", "print")},
+                         {"mismatches", std::move(mismatch_arr)},
+                         {"config_digest", report.config_digest},
+                     })},
+        }));
     }
-    (void) preset;
-    return mismatches;
+
+    if (!had_set_config)
+        report.config_digest = config_digest(user_goal_hint);
+
+    return report;
+}
+
+std::string OllamaAgentStateService::build_verify_retry_nudge(const OllamaConfigVerifyReport& report, bool korean)
+{
+    std::string fb = korean
+        ? "verify_config 실패. config_digest와 mismatches를 확인한 뒤 set_config를 다시 호출하세요.\n"
+        : "verify_config failed. Review config_digest and mismatches, then call set_config again.\n";
+
+    if (!report.mismatches.empty()) {
+        fb += korean ? "\nMismatches:\n" : "\nMismatches:\n";
+        for (const std::string& m : report.mismatches)
+            fb += "- " + m + "\n";
+    }
+    if (!report.config_digest.empty()) {
+        fb += korean ? "\nConfig digest (JSON):\n" : "\nConfig digest (JSON):\n";
+        fb += report.config_digest.dump(2);
+        fb += "\n";
+    }
+    fb += korean ? "\nGoal:\n" : "\nGoal:\n";
+    return fb;
 }
 
 }} // namespace

@@ -27,7 +27,7 @@ class BambuSmartPrintPanel;
 
 namespace SlicePilotUi {
 
-/** Auto-confirm Smart Print choice dialogs after this delay (export/save dialogs excluded). */
+/** Auto-dismiss Smart Print choice dialogs after this delay (default: dismiss, not apply). */
 constexpr int SMART_PRINT_DIALOG_AUTO_MS = 10000;
 
 enum class BannerKind { Info, Warning, Success };
@@ -50,6 +50,8 @@ struct Theme
 };
 
 void apply_dialog_chrome(wxWindow* dialog, const wxString& title = {});
+
+bool smart_print_locale_korean();
 
 /** Panel / tab page background (matches Monitor / Project tabs). */
 void apply_panel_chrome(wxPanel* panel);

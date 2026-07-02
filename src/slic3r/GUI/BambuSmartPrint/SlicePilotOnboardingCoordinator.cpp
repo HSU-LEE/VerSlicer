@@ -70,7 +70,7 @@ void SlicePilotOnboardingCoordinator::on_guide_completed()
     if (!wxGetApp().app_config)
         return;
     if (!wxGetApp().app_config->has("bambu_smart_print_auto_load_mode"))
-        BambuSmartPrintService::set_auto_load_mode(BambuSmartPrintService::AutoLoadMode::FullDialog);
+        BambuSmartPrintService::set_auto_load_mode(BambuSmartPrintService::AutoLoadMode::Notify);
 
     wxGetApp().CallAfter([]() {
         Plater* plater = wxGetApp().plater();

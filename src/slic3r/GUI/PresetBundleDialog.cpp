@@ -10,7 +10,6 @@
 #include <wx/scrolwin.h>
 #include <wx/sizer.h>
 #include <libslic3r/PresetBundle.hpp>
-#include <libslic3r/SlicePilot/SlicePilotRestrictions.hpp>
 #include <wx/string.h>
 #include "MainFrame.hpp"
 #include <slic3r/GUI/Widgets/WebView.hpp>
@@ -57,7 +56,6 @@ PresetBundleDialog::~PresetBundleDialog()
 void PresetBundleDialog::OnFSWatch(wxFileSystemWatcherEvent& e)
 {
     GUI::wxGetApp().preset_bundle->load_presets(*app_config, ForwardCompatibilitySubstitutionRule::EnableSilentDisableSystem);
-    Slic3r::SlicePilot::enforce_bbl_only_bundle(*GUI::wxGetApp().preset_bundle);
     wxGetApp().mainframe->update_side_preset_ui();
 
     // ListBundles();

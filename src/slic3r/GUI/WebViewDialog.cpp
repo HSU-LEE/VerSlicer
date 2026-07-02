@@ -4,7 +4,6 @@
 #include "slic3r/GUI/wxExtensions.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/MainFrame.hpp"
-#include "MakerWorld/MakerWorldUrl.hpp"
 #include "libslic3r_version.h"
 #include "../Utils/Http.hpp"
 
@@ -474,12 +473,12 @@ void WebViewPanel::OpenModelDetail(std::string id, NetworkAgent *agent)
     {
         if (url.find("?") != std::string::npos) 
         { 
-            url += "&from=verslicer";
+            url += "&from=orcaslicer";
         } else {
-            url += "?from=verslicer";
+            url += "?from=orcaslicer";
         }
         
-        wxLaunchDefaultBrowser(wxString::FromUTF8(absolute_makerworld_browser_url(url)));
+        wxLaunchDefaultBrowser(url); 
     }
 }
 
@@ -527,7 +526,7 @@ void WebViewPanel::SendCloudProvidersInfo()
     json data;
     json provider_array = json::array();
 
-    if (!app_config->get_stealth_mode()) {
+    {
         auto providers = app_config->get_cloud_providers();
         for (const auto& p : providers) {
             provider_array.push_back(p);

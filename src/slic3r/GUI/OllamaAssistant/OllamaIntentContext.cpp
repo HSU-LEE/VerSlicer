@@ -94,90 +94,6 @@ double OllamaIntentContext::recommended_brim_width_mm()
     return ollama_recommended_brim_width_mm(fp.x_mm, fp.y_mm);
 }
 
-bool OllamaIntentContext::user_vague_fix_request(const std::string& user)
-{
-    return user.find("고쳐") != std::string::npos || user.find("도와") != std::string::npos ||
-           user.find("help") != std::string::npos || user.find("fix") != std::string::npos ||
-           user.find("문제") != std::string::npos || user.find("안돼") != std::string::npos ||
-           user.find("안되") != std::string::npos || user.find("망했") != std::string::npos ||
-           user.find("failed") != std::string::npos;
-}
-
-bool OllamaIntentContext::user_wants_warp_relief(const std::string& user)
-{
-    return user.find("들뜸") != std::string::npos || user.find("warp") != std::string::npos ||
-           user.find("curl") != std::string::npos || user.find("lift") != std::string::npos ||
-           user.find("코너") != std::string::npos || user.find("corner") != std::string::npos;
-}
-
-bool OllamaIntentContext::user_complains_print_too_slow(const std::string& user)
-{
-    return user.find("느려") != std::string::npos || user.find("느리") != std::string::npos ||
-           user.find("too slow") != std::string::npos || user.find("속도가") != std::string::npos ||
-           user.find("속도가 너무") != std::string::npos ||
-           (user.find("slow") != std::string::npos && user.find("print") != std::string::npos);
-}
-
-bool OllamaIntentContext::user_wants_faster_print(const std::string& user)
-{
-    if (user_complains_print_too_slow(user))
-        return true;
-    return user.find("빨리") != std::string::npos || user.find("빠르") != std::string::npos ||
-           user.find("속도를") != std::string::npos || user.find("속도 좀") != std::string::npos ||
-           (user.find("올려") != std::string::npos && user.find("속도") != std::string::npos) ||
-           user.find("speed up") != std::string::npos || user.find("faster") != std::string::npos ||
-           user.find("print faster") != std::string::npos;
-}
-
-bool OllamaIntentContext::user_wants_stringing_relief(const std::string& user)
-{
-    if (user_complains_print_too_slow(user) || user_wants_faster_print(user))
-        return false;
-    return user.find("stringing") != std::string::npos || user.find("string") != std::string::npos ||
-           user.find("실같") != std::string::npos || user.find("거미") != std::string::npos ||
-           user.find("실이") != std::string::npos ||
-           user.find("spider") != std::string::npos || user.find("ooze") != std::string::npos ||
-           (user.find("실") != std::string::npos &&
-            (user.find("질질") != std::string::npos || user.find("끈") != std::string::npos ||
-             user.find("늘어") != std::string::npos));
-}
-
-double OllamaIntentContext::recommended_retraction_for_stringing()
-{
-    constexpr double kBaseline = 0.8;
-    if (!wxTheApp || !wxGetApp().preset_bundle)
-        return kBaseline;
-    const DynamicPrintConfig& cfg = wxGetApp().preset_bundle->filaments.get_edited_preset().config;
-    if (!cfg.has("retraction_length"))
-        return kBaseline;
-    const double cur = cfg.opt_float("retraction_length");
-    if (cur < kBaseline)
-        return kBaseline;
-    return std::min(2.0, cur + 0.2);
-}
-
-bool OllamaIntentContext::user_wants_top_surface_quality(const std::string& user)
-{
-    return user.find("윗면") != std::string::npos || user.find("윗 층") != std::string::npos ||
-           user.find("top surface") != std::string::npos || user.find("rough top") != std::string::npos ||
-           user.find("거칠") != std::string::npos || user.find("ironing") != std::string::npos ||
-           user.find("아이어링") != std::string::npos;
-}
-
-bool OllamaIntentContext::user_wants_first_layer_help(const std::string& user)
-{
-    return user.find("첫층") != std::string::npos || user.find("첫 층") != std::string::npos ||
-           user.find("first layer") != std::string::npos || user.find("initial layer") != std::string::npos;
-}
-
-bool OllamaIntentContext::user_wants_lay_flat(const std::string& user)
-{
-    return user.find("눕혀") != std::string::npos || user.find("눕") != std::string::npos ||
-           user.find("lay flat") != std::string::npos || user.find("넘어") != std::string::npos ||
-           user.find("쓰러") != std::string::npos || user.find("기둥") != std::string::npos ||
-           user.find("tall") != std::string::npos || user.find("narrow") != std::string::npos;
-}
-
 nlohmann::json OllamaIntentContext::build_intent_signals_json()
 {
     nlohmann::json signals = nlohmann::json::object();
@@ -283,13 +199,6 @@ void OllamaIntentContext::consume_slice_feedback_if_ready()
     OllamaTelemetry::slice_feedback_evaluated(still, isl);
 }
 
-static bool user_describes_durability(const std::string& user)
-{
-    return user.find("파손") != std::string::npos || user.find("부서") != std::string::npos ||
-           user.find("부러") != std::string::npos || user.find("fragile") != std::string::npos ||
-           user.find("brittle") != std::string::npos || user.find("break") != std::string::npos;
-}
-
 static double json_number_value(const nlohmann::json& v, double fallback = 0.0)
 {
     if (v.is_number())
@@ -311,7 +220,7 @@ static bool is_llm_placeholder_brim_width(const nlohmann::json& v)
     return w > 0.0 && w == 5.0;
 }
 
-void OllamaIntentContext::refine_set_config_options(nlohmann::json& options, const std::string& user_request)
+void OllamaIntentContext::refine_set_config_options(nlohmann::json& options, const std::string& /*user_request*/)
 {
     if (!options.is_object())
         return;
@@ -329,43 +238,6 @@ void OllamaIntentContext::refine_set_config_options(nlohmann::json& options, con
                 options["brim_type"] = "outer_only";
         }
     }
-
-    if (user_describes_durability(user_request)) {
-        if (!options.contains("wall_loops") && !options.contains("sparse_infill_density"))
-            options["wall_loops"] = 3;
-    }
-
-    if (user_wants_warp_relief(user_request) && !options.contains("elefant_foot_compensation"))
-        options["elefant_foot_compensation"] = 0.1;
-
-    if (user_wants_stringing_relief(user_request) && !options.contains("retraction_length"))
-        options["retraction_length"] = recommended_retraction_for_stringing();
-
-    if (user_wants_faster_print(user_request)) {
-        if (auto* bundle = wxGetApp().preset_bundle) {
-            const DynamicPrintConfig& cfg = bundle->prints.get_edited_preset().config;
-            auto bump_speed = [&](const char* key) {
-                if (options.contains(key) || !cfg.has(key))
-                    return;
-                const double cur = cfg.opt_float(key);
-                if (cur <= 0.0)
-                    return;
-                options[key] = std::min(500.0, std::round(cur * 1.15 / 5.0) * 5.0);
-            };
-            bump_speed("outer_wall_speed");
-            bump_speed("sparse_infill_speed");
-        }
-    }
-
-    if (user_wants_top_surface_quality(user_request)) {
-        if (!options.contains("ironing_type"))
-            options["ironing_type"] = "top";
-        if (!options.contains("top_shell_layers"))
-            options["top_shell_layers"] = 4;
-    }
-
-    if (user_wants_first_layer_help(user_request) && !options.contains("initial_layer_print_height"))
-        options["initial_layer_print_height"] = 0.24;
 }
 
 }} // namespace

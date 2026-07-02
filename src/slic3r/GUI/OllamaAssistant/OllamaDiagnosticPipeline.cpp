@@ -4,7 +4,6 @@
 #include "OllamaActionJsonExtract.hpp"
 #include "OllamaConfig.hpp"
 #include "OllamaIntentContext.hpp"
-#include "OllamaRequestRouter.hpp"
 #include "OllamaSettingSearch.hpp"
 
 #include "../GUI_App.hpp"
@@ -179,18 +178,9 @@ void localize_wiki_queries(std::vector<std::string>& queries)
 
 } // namespace
 
-bool OllamaDiagnosticPipeline::needs_pipeline(const std::string& user_request, bool apply_mode)
+bool OllamaDiagnosticPipeline::needs_pipeline(const std::string& /*user_request*/, bool /*apply_mode*/)
 {
-    if (!apply_mode || user_request.empty())
-        return false;
-    const OllamaRequestRoute route = OllamaRequestRouter::classify(user_request);
-    if (route == OllamaRequestRoute::Fast)
-        return false;
-    if (!ollama_adaptive_routing_enabled())
-        return true;
-    if (route == OllamaRequestRoute::Deep)
-        return true;
-    return !ollama_two_hop_enabled();
+    return false;
 }
 
 OllamaDiagnosis OllamaDiagnosticPipeline::parse_diagnosis(const std::string& llm_text)

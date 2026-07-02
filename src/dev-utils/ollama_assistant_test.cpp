@@ -1,7 +1,6 @@
 #include "../slic3r/GUI/OllamaAssistant/OllamaActionRegistry.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaConfig.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaIntentContext.hpp"
-#include "../slic3r/GUI/OllamaAssistant/OllamaIntentRules.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaModelPick.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.hpp"
@@ -80,11 +79,6 @@ int main()
 
     expect_true(OllamaIntentContext::clamp_filament_index(-1, 4) == 0, "filament idx clamp low");
     expect_true(OllamaIntentContext::clamp_filament_index(9, 4) == 3, "filament idx clamp high");
-
-    {
-        const auto z = OllamaIntentRules::parse_z_rotation_degrees("90도 돌려");
-        expect_true(z.has_value() && *z == 90.0, "parse rotation degrees");
-    }
 
     if (g_failures == 0) {
         std::cout << "ollama_assistant_test: all passed\n";

@@ -76,6 +76,15 @@ PrintGoal PrintGoalParser::parse(const std::string& user_text)
         add_intent(goal, PrintGoalIntent::Overhang);
     }
 
+    if (contains(s, "로봇") || contains(s, "부품") || contains(s, "용도") || contains(s, "목적")
+        || contains(s, "기계") || contains(s, "장치") || contains(s, "prototype")
+        || contains(s, "robot") || contains(s, "functional") || contains(s, " parts")
+        || contains(s, "part ") || contains(s, "going to print") || contains(s, "print for")
+        || contains(s, "print this for")) {
+        add_intent(goal, PrintGoalIntent::Strong);
+        bump_weight(goal.weight_strong, 0.65f);
+    }
+
     if (goal.intents.empty() && !user_text.empty())
         add_intent(goal, PrintGoalIntent::Unknown);
 
@@ -94,6 +103,16 @@ PrintGoal PrintGoalParser::merge(const PrintGoal& session_goal, const PrintGoal&
     merged.weight_fast     = std::max(session_goal.weight_fast, new_goal.weight_fast);
     merged.weight_outdoor  = std::max(session_goal.weight_outdoor, new_goal.weight_outdoor);
     return merged;
+}
+
+bool PrintGoalParser::is_recognized_goal(const std::string& user_text)
+{
+    const PrintGoal goal = parse(user_text);
+    for (PrintGoalIntent intent : goal.intents) {
+        if (intent != PrintGoalIntent::Unknown)
+            return true;
+    }
+    return false;
 }
 
 } // namespace BambuSmartPrint
