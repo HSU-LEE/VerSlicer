@@ -385,6 +385,14 @@ bool sanitize_one_action(nlohmann::json& action, const std::string& user, Ollama
         return true;
     }
 
+    if (type == "makerworld_find_and_print") {
+        if (!action.contains("query") || !action["query"].is_string() || action["query"].get<std::string>().empty()) {
+            block_action(out, "makerworld_find_and_print: missing query");
+            return false;
+        }
+        return true;
+    }
+
     if (type == "import_makerworld") {
         const bool has_id = action.contains("design_id") && action["design_id"].is_string()
             && !action["design_id"].get<std::string>().empty();

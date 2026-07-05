@@ -74,6 +74,11 @@ struct ModelAnalysis {
     double bed_scale_factor{ 1.0 }; // 1.0 = fits; lower means scale down needed
     std::string suggested_orientation_hint;
     std::string suggested_material; // PLA, PETG, ABS, TPU
+
+    // Phase 5 stability mirror fields (populated by GeometryAssessmentProducer; additive).
+    bool   stability_known{ false };      // false => leave stability-based scoring untouched
+    double tip_over_risk{ 0.0 };          // 0..1
+    double base_contact_area_mm2{ 0.0 };  // XY-union area of resting facets
 };
 
 struct PrintInsight {

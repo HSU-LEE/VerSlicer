@@ -27,6 +27,7 @@ const OllamaActionTypeSpec kActionTypes[] = {
     {"slice", true, false, false, "Slice current plate", "슬라이스"},
     {"add_model", true, false, false, "Import local model file", "로컬 모델 추가"},
     {"makerworld_search", true, false, false, "Search MakerWorld catalog", "MakerWorld 검색"},
+    {"makerworld_find_and_print", true, false, false, "Search MakerWorld top 3 and print", "MakerWorld 검색 후 출력"},
     {"import_makerworld", true, false, false, "Import from MakerWorld", "MakerWorld 가져오기"},
     {"open_smart_print", true, false, true, "Open Smart Print tab/panel", "스마트 프린트 열기"},
     {"open_setup", true, false, true, "Open Smart Print setup wizard", "프린터 설정/연결"},

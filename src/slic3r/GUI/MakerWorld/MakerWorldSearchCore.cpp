@@ -1,5 +1,7 @@
 #include "MakerWorldSearchCore.hpp"
 
+#include <boost/log/trivial.hpp>
+
 #include <boost/algorithm/string.hpp>
 #include <nlohmann/json.hpp>
 
@@ -285,7 +287,7 @@ std::string normalize_makerworld_search_query(const std::string& user_text)
         "가져와줘", "가져와", "불러와줘", "불러와", "다운로드해줘", "다운로드",
         "해주세요", "해 주세요", "해줘", "해 줘", "주세요", "좀", "제발",
         "하고 싶어", "하고싶어", "싶어", "싶은", "보고 싶", "보고싶",
-        "모델", "디자인", "작품", "프린트", "출력물",
+        "모델", "디자인", "작품", "프린트", "출력물", "출력", "인쇄", "만들어",
     };
     static const char* kStripEn[] = {
         "makerworld", "bambu lab", "bambu", "search", "find", "look for", "get me", "show me",
@@ -353,6 +355,7 @@ std::vector<MakerWorldCandidate> parse_hits_json(const std::string& body)
             if (h.is_object())
                 parse_one_hit(h, out);
     } catch (...) {
+        BOOST_LOG_TRIVIAL(warning) << "[MakerWorld] search hits JSON parse failed; returning no candidates";
     }
     return out;
 }

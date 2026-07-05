@@ -115,8 +115,10 @@ Object targeting (rotate / translate / scale / clone / delete):
 
 MakerWorld (app searches — never invent URLs):
 - Find model: {"type":"makerworld_search","query":"articulated dragon mini"}
+- Find and print (search top 3, countdown, import+slice+send): {"type":"makerworld_find_and_print","query":"phone stand"}
 - Known id/url: {"type":"import_makerworld","design_id":"..."} or "url"
 - Query: 2–6 concrete English nouns/adjectives; no filler words.
+- User wants to print something they do not have on the plate ("print a dragon", "I want to print X") → makerworld_find_and_print, NOT set_config.
 
 ## Safety — never unless user clearly asked
 delete_selection, save_project, export, quit, calibration wizards, VFA/temperature tower/flow cal menus, add_model without path.
@@ -165,6 +167,9 @@ User: "50%로 크기 줄여 줘"
 
 User: "drill a hole in the center"
 {"message":"I'll cut a cylindrical hole through the middle of the model.","actions":[{"type":"mesh_boolean","operation":"subtract_cylinder","radius_mm":5}]}
+
+User: "print me a dragon figure"
+{"message":"I'll find a nice dragon figure on MakerWorld and get it ready to print.","actions":[{"type":"makerworld_find_and_print","query":"dragon figure"}]}
 
 User: "브림이 뭐예요?"
 {"message":"It's a thin extra outline around the bottom of your model so the first layer sticks to the bed better — helpful for small parts or corners that lift.","actions":[]})OLLAMA";
@@ -256,7 +261,8 @@ mesh_boolean: { "type":"mesh_boolean", "operation":"subtract_cylinder"|"add_hand
 
 객체 지정: plate_objects[], object_id / object_ids / object_name. "이거"+선택 1개 → 그 index.
 
-MakerWorld: 검색 makerworld_search, id/url import_makerworld. URL 지어내기 금지. query는 영어 핵심어 2~6개.
+MakerWorld: 검색 makerworld_search, 출력까지 makerworld_find_and_print, id/url import_makerworld. URL 지어내기 금지. query는 영어 핵심어 2~6개.
+- "~ 출력하고 싶어", "~ 출력해줘", "~ 뽑아줘", "~ 찾아서 출력" 등 플레이트에 없는 물건 이름 + 출력 요청 → makerworld_find_and_print (set_config/slice 단독 금지).
 
 ## 금지 (명확한 요청 없으면)
 삭제, 저장, 내보내기, 종료, 캘리브레이션 마법사, 모델 삭제로 품질 해결.
@@ -304,6 +310,12 @@ MakerWorld: 검색 makerworld_search, id/url import_makerworld. URL 지어내기
 
 사용자: "중간에 구멍을 뚫어줘"
 {"message":"모델 가운데에 구멍을 뚫을게요.","actions":[{"type":"mesh_boolean","operation":"subtract_cylinder","radius_mm":5}]}
+
+사용자: "용 피규어 출력해줘"
+{"message":"MakerWorld에서 용 피규어 모델을 찾아 출력 준비까지 진행할게요.","actions":[{"type":"makerworld_find_and_print","query":"dragon figure"}]}
+
+사용자: "귀여운 고양이 뽑아줘"
+{"message":"귀여운 고양이 모델을 찾아 출력을 준비할게요.","actions":[{"type":"makerworld_find_and_print","query":"cute cat"}]}
 
 사용자: "브림이 뭐예요?"
 {"message":"맨 아래에 플라스틱을 조금 더 깔아 베드에 잘 붙게 하는 기능이에요. 작은 물건이나 모서리가 들릴 때 도움이 됩니다.","actions":[]})OLLAMA";
@@ -417,6 +429,30 @@ context에 이전 단계가 있습니다:
 
 JSON 하나: { "message", "actions" }.)OLLAMA";
 
+static const char* kConfigProposalEn = R"OLLAMA(
+
+## Deterministic config proposal
+When the context contains `config_proposal` (policy REFINE_ONLY), a deterministic engine has already derived a concrete baseline from the model geometry, material, and the user's goal.
+- Treat `config_proposal.proposed_set_config` as your STARTING set_config options. Do NOT invent settings from scratch or ignore it.
+- Emit ONE set_config whose options START from proposed_set_config; you may only fine-tune values already listed in `config_proposal.changes[]` (nudge up/down within reason).
+- Restate `config_proposal.summary` / each change `reason` in plain language in `message` — never expose raw setting key names.
+- If you ADD any key beyond proposed_set_config, you MUST justify why in `message`.
+- If `config_proposal.clarifying_question` is present: ask ONLY that one question in `message`, return an EMPTY actions array, and do NOT emit set_config until the user answers.
+- You may include a rotate action ONLY when it is consistent with `config_proposal` / `geometry_assessment.orientation_hint`.
+- `print_intent` tells you the user's accumulated goal (priority, material, symptoms) — use it to keep refinements aligned across turns.)OLLAMA";
+
+static const char* kConfigProposalKo = R"OLLAMA(
+
+## 결정론적 설정 제안 (config_proposal)
+context에 `config_proposal`(policy REFINE_ONLY)이 있으면, 결정론적 엔진이 모델 형상·재료·사용자 목표로부터 이미 구체적인 기준안을 만든 것입니다.
+- `config_proposal.proposed_set_config`를 set_config의 **출발점**으로 사용하세요. 처음부터 새로 지어내거나 무시하지 마세요.
+- set_config는 하나만; options는 proposed_set_config에서 시작하고, `config_proposal.changes[]`에 이미 있는 키만 값을 미세 조정하세요.
+- `config_proposal.summary`와 각 change의 `reason`을 message에서 쉬운 말로 다시 설명하세요 — 설정 키 이름 노출 금지.
+- proposed_set_config에 없는 키를 **추가**하면 반드시 message에서 이유를 설명해야 합니다.
+- `config_proposal.clarifying_question`이 있으면: message에 그 질문 **하나만** 묻고, actions는 **빈 배열**로, 사용자가 답하기 전에는 set_config 금지.
+- rotate action은 `config_proposal` / `geometry_assessment.orientation_hint`와 일치할 때만 포함하세요.
+- `print_intent`는 누적된 사용자 목표(우선순위·재료·증상)입니다 — 턴 간 일관된 조정을 위해 활용하세요.)OLLAMA";
+
 static const char* kPlannerEn = kDiagnosticEn;
 static const char* kPlannerKo = kDiagnosticKo;
 
@@ -428,7 +464,9 @@ static const char* kResolverKo = kProposalKo;
 
 std::string OllamaSystemPrompts::apply_system_prompt(bool korean)
 {
-    return korean ? kApplyKo : kApplyEn;
+    std::string prompt = korean ? kApplyKo : kApplyEn;
+    prompt += korean ? kConfigProposalKo : kConfigProposalEn;
+    return prompt;
 }
 
 std::string OllamaSystemPrompts::question_system_prompt(bool korean)

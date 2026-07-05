@@ -1,45 +1,49 @@
 #include "OllamaChatPanel.hpp"
-#include "OllamaActionCritic.hpp"
 #include "OllamaActionExecutor.hpp"
 #include "OllamaActionPipeline.hpp"
-#include "BambuLabWikiSearch.hpp"
-#include "OllamaDiagnosticPipeline.hpp"
 #include "OllamaIntentContext.hpp"
 #include "OllamaModelPick.hpp"
 #include "OllamaServerManager.hpp"
 #include "OllamaActionWorkflow.hpp"
 #include "OllamaAgentGoalPlanner.hpp"
 #include "OllamaAgentStateService.hpp"
-#include "OllamaAssistRouter.hpp"
 #include "OllamaConfig.hpp"
 #include "OllamaExecutionPolicy.hpp"
 #include "OllamaProcessingNotice.hpp"
-#include "OllamaSettingDescriptions.hpp"
-#include "OllamaSettingSearch.hpp"
 #include "OllamaToolResult.hpp"
 #include "OllamaPrintingTips.hpp"
-#include "OllamaRequestRouter.hpp"
-#include "OllamaResponseNormalizer.hpp"
 #include "OllamaTelemetry.hpp"
 #include "OllamaUserFlow.hpp"
 #include "OllamaVoiceTranscript.hpp"
+#include "OllamaSendRouter.hpp"
 #include "../MakerWorld/MakerWorldImportFlow.hpp"
-#include "../MakerWorld/MakerWorldSearchService.hpp"
+#include "../MakerWorld/MakerWorldIntent.hpp"
 #include "../MakerWorld/MakerWorldTypes.hpp"
 #include "../MakerWorld/MakerWorldUrl.hpp"
 
 #include "../BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "../BambuSmartPrint/PrintPlannerGui.hpp"
+#include "../AIPipeline/PrintJob.hpp"
+#include "../AIPipeline/PrintJobOrchestrator.hpp"
+#include "../AIPipeline/PrintJobState.hpp"
+#include "../AIPipeline/PrintJobUiAdapter.hpp"
+#include "AiLocale.hpp"
+#include "OllamaChatMessageList.hpp"
+#include "OllamaConfigProposalBuilder.hpp"
 #include "libslic3r/BambuSmartPrint/PrintGoalParser.hpp"
 #include "libslic3r/BambuSmartPrint/PrintGoalSession.hpp"
+#include "libslic3r/BambuSmartPrint/PrintIntentSession.hpp"
 #include "libslic3r/BambuSmartPrint/PrintPlanner.hpp"
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
 #include "../Plater.hpp"
 #include "../Widgets/Button.hpp"
+#include "../Widgets/ComboBox.hpp"
+#include "../Widgets/ProgressBar.hpp"
 #include "../Widgets/TextInput.hpp"
 
-#include <wx/choice.h>
+#include <wx/control.h>
+#include <wx/dcclient.h>
 #include <wx/sizer.h>
 #include <wx/textctrl.h>
 #include <wx/stattext.h>
@@ -50,6 +54,7 @@
 #include <wx/weakref.h>
 
 #include <boost/algorithm/string.hpp>
+#include <boost/log/trivial.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -67,7 +72,6 @@ constexpr const char* kModeApply         = "apply";
 constexpr const char* kModeAssist        = "assist";
 constexpr const char* kModeQuestion      = "question";
 constexpr int         kMaxModelPollFailures = 12;
-constexpr size_t      kMaxHistoryChars      = 48000;
 constexpr size_t      kMaxContextChars      = 8000;
 
 std::string extract_first_url_from_text(const std::string& text)
@@ -116,14 +120,9 @@ static bool looks_like_json_parse_error(const std::string& what)
         || what.find("balanced JSON") != std::string::npos;
 }
 
-static bool ui_is_korean()
-{
-    return wxGetApp().current_language_code().StartsWith("ko");
-}
-
 static wxString format_chat_error(const std::string& raw)
 {
-    const bool ko = ui_is_korean();
+    const bool ko = AiLocale::korean();
     if (raw.find("Connection refused") != std::string::npos || raw.find("connection refused") != std::string::npos
         || raw.find("Could not connect") != std::string::npos || raw.find("Failed to connect") != std::string::npos)
         return ko ? wxString::FromUTF8("AI에 연결할 수 없습니다. Ollama가 실행 중인지 확인해 주세요.")
@@ -161,17 +160,17 @@ static wxString format_assistant_failure(const std::string& what, const std::str
             display = display.Left(600) + "\n…";
         if (parse_error) {
             display += "\n\n"
-                + (ui_is_korean()
+                + (AiLocale::korean()
                        ? wxString::FromUTF8("설명은 위와 같습니다. 자동 적용은 되지 않았어요 — '브림 켜 줘'처럼 다시 요청해 보세요.")
                        : _L("See above for the explanation. To apply automatically, try a direct request like “turn on brim”."));
         } else if (apply_mode) {
             display += "\n\n"
-                + (ui_is_korean()
+                + (AiLocale::korean()
                        ? wxString::FromUTF8("위 내용은 참고용입니다. 자동 적용이 되지 않았어요 — 플레이트에서 모델을 선택한 뒤 다시 시도해 주세요.")
                        : _L("See above for context. It wasn't applied automatically — select a model on the plate and try again."));
         } else {
             display += "\n\n"
-                + (ui_is_korean()
+                + (AiLocale::korean()
                        ? wxString::FromUTF8("답변 중 일부를 처리하지 못했습니다. 질문을 다시 보내 보세요.")
                        : _L("Part of the reply couldn't be processed. Try sending your question again."));
         }
@@ -179,7 +178,7 @@ static wxString format_assistant_failure(const std::string& what, const std::str
     }
 
     if (parse_error)
-        return ui_is_korean()
+        return AiLocale::korean()
             ? wxString::FromUTF8("응답을 이해하지 못했습니다. '브림 켜 줘'처럼 짧게 다시 보내 보세요.")
             : _L("Couldn't understand the reply. Try a short request like “turn on brim”.");
 
@@ -187,47 +186,47 @@ static wxString format_assistant_failure(const std::string& what, const std::str
     if (mapped != wxString::FromUTF8(what))
         return mapped;
 
-    return ui_is_korean() ? wxString::FromUTF8("문제가 발생했습니다. 잠시 후 다시 시도해 주세요.")
+    return AiLocale::korean() ? wxString::FromUTF8("문제가 발생했습니다. 잠시 후 다시 시도해 주세요.")
                           : _L("Something went wrong. Try again in a moment.");
 }
 
 static wxString change_not_applied_msg()
 {
-    return ui_is_korean()
+    return AiLocale::korean()
         ? wxString::FromUTF8("아직 적용되지 않았습니다. 플레이트에서 모델을 선택하거나, '브림 켜 줘'처럼 구체적으로 말씀해 주세요.")
         : _L("That wasn't applied yet. Select a model on the plate, or try a clearer request like “turn on brim”.");
 }
 
 static wxString cancelled_no_changes_msg()
 {
-    return ui_is_korean() ? wxString::FromUTF8("취소되었습니다 — 변경 사항은 없습니다.")
+    return AiLocale::korean() ? wxString::FromUTF8("취소되었습니다 — 변경 사항은 없습니다.")
                           : _L("Cancelled — nothing was changed.");
 }
 
 static wxString preview_only_msg()
 {
-    return ui_is_korean()
+    return AiLocale::korean()
         ? wxString::FromUTF8("미리보기만 표시되었습니다. 비교 창을 닫은 뒤 적용 여부를 확인해 주세요.")
         : _L("Preview only — close the compare dialog to finish or cancel.");
 }
 
 static wxString nothing_applied_msg()
 {
-    return ui_is_korean()
+    return AiLocale::korean()
         ? wxString::FromUTF8("적용된 변경이 없습니다. 플레이트에서 모델을 선택한 뒤 다시 시도해 주세요.")
         : _L("Nothing was applied. Select a model on the plate and try again.");
 }
 
 static wxString manual_instruction_msg()
 {
-    return ui_is_korean()
+    return AiLocale::korean()
         ? wxString::FromUTF8("자동으로 적용하지 못했습니다. 플레이트에서 모델을 선택하거나, 적용 모드에서 더 구체적으로 요청해 주세요.")
         : _L("Couldn't apply that automatically. Select a model on the plate, or try a more specific request in Apply mode.");
 }
 
 static wxString question_mode_actions_skipped_msg()
 {
-    return ui_is_korean() ? wxString::FromUTF8("(질문 모드 — 제안된 변경은 적용하지 않았습니다.)")
+    return AiLocale::korean() ? wxString::FromUTF8("(질문 모드 — 제안된 변경은 적용하지 않았습니다.)")
                           : _L("(Question mode — suggested changes were not applied.)");
 }
 
@@ -244,61 +243,6 @@ static bool result_message_looks_jargon(const std::string& m)
             return true;
     }
     return m.find('_') != std::string::npos && m.find(' ') == std::string::npos;
-}
-
-static wxString thinking_diagnosis_lines(const OllamaDiagnosis& diagnosis, bool ko)
-{
-    wxString out;
-    if (!diagnosis.symptom.empty())
-        out += (ko ? wxString::FromUTF8("  증상: ") : wxString("  What you reported: "))
-             + wxString::FromUTF8(diagnosis.symptom) + "\n";
-    if (!diagnosis.diagnosis.empty())
-        out += (ko ? wxString::FromUTF8("  원인 추정: ") : wxString("  Likely cause: "))
-             + wxString::FromUTF8(diagnosis.diagnosis) + "\n";
-    if (!diagnosis.user_message.empty())
-        out += wxString("  ") + wxString::FromUTF8(diagnosis.user_message) + "\n";
-    return out;
-}
-
-static wxString thinking_wiki_lines(const nlohmann::json& wiki, bool ko)
-{
-    wxString out;
-    if (!wiki.is_array())
-        return out;
-    for (const auto& item : wiki) {
-        if (!item.is_object() || !item.contains("title") || !item["title"].is_string())
-            continue;
-        const wxString title = wxString::FromUTF8(item["title"].get<std::string>());
-        out += (ko ? wxString::FromUTF8("  참고 자료: ") : wxString("  Reference: ")) + title + "\n";
-    }
-    return out;
-}
-
-static wxString thinking_settings_lines(const nlohmann::json& analysis, bool ko)
-{
-    wxString out;
-    if (!analysis.contains("relevant_settings") || !analysis["relevant_settings"].is_array())
-        return out;
-    for (const auto& row : analysis["relevant_settings"]) {
-        if (!row.is_object() || !row.contains("key"))
-            continue;
-        const std::string key_raw = row.value("key", "");
-        const wxString    label   = wxString::FromUTF8(OllamaSettingDescriptions::setting_label(key_raw, ko));
-        wxString          cur;
-        if (row.contains("current") && row["current"].is_string())
-            cur = wxString::FromUTF8(OllamaSettingDescriptions::format_value(
-                key_raw, row["current"].get<std::string>(), ko));
-        else if (row.contains("current") && !row["current"].is_null())
-            cur = wxString::FromUTF8(row["current"].dump());
-        const wxString note = row.contains("assessment") && row["assessment"].is_string()
-            ? wxString::FromUTF8(row["assessment"].get<std::string>())
-            : wxString{};
-        if (cur.IsEmpty())
-            out += wxString::Format("  %s — %s\n", label, note);
-        else
-            out += wxString::Format("  %s: %s — %s\n", label, cur, note);
-    }
-    return out;
 }
 
 static wxString strip_leading_list_numbering(const wxString& line)
@@ -348,7 +292,7 @@ static wxString summarize_applied_changes(const std::string& /*user_req*/,
         }
         return saw_success;
     };
-    const bool ko = ui_is_korean();
+    const bool ko = AiLocale::korean();
     if (!had_effective_change()) {
         if (had_noop_only())
             return ko ? wxString::FromUTF8("요청하신 값과 동일해서 변경하지 않았습니다.")
@@ -447,6 +391,7 @@ static std::string assistant_history_content(const std::string& assistant_text, 
         if (hist.contains("message") && hist["message"].is_string())
             return hist["message"].get<std::string>();
     } catch (...) {
+        BOOST_LOG_TRIVIAL(warning) << "Ollama chat: failed to strip actions from question history";
     }
     return std::string("(assistant reply — actions omitted from history)");
 }
@@ -473,52 +418,36 @@ static void drop_last_assistant_message(std::vector<OllamaMessage>& messages)
     }
 }
 
-static wxString last_assistant_message(const wxString& chat)
-{
-    const wxString marker = _L("Assistant") + wxT("\n");
-    wxString       last_line;
-    int            offset = 0;
-    while (true) {
-        const int p = chat.Mid(offset).Find(marker);
-        if (p == wxNOT_FOUND)
-            break;
-        const int abs = offset + p + static_cast<int>(marker.length());
-        last_line     = chat.Mid(abs).BeforeFirst('\n').Trim();
-        offset        = abs;
-    }
-    return last_line;
-}
-
 static wxString completion_status_for_reply(const wxString& reply, bool apply_mode)
 {
     if (!apply_mode)
-        return ui_is_korean() ? wxString::FromUTF8("답변 완료") : _L("Answer ready");
+        return AiLocale::korean() ? wxString::FromUTF8("답변 완료") : _L("Answer ready");
 
     if (reply.IsEmpty())
-        return ui_is_korean() ? wxString::FromUTF8("완료") : _L("Done");
+        return AiLocale::korean() ? wxString::FromUTF8("완료") : _L("Done");
 
     if (reply.Contains(_L("No models found")) || reply.Contains(wxString::FromUTF8("모델을 찾지 못")))
-        return ui_is_korean() ? wxString::FromUTF8("MakerWorld 검색 완료 — 결과 없음")
+        return AiLocale::korean() ? wxString::FromUTF8("MakerWorld 검색 완료 — 결과 없음")
                               : _L("MakerWorld: no models found");
 
     if (reply.Contains(_L("Search cancelled")) || reply.Contains(_L("Import cancelled")))
-        return ui_is_korean() ? wxString::FromUTF8("취소됨") : _L("Cancelled");
+        return AiLocale::korean() ? wxString::FromUTF8("취소됨") : _L("Cancelled");
 
     if (reply.Contains(_L("Model loaded")) || reply.Contains(wxString::FromUTF8("불러왔")))
-        return ui_is_korean() ? wxString::FromUTF8("모델 불러오기 완료") : _L("Model loaded");
+        return AiLocale::korean() ? wxString::FromUTF8("모델 불러오기 완료") : _L("Model loaded");
 
     if (reply.Contains(_L("Import failed")) || reply.Contains(wxString::FromUTF8("가져오기 실패")))
-        return ui_is_korean() ? wxString::FromUTF8("가져오기 실패") : _L("Import failed");
+        return AiLocale::korean() ? wxString::FromUTF8("가져오기 실패") : _L("Import failed");
 
     if (reply.Contains(_L("Found ")) && reply.Contains(_L("models on MakerWorld")))
-        return ui_is_korean() ? wxString::FromUTF8("MakerWorld 검색 완료") : _L("MakerWorld search done");
+        return AiLocale::korean() ? wxString::FromUTF8("MakerWorld 검색 완료") : _L("MakerWorld search done");
 
     if (reply.Contains(_L("Cancelled")) || reply.Contains(wxString::FromUTF8("취소")))
-        return ui_is_korean() ? wxString::FromUTF8("취소됨") : _L("Cancelled");
+        return AiLocale::korean() ? wxString::FromUTF8("취소됨") : _L("Cancelled");
 
     if (reply.Contains(_L("Nothing was applied")) || reply.Contains(_L("wasn't applied"))
         || reply.Contains(wxString::FromUTF8("적용되지 않")) || reply.Contains(wxString::FromUTF8("아직 적용")))
-        return ui_is_korean() ? wxString::FromUTF8("적용된 변경 없음") : _L("Nothing applied");
+        return AiLocale::korean() ? wxString::FromUTF8("적용된 변경 없음") : _L("Nothing applied");
 
     if (reply.Contains(wxString::FromUTF8("분할")) || reply.Contains(_L("Split"))
         || reply.Contains(wxString::FromUTF8("구멍")) || reply.Contains(_L("Drilled a hole"))
@@ -526,27 +455,108 @@ static wxString completion_status_for_reply(const wxString& reply, bool apply_mo
         || reply.Contains(wxString::FromUTF8("메쉬")) || reply.Contains(_L("Repaired the mesh"))
         || reply.Contains(wxString::FromUTF8("회전")) || reply.Contains(_L("Rotated"))
         || reply.Contains(wxString::FromUTF8("크기를 조정")) || reply.Contains(_L("Resized the model")))
-        return ui_is_korean() ? wxString::FromUTF8("모델 수정 완료") : _L("Model edit done");
+        return AiLocale::korean() ? wxString::FromUTF8("모델 수정 완료") : _L("Model edit done");
 
     if (reply.Contains(wxString::FromUTF8("브림")) || reply.Contains(wxString::FromUTF8("서포트"))
         || reply.Contains(wxString::FromUTF8("속도")) || reply.Contains(wxString::FromUTF8("켰"))
         || reply.Contains(wxString::FromUTF8("업데이트")) || reply.Contains(_L("Enabled brim"))
         || reply.Contains(_L("Print settings updated")))
-        return ui_is_korean() ? wxString::FromUTF8("설정 반영 완료") : _L("Settings updated");
+        return AiLocale::korean() ? wxString::FromUTF8("설정 반영 완료") : _L("Settings updated");
 
     if (reply.Contains(wxString::FromUTF8("크기")) || reply.Contains(_L("Resized")))
-        return ui_is_korean() ? wxString::FromUTF8("모델 수정 완료") : _L("Model edit done");
+        return AiLocale::korean() ? wxString::FromUTF8("모델 수정 완료") : _L("Model edit done");
 
     if (reply.Contains(_L("couldn't understand")) || reply.Contains(wxString::FromUTF8("이해하지 못했")))
-        return ui_is_korean() ? wxString::FromUTF8("다시 입력해 주세요") : _L("Try again");
+        return AiLocale::korean() ? wxString::FromUTF8("다시 입력해 주세요") : _L("Try again");
 
     if (reply.Contains(wxString::FromUTF8("플레이트")) || reply.Contains(_L("build plate")))
-        return ui_is_korean() ? wxString::FromUTF8("플레이트 추가 완료") : _L("Plate added");
+        return AiLocale::korean() ? wxString::FromUTF8("플레이트 추가 완료") : _L("Plate added");
 
-    return ui_is_korean() ? wxString::FromUTF8("완료") : _L("Done");
+    return AiLocale::korean() ? wxString::FromUTF8("완료") : _L("Done");
 }
 
+// Strip a trailing incomplete UTF-8 sequence so a partial stream buffer can be
+// converted without wxString::FromUTF8 rejecting the whole string.
+static std::string utf8_complete_prefix(std::string s)
+{
+    size_t i = s.size();
+    size_t trailing = 0;
+    while (i > 0 && trailing < 4) {
+        const unsigned char c = static_cast<unsigned char>(s[i - 1]);
+        if ((c & 0x80) == 0)
+            return s; // ends on ASCII — complete
+        if ((c & 0xC0) == 0xC0) {
+            // Lead byte: check whether its sequence is complete.
+            size_t need = 2;
+            if ((c & 0xF0) == 0xE0)
+                need = 3;
+            else if ((c & 0xF8) == 0xF0)
+                need = 4;
+            if (trailing + 1 < need)
+                s.resize(i - 1); // incomplete sequence — drop it
+            return s;
+        }
+        // Continuation byte — keep scanning backwards.
+        ++trailing;
+        --i;
+    }
+    return s;
+}
+
+// Best-effort live preview of a streaming reply: JSON replies stream the
+// partial "message" string value; plain-text replies stream verbatim.
+static wxString streaming_preview_text(const std::string& buf)
+{
+    std::string t = buf;
+    boost::trim_left(t);
+    const bool looks_json = !t.empty() && (t[0] == '{' || t.rfind("```", 0) == 0);
+    if (!looks_json)
+        return wxString::FromUTF8(utf8_complete_prefix(buf));
+
+    const size_t key = t.find("\"message\"");
+    if (key == std::string::npos)
+        return {};
+    const size_t colon = t.find(':', key + 9);
+    if (colon == std::string::npos)
+        return {};
+    const size_t quote = t.find('"', colon + 1);
+    if (quote == std::string::npos)
+        return {};
+    std::string out;
+    bool        esc = false;
+    for (size_t i = quote + 1; i < t.size(); ++i) {
+        const char c = t[i];
+        if (esc) {
+            switch (c) {
+            case 'n': out += '\n'; break;
+            case 't': out += '\t'; break;
+            case 'r': break;
+            default: out += c; break;
+            }
+            esc = false;
+            continue;
+        }
+        if (c == '\\') {
+            esc = true;
+            continue;
+        }
+        if (c == '"')
+            break;
+        out += c;
+    }
+    return wxString::FromUTF8(utf8_complete_prefix(out));
+}
+
+// Most recently created panel; the agent loop routes makerworld_find_and_print
+// through it so the orchestrator always runs with real chat/busy callbacks.
+OllamaChatPanel* g_active_chat_panel = nullptr;
+
 } // namespace
+
+OllamaChatPanel* OllamaChatPanel::active_panel()
+{
+    return g_active_chat_panel;
+}
 
 static bool process_makerworld_actions(nlohmann::json& root, wxWindow* parent, bool apply_mode,
                                        const std::string& user_req, MakerWorldFlowUiCallbacks callbacks)
@@ -557,37 +567,12 @@ static bool process_makerworld_actions(nlohmann::json& root, wxWindow* parent, b
     bool handled = false;
     nlohmann::json kept = nlohmann::json::array();
     for (const auto& action : root["actions"]) {
-        if (!action.is_object() || !action.contains("type") || !action["type"].is_string()) {
+        // Route MakerWorld actions through the shared executor helper so the single-shot
+        // chat path and the agent loop stay in sync (see MakerWorldImportFlow::run_agent_action).
+        if (MakerWorldImportFlow::run_agent_action(action, parent, apply_mode, user_req, callbacks))
+            handled = true;
+        else
             kept.push_back(action);
-            continue;
-        }
-        const std::string type = action["type"].get<std::string>();
-        if (type == "makerworld_search") {
-            std::string query = action.value("query", "");
-            if (query.empty())
-                query = MakerWorldSearchService::normalize_search_query(user_req);
-            MakerWorldImportFlow::run_search_from_query(parent, query, apply_mode, callbacks);
-            handled = true;
-            continue;
-        }
-        if (type == "import_makerworld") {
-            if (!apply_mode) {
-                if (callbacks.append_chat)
-                    callbacks.append_chat(_L("Switch to Apply mode to import a MakerWorld model."));
-            } else if (action.contains("url") && action["url"].is_string()) {
-                MakerWorldImportFlow::run_import_from_user_text(parent, action["url"].get<std::string>(), true,
-                                                                callbacks);
-            } else {
-                MakerWorldCandidate c;
-                c.design_id = action.value("design_id", "");
-                c.title     = action.value("title", "model_" + c.design_id);
-                if (!c.design_id.empty())
-                    MakerWorldImportFlow::confirm_and_import(parent, c, true, callbacks);
-            }
-            handled = true;
-            continue;
-        }
-        kept.push_back(action);
     }
     root["actions"] = kept;
     return handled;
@@ -610,7 +595,7 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
         auto* header_sizer = new wxBoxSizer(wxHORIZONTAL);
         m_collapse_btn     = new wxButton(m_header, wxID_ANY, "–", wxDefaultPosition, wxSize(FromDIP(26), FromDIP(22)));
         m_title            = new wxStaticText(m_header, wxID_ANY,
-            wxGetApp().current_language_code().StartsWith("ko") ? wxString::FromUTF8("AI 도우미")
+            AiLocale::korean() ? wxString::FromUTF8("AI 도우미")
                                                                 : _L("AI Assistant"));
         m_title->SetForegroundColour(SlicePilotUi::Theme::text());
         header_sizer->Add(m_collapse_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(6));
@@ -633,25 +618,29 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     auto* model_key = new wxStaticText(m_body, wxID_ANY, _L("Model"));
     model_key->SetForegroundColour(SlicePilotUi::Theme::text_muted());
     model_key->SetFont(Label::Body_13);
-    m_model_label = new wxStaticText(m_body, wxID_ANY, wxString::FromUTF8(kOllamaDefaultModel));
-    m_model_label->SetForegroundColour(SlicePilotUi::Theme::text());
-    m_model_label->SetFont(Label::Body_13);
+    m_model_combo = new ComboBox(m_body, wxID_ANY, wxEmptyString, wxDefaultPosition,
+                                 wxSize(FromDIP(150), row_h), 0, nullptr, wxCB_READONLY);
+    SlicePilotUi::style_orca_combobox(m_model_combo);
+    m_model_combo->SetFont(Label::Body_13);
+    m_model_combo->GetDropDown().SetFont(Label::Body_13);
+    m_model_combo->Append(wxString::FromUTF8(kOllamaDefaultModel));
+    SlicePilotUi::sync_combobox_selection(m_model_combo, 0);
     toolbar->Add(model_key, 0, wxALIGN_CENTER_VERTICAL);
-    toolbar->Add(m_model_label, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(4));
+    toolbar->Add(m_model_combo, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(4));
 
     toolbar->AddStretchSpacer(1);
 
     m_mode_label = new wxStaticText(m_body, wxID_ANY, _L("Mode"));
     m_mode_label->SetForegroundColour(SlicePilotUi::Theme::text_muted());
     m_mode_label->SetFont(Label::Body_13);
-    m_mode_choice = new wxChoice(m_body, wxID_ANY);
-    m_mode_choice->Append(_L("Question"));
-    m_mode_choice->Append(_L("Assist"));
-    m_mode_choice->SetMinSize(wxSize(FromDIP(96), row_h));
-    m_mode_choice->SetFont(Label::Body_13);
-    m_mode_choice->SetBackgroundColour(SlicePilotUi::Theme::background());
-    m_mode_choice->SetForegroundColour(SlicePilotUi::Theme::text());
-    wxGetApp().UpdateDarkUI(m_mode_choice);
+    m_mode_combo = new ComboBox(m_body, wxID_ANY, wxEmptyString, wxDefaultPosition,
+                                wxSize(FromDIP(96), row_h), 0, nullptr, wxCB_READONLY);
+    SlicePilotUi::style_orca_combobox(m_mode_combo);
+    m_mode_combo->SetFont(Label::Body_13);
+    m_mode_combo->GetDropDown().SetFont(Label::Body_13);
+    m_mode_combo->Append(AiLocale::text(_L("Question"), "질문"));
+    m_mode_combo->Append(AiLocale::text(_L("Apply"), "적용"));
+    SlicePilotUi::sync_combobox_selection(m_mode_combo, 1);
 
     m_reset_btn = new Button(m_body, _L("Reset"));
     SlicePilotUi::style_secondary_button(m_reset_btn);
@@ -659,7 +648,7 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     SlicePilotUi::size_compact_toolbar_button(m_body, m_reset_btn);
 
     toolbar->Add(m_mode_label, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, gap);
-    toolbar->Add(m_mode_choice, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(4));
+    toolbar->Add(m_mode_combo, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(4));
     toolbar->Add(m_reset_btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(6));
     body_sizer->Add(toolbar, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, pad);
 
@@ -667,13 +656,45 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     toolbar_rule->SetBackgroundColour(SlicePilotUi::Theme::border());
     body_sizer->Add(toolbar_rule, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(6));
 
-    // Chat log (flat — same background as window)
-    m_history_ctrl = new wxTextCtrl(m_body, wxID_ANY, {}, wxDefaultPosition, wxDefaultSize,
-                                    wxTE_MULTILINE | wxTE_READONLY | wxTE_WORDWRAP | wxTE_RICH2 | wxBORDER_NONE);
-    m_history_ctrl->SetBackgroundColour(SlicePilotUi::Theme::background());
-    m_history_ctrl->SetForegroundColour(SlicePilotUi::Theme::text());
-    m_history_ctrl->SetFont(Label::Body_14);
-    body_sizer->Add(m_history_ctrl, 1, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(10));
+    // Chat transcript: bubble list (user right, assistant/system left)
+    m_history_list = new OllamaChatMessageList(m_body);
+    body_sizer->Add(m_history_list, 1, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(10));
+
+    // Pipeline progress strip (hidden unless an orchestrator job is active):
+    // step label + progress gauge + stop button.
+    m_pipeline_panel = new wxPanel(m_body, wxID_ANY);
+    m_pipeline_panel->SetBackgroundColour(SlicePilotUi::Theme::surface_alt());
+    {
+        auto* strip = new wxBoxSizer(wxHORIZONTAL);
+        m_pipeline_step_label = new wxStaticText(m_pipeline_panel, wxID_ANY, wxEmptyString,
+                                                 wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
+        m_pipeline_step_label->SetForegroundColour(SlicePilotUi::Theme::text());
+        m_pipeline_step_label->SetFont(Label::Body_13);
+        m_pipeline_step_label->SetBackgroundColour(SlicePilotUi::Theme::surface_alt());
+
+        const int gauge_h = FromDIP(8);
+        m_pipeline_gauge  = new ProgressBar(m_pipeline_panel, wxID_ANY, 100, wxDefaultPosition,
+                                            wxSize(FromDIP(120), gauge_h));
+        m_pipeline_gauge->SetMinSize(wxSize(FromDIP(120), gauge_h));
+        m_pipeline_gauge->SetRadius(gauge_h / 2.0);
+        m_pipeline_gauge->SetProgressBackgroundColour(SlicePilotUi::Theme::border());
+        m_pipeline_gauge->SetProgressForedColour(SlicePilotUi::Theme::primary());
+
+        m_pipeline_stop_btn = new Button(m_pipeline_panel, AiLocale::text(_L("Stop"), "중지"));
+        SlicePilotUi::style_secondary_button(m_pipeline_stop_btn);
+        m_pipeline_stop_btn->SetStyle(ButtonStyle::Regular, ButtonType::Compact);
+        SlicePilotUi::size_compact_toolbar_button(m_pipeline_panel, m_pipeline_stop_btn);
+
+        strip->Add(m_pipeline_step_label, 1, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(8));
+        strip->Add(m_pipeline_gauge, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(8));
+        strip->Add(m_pipeline_stop_btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, FromDIP(8));
+
+        auto* strip_col = new wxBoxSizer(wxVERTICAL);
+        strip_col->Add(strip, 0, wxEXPAND | wxTOP | wxBOTTOM, FromDIP(6));
+        m_pipeline_panel->SetSizer(strip_col);
+    }
+    m_pipeline_panel->Hide();
+    body_sizer->Add(m_pipeline_panel, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, pad);
 
     // Footer: input row + status (aligned under input, vertically centered)
     auto* footer_block = new wxBoxSizer(wxVERTICAL);
@@ -687,6 +708,11 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     m_input_ctrl->SetHint(wxEmptyString);
     wxGetApp().UpdateDarkUI(m_input_field);
     wxGetApp().UpdateDarkUI(m_input_ctrl);
+    // Re-elide the placeholder whenever the compose row is resized.
+    m_input_field->Bind(wxEVT_SIZE, [this](wxSizeEvent& evt) {
+        evt.Skip();
+        CallAfter([this]() { update_input_hint(); });
+    });
 
     footer_row->Add(m_input_field, 1, wxEXPAND | wxALIGN_CENTER_VERTICAL | wxRIGHT, gap);
 
@@ -705,7 +731,8 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     m_status_host->SetBackgroundColour(SlicePilotUi::Theme::background());
     auto* status_row = new wxBoxSizer(wxHORIZONTAL);
     m_status = new wxStaticText(m_status_host, wxID_ANY,
-                                ui_is_korean() ? wxString::FromUTF8("준비됨") : _L("Ready"));
+                                AiLocale::korean() ? wxString::FromUTF8("준비됨") : _L("Ready"),
+                                wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
     m_status->SetForegroundColour(SlicePilotUi::Theme::text_muted());
     m_status->SetFont(Label::Body_13);
     status_row->Add(m_status, 1, wxEXPAND | wxALIGN_CENTER_VERTICAL);
@@ -713,8 +740,6 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
 
     footer_block->Add(m_status_host, 0, wxEXPAND | wxTOP, FromDIP(6));
     body_sizer->Add(footer_block, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP | wxBOTTOM, pad);
-
-    wxGetApp().UpdateDarkUI(m_history_ctrl);
 
     m_body->SetSizer(body_sizer);
     topsizer->Add(m_body, 1, wxEXPAND);
@@ -726,7 +751,7 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     if (m_collapse_btn)
         m_collapse_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { set_collapsed(!m_collapsed); });
 
-    m_mode_choice->Bind(wxEVT_CHOICE, [this](wxCommandEvent& e) {
+    m_mode_combo->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent& e) {
         m_apply_mode = e.GetSelection() != 0;
         save_settings();
         refresh_mode_ui();
@@ -735,11 +760,26 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
         update_system_welcome_in_chat();
         e.Skip();
     });
+    m_model_combo->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent& e) {
+        const int sel = e.GetSelection();
+        if (sel >= 0 && sel < static_cast<int>(m_model_combo->GetCount())) {
+            m_model = normalize_ollama_model_tag(m_model_combo->GetString(static_cast<unsigned>(sel)).utf8_string());
+            if (m_assist_controller)
+                m_assist_controller->set_model(m_model);
+            save_settings();
+        }
+        e.Skip();
+    });
     m_reset_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { reset_conversation(); });
+    m_pipeline_stop_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        if (m_orchestrator && m_orchestrator->is_active())
+            m_orchestrator->cancel();
+        hide_pipeline_progress();
+    });
 
     load_settings();
     reset_conversation();
-    set_status_text(ui_is_korean() ? wxString::FromUTF8("준비됨") : _L("Ready"));
+    set_status_text(AiLocale::korean() ? wxString::FromUTF8("준비됨") : _L("Ready"));
 
     m_poll_timer = new wxTimer(this);
     m_poll_timer->Bind(wxEVT_TIMER, [this](wxTimerEvent&) {
@@ -748,16 +788,28 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
         refresh_models();
     });
 
+    g_active_chat_panel = this;
+
     ensure_ollama_running();
 }
 
 OllamaChatPanel::~OllamaChatPanel()
 {
+    if (g_active_chat_panel == this)
+        g_active_chat_panel = nullptr;
     m_alive->store(false);
     ++m_request_gen;
     OllamaClient::cancel_active_requests(OllamaCancelDomain::Chat);
-    if (m_assist_controller)
+    if (m_assist_controller) {
+        m_assist_controller->cancel();
         m_assist_controller.reset();
+    }
+    if (m_orchestrator) {
+        // Cancel any in-flight print job so pending searches stop and the shared
+        // import/slice registries are released before the panel goes away.
+        m_orchestrator->cancel();
+        m_orchestrator.reset();
+    }
     if (m_poll_timer) {
         m_poll_timer->Stop();
         m_poll_timer = nullptr;
@@ -789,73 +841,40 @@ void OllamaChatPanel::trim_message_history()
     m_messages.swap(trimmed);
 }
 
-void OllamaChatPanel::trim_history_display()
-{
-    if (m_persistent_chat.length() <= kMaxHistoryChars)
-        return;
-    m_persistent_chat = m_persistent_chat.Mid(m_persistent_chat.length() - static_cast<int>(kMaxHistoryChars));
-    refresh_chat_display();
-}
-
 wxString OllamaChatPanel::thinking_role_label() const
 {
-    return ui_is_korean() ? wxString::FromUTF8("처리 중…") : _L("Working…");
-}
-
-void OllamaChatPanel::refresh_chat_display()
-{
-    if (!m_history_ctrl)
-        return;
-    const wxString display = m_persistent_chat + m_thinking_block;
-    m_history_ctrl->ChangeValue(display);
-
-    const long persist_len = static_cast<long>(m_persistent_chat.length());
-    const long total_len   = static_cast<long>(display.length());
-    const wxTextAttr normal_attr(SlicePilotUi::Theme::text(), wxNullColour, m_history_ctrl->GetFont());
-    if (persist_len > 0)
-        m_history_ctrl->SetStyle(0, persist_len, normal_attr);
-    if (!m_thinking_block.IsEmpty() && total_len > persist_len) {
-        const wxTextAttr muted_attr(SlicePilotUi::Theme::text_muted(), wxNullColour, m_history_ctrl->GetFont());
-        m_history_ctrl->SetStyle(persist_len, total_len, muted_attr);
-    }
-
-    m_history_ctrl->ShowPosition(m_history_ctrl->GetLastPosition());
+    return AiLocale::korean() ? wxString::FromUTF8("처리 중") : _L("Working");
 }
 
 void OllamaChatPanel::begin_thinking_block()
 {
-    if (!m_thinking_block.IsEmpty())
+    if (!m_history_list || m_history_list->has_pending())
         return;
-    m_thinking_block = thinking_role_label() + "\n";
-    refresh_chat_display();
+    m_history_list->begin_pending(thinking_role_label());
 }
 
 void OllamaChatPanel::append_thinking_line(const wxString& line)
 {
-    if (line.IsEmpty())
+    if (line.IsEmpty() || !m_history_list)
         return;
-    begin_thinking_block();
-    m_thinking_block += line + "\n";
-    refresh_chat_display();
+    if (!m_history_list->has_pending())
+        m_history_list->begin_pending(thinking_role_label());
+    m_history_list->append_pending_line(line);
 }
 
 void OllamaChatPanel::append_thinking_text(const wxString& text)
 {
     if (text.IsEmpty())
         return;
-    begin_thinking_block();
-    m_thinking_block += text;
-    if (!text.EndsWith("\n"))
-        m_thinking_block += "\n";
-    refresh_chat_display();
+    wxString trimmed = text;
+    trimmed.Trim();
+    append_thinking_line(trimmed);
 }
 
 void OllamaChatPanel::clear_thinking_block()
 {
-    if (m_thinking_block.IsEmpty())
-        return;
-    m_thinking_block.Clear();
-    refresh_chat_display();
+    if (m_history_list)
+        m_history_list->clear_pending();
 }
 
 void OllamaChatPanel::submit_text_and_send(const wxString& text)
@@ -873,6 +892,14 @@ void OllamaChatPanel::set_input_text(const wxString& text)
         return;
     m_input_ctrl->SetValue(text);
     m_input_ctrl->SetFocus();
+}
+
+void OllamaChatPanel::focus_input()
+{
+    if (!m_input_ctrl)
+        return;
+    m_input_ctrl->SetFocus();
+    m_input_ctrl->SetInsertionPointEnd();
 }
 
 void OllamaChatPanel::set_collapsed(bool collapsed)
@@ -896,8 +923,22 @@ std::string OllamaChatPanel::resolve_installed_model(const std::vector<std::stri
 
 void OllamaChatPanel::update_model_label_ui()
 {
-    if (m_model_label)
-        m_model_label->SetLabel(wxString::FromUTF8(m_model));
+    if (!m_model_combo)
+        return;
+    // Rebuild the selector from the installed models; fall back to the single
+    // configured model while the list is still loading.
+    m_model_combo->Clear();
+    int sel = 0;
+    if (m_available_models.empty()) {
+        m_model_combo->Append(wxString::FromUTF8(m_model));
+    } else {
+        for (size_t i = 0; i < m_available_models.size(); ++i) {
+            m_model_combo->Append(wxString::FromUTF8(m_available_models[i]));
+            if (m_available_models[i] == m_model)
+                sel = static_cast<int>(i);
+        }
+    }
+    SlicePilotUi::sync_combobox_selection(m_model_combo, sel);
 }
 
 void OllamaChatPanel::load_settings()
@@ -919,8 +960,8 @@ void OllamaChatPanel::load_settings()
         m_apply_mode = false;
     else
         m_apply_mode = true;
-    if (m_mode_choice)
-        m_mode_choice->SetSelection(m_apply_mode ? 1 : 0);
+    if (m_mode_combo)
+        SlicePilotUi::sync_combobox_selection(m_mode_combo, m_apply_mode ? 1 : 0);
     refresh_mode_ui();
 }
 
@@ -937,49 +978,65 @@ void OllamaChatPanel::save_settings()
 wxString OllamaChatPanel::system_welcome_message() const
 {
     if (m_apply_mode) {
-        return ui_is_korean()
+        return AiLocale::korean()
             ? wxString::FromUTF8("적용 모드입니다. 회전·크기 조정, 구멍 뚫기, 들뜸·수축 줄이기처럼 원하는 결과를 말씀해 주세요.")
             : _L("Apply mode: say what you want — rotate, resize, drill a hole, fix warping, and more.");
     }
-    return ui_is_korean()
+    return AiLocale::korean()
         ? wxString::FromUTF8("질문 모드입니다. 인쇄·설정에 대해 물어보세요. 프로그램 설정은 바꾸지 않습니다.")
         : _L("Question mode: ask anything about printing. Nothing will be changed — you'll get a plain-language explanation.");
 }
 
 void OllamaChatPanel::refresh_mode_ui()
 {
-    if (m_mode_choice) {
+    if (m_mode_combo) {
         const int sel = m_apply_mode ? 1 : 0;
-        if (m_mode_choice->GetSelection() != sel)
-            m_mode_choice->SetSelection(sel);
+        if (m_mode_combo->GetSelection() != sel)
+            SlicePilotUi::sync_combobox_selection(m_mode_combo, sel);
     }
     if (m_input_ctrl) {
         if (m_apply_mode) {
-            m_input_ctrl->SetHint(ui_is_korean()
+            m_input_hint_full = AiLocale::korean()
                 ? wxString::FromUTF8("예: 45도 돌려 줘 · 50%로 줄여 줘 · 중간에 구멍 뚫어 줘 · 코너 들뜸 줄여 줘")
-                : _L("e.g. rotate 45°, scale to 50%, drill a hole in the center, reduce corner warping"));
+                : _L("e.g. rotate 45°, scale to 50%, drill a hole in the center, reduce corner warping");
         } else {
-            m_input_ctrl->SetHint(ui_is_korean()
+            m_input_hint_full = AiLocale::korean()
                 ? wxString::FromUTF8("예: 브림이 뭐예요? · 서포트는 언제 필요해? · MakerWorld에서 드래곤 찾아줘")
-                : _L("e.g. What is a brim? When do I need supports? Search MakerWorld for a dragon"));
+                : _L("e.g. What is a brim? When do I need supports? Search MakerWorld for a dragon");
         }
+        update_input_hint();
     }
+}
+
+void OllamaChatPanel::update_input_hint()
+{
+    if (!m_input_ctrl || m_input_hint_full.IsEmpty())
+        return;
+    const int avail = m_input_ctrl->GetClientSize().GetWidth() - FromDIP(8);
+    wxString  hint  = m_input_hint_full;
+    if (avail > FromDIP(40)) {
+        wxClientDC dc(m_input_ctrl);
+        dc.SetFont(m_input_ctrl->GetFont());
+        hint = wxControl::Ellipsize(m_input_hint_full, dc, wxELLIPSIZE_END, avail);
+    }
+    m_input_ctrl->SetHint(hint);
+    // The full example list stays reachable via the tooltip when elided.
+    m_input_ctrl->SetToolTip(hint == m_input_hint_full ? wxString{} : m_input_hint_full);
 }
 
 void OllamaChatPanel::set_status_text(const wxString& text)
 {
     if (!m_status)
         return;
+    // Single-line status; long text ellipsizes (wxST_ELLIPSIZE_END) with the
+    // full message available as a tooltip.
     wxString label = text;
     if (label.Find('\n') != wxNOT_FOUND)
         label = label.BeforeFirst('\n').Trim();
-    // Status is a short hint — never echo the assistant chat body below the input.
-    if (label.length() > 72)
-        label = label.Left(69) + wxT("…");
     if (m_status->GetLabel() == label)
         return;
     m_status->SetLabel(label);
-    m_status->Wrap(0);
+    m_status->SetToolTip(text);
     if (m_status_host)
         m_status_host->Layout();
     if (m_body)
@@ -1000,25 +1057,9 @@ void OllamaChatPanel::set_assistant_mode(bool apply_mode)
 
 void OllamaChatPanel::update_system_welcome_in_chat()
 {
-    if (!m_history_ctrl)
+    if (!m_history_list)
         return;
-
-    const wxString role    = _L("System");
-    const wxString welcome = system_welcome_message();
-    const wxString block   = wxString::Format("%s\n%s\n\n", role, welcome);
-    const wxString prefix  = role + "\n";
-
-    if (m_persistent_chat.StartsWith(prefix)) {
-        const int body_start = static_cast<int>(prefix.length());
-        const int next_block = m_persistent_chat.find("\n\n", body_start);
-        if (next_block != wxNOT_FOUND)
-            m_persistent_chat = block + m_persistent_chat.Mid(next_block + 2);
-        else
-            m_persistent_chat = block;
-    } else {
-        m_persistent_chat = block + m_persistent_chat;
-    }
-    refresh_chat_display();
+    m_history_list->set_first_system_message(system_welcome_message());
 }
 
 void OllamaChatPanel::reset_conversation()
@@ -1027,14 +1068,14 @@ void OllamaChatPanel::reset_conversation()
     if (m_assist_controller && m_assist_controller->is_running())
         m_assist_controller->cancel();
     set_busy(false);
+    hide_pipeline_progress();
     m_messages.clear();
     m_messages.push_back({"system", OllamaActionExecutor::build_system_prompt(m_apply_mode)});
-    m_persistent_chat.Clear();
-    m_thinking_block.Clear();
-    if (m_history_ctrl)
-        m_history_ctrl->Clear();
+    m_stream_buf.clear();
+    if (m_history_list)
+        m_history_list->clear();
     append_chat(_L("System"), system_welcome_message());
-    set_status_text(ui_is_korean() ? wxString::FromUTF8("준비됨") : _L("Ready"));
+    set_status_text(AiLocale::korean() ? wxString::FromUTF8("준비됨") : _L("Ready"));
 }
 
 void OllamaChatPanel::ensure_ollama_running()
@@ -1052,12 +1093,12 @@ void OllamaChatPanel::ensure_ollama_running()
             if (error.empty()) {
                 OllamaServerManager::note_serve_reachable();
                 OllamaProcessingNotice::hide(wxGetApp().plater());
-                panel->set_status_text(ui_is_korean() ? wxString::FromUTF8("준비됨") : _L("Ready"));
+                panel->set_status_text(AiLocale::korean() ? wxString::FromUTF8("준비됨") : _L("Ready"));
                 return;
             }
 
             if (OllamaServerManager::should_spawn_serve()) {
-                panel->set_status_text(ui_is_korean() ? wxString::FromUTF8("AI 시작 중…") : _L("Starting AI…"));
+                panel->set_status_text(AiLocale::korean() ? wxString::FromUTF8("AI 시작 중…") : _L("Starting AI…"));
                 OllamaProcessingNotice::show_starting(wxGetApp().plater());
                 OllamaServerManager::note_serve_spawn_attempt();
                 const wxString cmd = OllamaServerManager::resolve_ollama_command();
@@ -1083,7 +1124,7 @@ void OllamaChatPanel::refresh_models()
     if (m_model_poll_failures >= kMaxModelPollFailures)
         return;
     if (m_status)
-        set_status_text(ui_is_korean() ? wxString::FromUTF8("모델 불러오는 중…") : _L("Loading models…"));
+        set_status_text(AiLocale::korean() ? wxString::FromUTF8("모델 불러오는 중…") : _L("Loading models…"));
     m_client.set_base_url(ollama_host_from_config());
     const auto alive = m_alive;
     wxWeakRef<wxWindow> weak(this);
@@ -1099,13 +1140,21 @@ void OllamaChatPanel::refresh_models()
     });
 }
 
+void OllamaChatPanel::append_chat_message(ChatMessageRole role, const wxString& text, ChatMessageKind kind)
+{
+    if (!m_history_list)
+        return;
+    m_history_list->append_message(role, text, kind);
+}
+
 void OllamaChatPanel::append_chat(const wxString& role, const wxString& text)
 {
-    if (!m_history_ctrl)
-        return;
-    m_persistent_chat += wxString::Format("%s\n%s\n\n", role, text);
-    trim_history_display();
-    refresh_chat_display();
+    ChatMessageRole mapped = ChatMessageRole::Assistant;
+    if (role == _L("You"))
+        mapped = ChatMessageRole::User;
+    else if (role == _L("System"))
+        mapped = ChatMessageRole::System;
+    append_chat_message(mapped, text, ChatMessageKind::Normal);
 }
 
 MakerWorldFlowUiCallbacks OllamaChatPanel::makerworld_flow_callbacks()
@@ -1128,12 +1177,172 @@ MakerWorldFlowUiCallbacks OllamaChatPanel::makerworld_flow_callbacks()
     };
     cb.on_flow_finished = [weak]() {
         wxGetApp().CallAfter([weak]() {
-            if (auto* panel = weak.get())
-                panel->set_status_text(completion_status_for_reply(last_assistant_message(panel->m_persistent_chat),
-                                                                    panel->m_apply_mode));
+            if (auto* panel = weak.get()) {
+                const wxString last = panel->m_history_list ? panel->m_history_list->last_assistant_text()
+                                                            : wxString{};
+                panel->set_status_text(completion_status_for_reply(last, panel->m_apply_mode));
+            }
         });
     };
     return cb;
+}
+
+AIPipeline::PrintJobUiCallbacks OllamaChatPanel::orchestrator_ui_callbacks()
+{
+    AIPipeline::PrintJobUiCallbacks ui;
+    wxWeakRef<OllamaChatPanel> weak(this);
+    // Orchestrator progress lines render as muted "progress" bubbles instead of
+    // full-width assistant messages; they still enter the LLM history so the
+    // model keeps context about the pipeline.
+    ui.append_chat = [weak](const wxString& msg) {
+        if (auto* panel = weak.get()) {
+            panel->append_chat_message(ChatMessageRole::Assistant, msg, ChatMessageKind::Progress);
+            panel->m_messages.push_back({"assistant", msg.utf8_string()});
+            panel->trim_message_history();
+        }
+    };
+    // Clarifying questions need a reply — render them as emphasized bubbles.
+    ui.append_question = [weak](const wxString& msg) {
+        if (auto* panel = weak.get()) {
+            panel->append_chat_message(ChatMessageRole::Assistant, msg, ChatMessageKind::Question);
+            panel->m_messages.push_back({"assistant", msg.utf8_string()});
+            panel->trim_message_history();
+        }
+    };
+    // Terminal failures get the warning-tinted error bubble.
+    ui.append_error = [weak](const wxString& msg) {
+        if (auto* panel = weak.get()) {
+            panel->append_chat_message(ChatMessageRole::Assistant, msg, ChatMessageKind::Error);
+            panel->m_messages.push_back({"assistant", msg.utf8_string()});
+            panel->trim_message_history();
+        }
+    };
+    ui.set_busy = [weak](bool busy, const wxString& status) {
+        if (auto* panel = weak.get()) {
+            panel->set_busy(busy);
+            if (!status.IsEmpty())
+                panel->set_status_text(status);
+        }
+    };
+    ui.on_step = [weak](AIPipeline::PrintJobState state, const wxString& detail) {
+        if (auto* panel = weak.get())
+            panel->on_pipeline_step(state, detail);
+    };
+    ui.on_finished = [weak]() {
+        wxGetApp().CallAfter([weak]() {
+            if (auto* panel = weak.get()) {
+                // Belt-and-braces: the job is over, so no indicator may survive
+                // even if a set_busy(false) was missed on some path.
+                panel->clear_thinking_block();
+                panel->hide_pipeline_progress();
+                const wxString last = panel->m_history_list ? panel->m_history_list->last_assistant_text()
+                                                            : wxString{};
+                panel->set_status_text(completion_status_for_reply(last, panel->m_apply_mode));
+            }
+        });
+    };
+    return ui;
+}
+
+void OllamaChatPanel::on_pipeline_step(AIPipeline::PrintJobState state, const wxString& detail)
+{
+    using AIPipeline::PrintJobState;
+
+    struct StepInfo { int index; const char* en; const char* ko; };
+    // 6 visible pipeline steps: search -> import -> analyze -> configure -> slice -> send.
+    StepInfo info{0, "", ""};
+    switch (state) {
+    case PrintJobState::Searching:
+    case PrintJobState::CandidateSelect:  info = {1, "Search",    "검색"};       break;
+    case PrintJobState::Importing:        info = {2, "Import",    "가져오기"};   break;
+    case PrintJobState::MeshHealth:
+    case PrintJobState::Repairing:
+    case PrintJobState::GeometryAnalysis: info = {3, "Analyze",   "분석"};       break;
+    case PrintJobState::AutoConfig:       info = {4, "Configure", "설정"};       break;
+    case PrintJobState::Slicing:
+    case PrintJobState::Estimating:       info = {5, "Slice",     "슬라이스"};   break;
+    case PrintJobState::ReadyToPrint:
+    case PrintJobState::Sending:          info = {6, "Send",      "전송"};       break;
+    default:
+        // Idle / intent / clarify / terminal states: no strip.
+        hide_pipeline_progress();
+        return;
+    }
+
+    if (!m_pipeline_panel || !m_pipeline_step_label || !m_pipeline_gauge)
+        return;
+
+    constexpr int total = 6;
+    wxString label = wxString::Format("%d/%d  %s", info.index, total, AiLocale::text(info.en, info.ko));
+    if (!detail.IsEmpty())
+        label += wxT(" — ") + detail;
+    m_pipeline_step_label->SetLabel(label);
+    m_pipeline_step_label->SetToolTip(label);
+    m_pipeline_gauge->SetProgress(info.index * 100 / total);
+
+    if (!m_pipeline_panel->IsShown()) {
+        m_pipeline_panel->Show();
+        if (m_body)
+            m_body->Layout();
+    } else {
+        m_pipeline_panel->Layout();
+    }
+}
+
+void OllamaChatPanel::hide_pipeline_progress()
+{
+    if (!m_pipeline_panel || !m_pipeline_panel->IsShown())
+        return;
+    m_pipeline_panel->Hide();
+    if (m_body)
+        m_body->Layout();
+}
+
+bool OllamaChatPanel::start_orchestrator_find_and_print(const std::string& query)
+{
+    if (!AIPipeline::print_job_orchestrator_enabled() || query.empty())
+        return false;
+    if (!m_orchestrator)
+        m_orchestrator = std::make_unique<AIPipeline::PrintJobOrchestrator>();
+    if (m_orchestrator->is_active())
+        return false;
+    return m_orchestrator->start(query, this, m_apply_mode, orchestrator_ui_callbacks());
+}
+
+bool OllamaChatPanel::maybe_start_orchestrator_job(nlohmann::json& root, const std::string& user_req)
+{
+    if (!AIPipeline::print_job_orchestrator_enabled())
+        return false;
+    if (!root.contains("actions") || !root["actions"].is_array())
+        return false;
+
+    bool           started = false;
+    nlohmann::json kept    = nlohmann::json::array();
+    for (auto& action : root["actions"]) {
+        const bool is_find_and_print =
+            !started && action.is_object() && action.value("type", std::string{}) == "makerworld_find_and_print";
+        if (!is_find_and_print) {
+            kept.push_back(action);
+            continue;
+        }
+
+        if (!m_orchestrator)
+            m_orchestrator = std::make_unique<AIPipeline::PrintJobOrchestrator>();
+        if (m_orchestrator->is_active()) {
+            // A job is already running; leave the action for the legacy path.
+            kept.push_back(action);
+            continue;
+        }
+
+        const std::string query     = action.value("query", std::string{});
+        const std::string utterance  = query.empty() ? user_req : query;
+        if (m_orchestrator->start(utterance, this, m_apply_mode, orchestrator_ui_callbacks()))
+            started = true;
+        else
+            kept.push_back(action);
+    }
+    root["actions"] = kept;
+    return started;
 }
 
 void OllamaChatPanel::set_busy(bool busy)
@@ -1143,19 +1352,65 @@ void OllamaChatPanel::set_busy(bool busy)
         m_send_btn->Enable(!busy);
     if (m_reset_btn)
         m_reset_btn->Enable(!busy);
-    if (m_mode_choice)
-        m_mode_choice->Enable(!busy);
+    if (m_mode_combo)
+        m_mode_combo->Enable(!busy);
+    if (m_model_combo)
+        m_model_combo->Enable(!busy);
     if (m_input_field)
         m_input_field->Enable(!busy);
     Plater* plater = wxGetApp().plater();
     if (busy) {
         begin_thinking_block();
         if (m_status)
-            set_status_text(ui_is_korean() ? wxString::FromUTF8("요청 처리 중…") : _L("Working on your request…"));
-        OllamaProcessingNotice::show_thinking(plater);
+            set_status_text(AiLocale::korean() ? wxString::FromUTF8("요청 처리 중…") : _L("Working on your request…"));
+        // Single source of busy truth: the pending bubble. The plater toast is
+        // only shown when the chat window itself is not visible.
+        if (!IsShownOnScreen())
+            OllamaProcessingNotice::show_thinking(plater);
+        else
+            OllamaProcessingNotice::hide(plater);
     } else {
+        // Not busy => no thinking indicator. Clearing here guarantees the
+        // pending "처리 중 / Working" bubble disappears on EVERY terminal path
+        // (orchestrator finish/error/cancel/timeout, clarify hand-off, legacy
+        // flow finish), not just when a chat reply arrives.
+        clear_thinking_block();
         OllamaProcessingNotice::hide(plater);
     }
+}
+
+OllamaClient::StreamCallback OllamaChatPanel::make_stream_callback(uint64_t gen)
+{
+    m_stream_buf.clear();
+    const auto          alive = m_alive;
+    wxWeakRef<wxWindow> weak(this);
+    // Called from the client's worker thread per token; marshal to the UI
+    // thread and re-validate liveness + request generation before touching UI.
+    return [alive, gen, weak](const std::string& chunk) {
+        if (!alive->load())
+            return;
+        wxGetApp().CallAfter([alive, gen, weak, chunk]() {
+            if (!alive->load() || wxGetApp().is_closing())
+                return;
+            auto* panel = dynamic_cast<OllamaChatPanel*>(weak.get());
+            if (!panel || panel->m_request_gen != gen)
+                return;
+            panel->on_stream_chunk(chunk);
+        });
+    };
+}
+
+void OllamaChatPanel::on_stream_chunk(const std::string& chunk)
+{
+    if (chunk.empty() || !m_history_list)
+        return;
+    m_stream_buf += chunk;
+    const wxString preview = streaming_preview_text(m_stream_buf);
+    if (preview.IsEmpty())
+        return;
+    if (!m_history_list->has_pending())
+        begin_thinking_block();
+    m_history_list->set_pending_stream_text(preview);
 }
 
 void OllamaChatPanel::on_send(wxCommandEvent&)
@@ -1179,8 +1434,16 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
 
     const std::string user_utf8 = user_text.utf8_string();
 
+    // Phase 3: while an orchestrator job is awaiting a clarifying answer, route
+    // this turn to it instead of starting a fresh LLM request.
+    if (AIPipeline::print_job_orchestrator_enabled() && m_orchestrator && m_orchestrator->is_active()
+        && m_orchestrator->state() == AIPipeline::PrintJobState::Clarifying) {
+        m_orchestrator->on_user_reply(user_utf8);
+        return;
+    }
+
     if (ollama_voice_looks_like_garbled_chat(user_utf8)) {
-        const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+        const bool ko = AiLocale::korean();
         append_chat(_L("Assistant"),
                     ko ? wxString::FromUTF8("음성/문장을 이해하지 못했습니다. 다시 말씀하시거나 직접 입력해 주세요.")
                        : _L("I couldn't understand that. Try again or type your request."));
@@ -1191,10 +1454,41 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
         return;
     }
 
-    if (MakerWorldSearchService::is_pure_makerworld_request(user_utf8)) {
+    // Deterministic acquisition-intent gate (pre-router): "get me X and print
+    // it" (e.g. "용 피규어 출력해줘") starts the end-to-end orchestrator job
+    // directly — no LLM, no PrintIntentSession/config-proposal injection this
+    // turn. Runs before the MakerWorld bypass so find-and-print requests reach
+    // the orchestrator; explicit URL/search requests still use the bypass below.
+    if (OllamaSendRouter::acquisition_gate_open(m_apply_mode, AIPipeline::print_job_orchestrator_enabled(),
+                                                m_orchestrator && m_orchestrator->is_active())) {
+        bool has_model = false;
+        if (Plater* plater = wxGetApp().plater()) {
+            try {
+                has_model = !plater->model().objects.empty();
+            } catch (...) {
+                BOOST_LOG_TRIVIAL(warning) << "Ollama chat: plate-model check failed; assuming empty plate";
+            }
+        }
+        if (OllamaSendRouter::is_acquisition_request(user_utf8, has_model)) {
+            const std::string query = OllamaSendRouter::acquisition_query(user_utf8);
+            if (start_orchestrator_find_and_print(query)) {
+                m_messages.push_back({"user", user_utf8});
+                trim_message_history();
+                const wxString stub = AiLocale::korean()
+                    ? wxString::FromUTF8("원하시는 모델을 찾아서 출력을 준비할게요…")
+                    : _L("I'll find a model and get the print ready…");
+                append_chat(_L("Assistant"), stub);
+                m_messages.push_back({"assistant", stub.utf8_string()});
+                trim_message_history();
+                return;
+            }
+        }
+    }
+
+    if (OllamaSendRouter::should_bypass_to_makerworld(user_utf8)) {
         m_messages.push_back({"user", user_utf8});
         trim_message_history();
-        const bool is_import = MakerWorldSearchService::user_wants_makerworld_import(user_utf8);
+        const bool is_import = MakerWorldIntent::user_wants_makerworld_import(user_utf8);
         const wxString stub  = is_import ? _L("Importing from MakerWorld…") : _L("Searching MakerWorld…");
         append_chat(_L("Assistant"), stub);
         m_messages.push_back({"assistant", stub.utf8_string()});
@@ -1213,10 +1507,33 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
 
     std::string user_msg = user_text.utf8_string();
     if (!m_apply_mode) {
-        const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+        const bool ko = AiLocale::korean();
         user_msg = ko ? std::string("질문 (설명만, 슬라이서 변경 금지):\n") + user_msg
                       : std::string("Question (explain only — do not change slicer settings):\n") + user_msg;
     }
+    // Non-agent apply path: mirror the assist loop so the single-hop request also derives a
+    // deterministic proposal that the LLM refines (rather than inventing settings).
+    if (m_apply_mode && attach_context) {
+        // The deterministic proposal is best-effort context for the LLM. Any failure here
+        // (empty/partial config, missing preset, geometry edge cases) must degrade
+        // gracefully — an uncaught exception would unwind the wx main loop and quit the app.
+        try {
+            const bool ko_intent = AiLocale::korean();
+            auto&      session   = BambuSmartPrint::PrintIntentSession::instance();
+            if (Plater* plater = wxGetApp().plater()) {
+                const BambuSmartPrint::PlateContext ctx = PrintPlannerGui::build_plate_context(plater);
+                session.merge_turn(user_utf8, ctx.mesh, ctx.base_config);
+                OllamaConfigProposalBuilder::build_from_context(plater, ctx, session.intent(), ko_intent);
+            } else {
+                session.merge_turn(user_utf8);
+            }
+        } catch (const std::exception& ex) {
+            BOOST_LOG_TRIVIAL(error) << "Ollama proposal build failed: " << ex.what();
+        } catch (...) {
+            BOOST_LOG_TRIVIAL(error) << "Ollama proposal build failed: unknown error";
+        }
+    }
+
     if (attach_context) {
         std::string context = (user_turns == 0)
             ? OllamaActionExecutor::build_compact_context_json()
@@ -1224,10 +1541,11 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
         if (m_apply_mode) {
             try {
                 nlohmann::json ctx = nlohmann::json::parse(context);
-                const bool     ko  = wxGetApp().current_language_code().StartsWith("ko");
+                const bool     ko  = AiLocale::korean();
                 ctx["pro_tips"]    = OllamaPrintingTips::tips_for_request(user_utf8, ko);
                 context            = ctx.dump(2);
             } catch (...) {
+                BOOST_LOG_TRIVIAL(warning) << "Ollama chat: pro_tips context enrichment failed; sending base context";
             }
         }
         context = OllamaActionExecutor::fit_context_json_to_limit(std::move(context), kMaxContextChars);
@@ -1238,9 +1556,10 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
             const nlohmann::json digest = OllamaAgentStateService::config_digest(user_utf8);
             user_msg += std::string("\n\nConfig digest (JSON):\n") + digest.dump(2);
         } catch (...) {
+            BOOST_LOG_TRIVIAL(warning) << "Ollama chat: config digest failed; sending message without it";
         }
         if (OllamaAgentGoalPlanner::is_single_shot_apply(user_utf8)) {
-            const bool           ko   = wxGetApp().current_language_code().StartsWith("ko");
+            const bool           ko   = AiLocale::korean();
             const nlohmann::json hint = OllamaAgentGoalPlanner::build_plan_hint(user_utf8, ko);
             user_msg += std::string("\n\nApply plan hint (JSON):\n") + hint.dump(2);
         }
@@ -1249,30 +1568,18 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
     if (!m_available_models.empty())
         m_model = resolve_installed_model(m_available_models, m_model);
 
-    if (OllamaAssistRouter::should_use_assist_loop(user_utf8, m_apply_mode)) {
+    if (OllamaSendRouter::should_use_assist_loop(user_utf8, m_apply_mode)) {
         m_messages.push_back({"user", user_msg});
         trim_message_history();
         start_assist_loop_turn(user_utf8);
         return;
     }
-    if (OllamaAssistRouter::should_use_two_hop(user_utf8, m_apply_mode)) {
-        m_messages.push_back({"user", user_msg});
-        trim_message_history();
-        start_two_hop_turn(user_utf8);
-        return;
-    }
-
     m_messages.push_back({"user", user_msg});
     trim_message_history();
 
-    if (OllamaDiagnosticPipeline::needs_pipeline(user_utf8, m_apply_mode)) {
-        start_diagnostic_turn(user_utf8);
-        return;
-    }
-
     set_busy(true);
     begin_thinking_block();
-    const bool ko_fast = wxGetApp().current_language_code().StartsWith("ko");
+    const bool ko_fast = AiLocale::korean();
     if (m_apply_mode) {
         append_thinking_line(wxString::FromUTF8(ollama_thinking_goal_intro(user_utf8, ko_fast)));
         if (OllamaAgentGoalPlanner::is_single_shot_apply(user_utf8)) {
@@ -1303,14 +1610,14 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
                 return;
             panel->on_chat_response(text, error);
         });
-    });
+    }, OllamaRequestKind::Chat, make_stream_callback(gen));
 }
 
 void OllamaChatPanel::start_assist_loop_turn(const std::string& user_utf8)
 {
     set_busy(true);
     begin_thinking_block();
-    const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+    const bool ko = AiLocale::korean();
     append_thinking_line(wxString::FromUTF8(ollama_thinking_goal_intro(user_utf8, ko)));
     const nlohmann::json plan_hint = OllamaAgentGoalPlanner::build_plan_hint(user_utf8, ko);
     if (plan_hint.contains("suggested_steps") && plan_hint["suggested_steps"].is_array()) {
@@ -1351,7 +1658,7 @@ void OllamaChatPanel::on_assist_loop_finished(const OllamaAgentRunResult& result
     clear_thinking_block();
     set_busy(false);
 
-    const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+    const bool ko = AiLocale::korean();
     wxString   display;
     if (result.completed && !result.step_tool_results.empty()) {
         const std::string summary =
@@ -1375,249 +1682,6 @@ void OllamaChatPanel::on_assist_loop_finished(const OllamaAgentRunResult& result
     set_status_text(completion_status_for_reply(display, m_apply_mode));
 }
 
-void OllamaChatPanel::start_two_hop_turn(const std::string& user_utf8)
-{
-    set_busy(true);
-    const bool ko = wxGetApp().current_language_code().StartsWith("ko");
-    append_thinking_line(ko ? wxString::FromUTF8("관련 설정 찾는 중…") : wxString("Finding relevant settings…"));
-
-    std::vector<OllamaMessage> planner_msgs;
-    planner_msgs.push_back({"system", OllamaActionExecutor::build_planner_system_prompt()});
-    planner_msgs.push_back({"user", OllamaActionExecutor::build_planner_user_message(user_utf8)});
-
-    const std::string   model = normalize_ollama_model_tag(m_model);
-    const auto          alive = m_alive;
-    const uint64_t      gen   = ++m_request_gen;
-    wxWeakRef<wxWindow> weak_panel(this);
-    m_client.chat(
-        model, planner_msgs,
-        [alive, gen, weak_panel, user_utf8](const std::string& text, const std::string& error) {
-            wxGetApp().CallAfter([alive, gen, weak_panel, user_utf8, text, error]() {
-                if (!alive->load() || wxGetApp().is_closing())
-                    return;
-                auto* panel = dynamic_cast<OllamaChatPanel*>(weak_panel.get());
-                if (!panel || panel->m_request_gen != gen)
-                    return;
-                panel->on_two_hop_planner_response(text, user_utf8, error);
-            });
-        },
-        OllamaRequestKind::Planner);
-}
-
-void OllamaChatPanel::on_two_hop_planner_response(const std::string& planner_text, const std::string& user_utf8,
-                                                  const std::string& error)
-{
-    if (!error.empty()) {
-        clear_thinking_block();
-        set_busy(false);
-        append_chat(_L("Assistant"), format_chat_error(error));
-        set_status_text(format_chat_error(error));
-        return;
-    }
-
-    std::vector<std::string> keys = OllamaSettingSearch::keys_from_planner_json(planner_text);
-    if (keys.empty())
-        keys = OllamaSettingSearch::candidate_keys_for_request(user_utf8, 3, 10);
-
-    const bool ko = wxGetApp().current_language_code().StartsWith("ko");
-    append_thinking_line(ko ? wxString::FromUTF8("변경안 준비 중…") : wxString("Preparing changes…"));
-
-    nlohmann::json wiki_context = nlohmann::json::array();
-    if (ollama_wiki_search_enabled() && OllamaRequestRouter::benefits_from_wiki(user_utf8)) {
-        OllamaDiagnosis pseudo;
-        pseudo.wiki_queries.push_back(user_utf8);
-        wiki_context = OllamaDiagnosticPipeline::build_wiki_evidence(pseudo, user_utf8, ko);
-    }
-
-    const std::string resolver_user =
-        OllamaActionExecutor::build_resolver_user_message(user_utf8, keys, wiki_context);
-    launch_single_chat_llm(resolver_user);
-}
-
-void OllamaChatPanel::launch_single_chat_llm(std::string final_user_msg)
-{
-    m_messages.push_back({"user", std::move(final_user_msg)});
-    trim_message_history();
-    if (!m_available_models.empty())
-        m_model = resolve_installed_model(m_available_models, m_model);
-    set_busy(true);
-    const std::string   model = normalize_ollama_model_tag(m_model);
-    const auto          alive = m_alive;
-    const uint64_t      gen   = ++m_request_gen;
-    wxWeakRef<wxWindow> weak_panel(this);
-    m_client.chat(model, m_messages, [alive, gen, weak_panel](const std::string& text, const std::string& error) {
-        wxGetApp().CallAfter([alive, gen, weak_panel, text, error]() {
-            if (!alive->load() || wxGetApp().is_closing())
-                return;
-            auto* panel = dynamic_cast<OllamaChatPanel*>(weak_panel.get());
-            if (!panel || panel->m_request_gen != gen)
-                return;
-            panel->on_chat_response(text, error);
-        });
-    });
-}
-
-void OllamaChatPanel::start_diagnostic_turn(const std::string& user_utf8)
-{
-    set_busy(true);
-    const uint64_t gen = ++m_request_gen;
-    const bool     ko  = wxGetApp().current_language_code().StartsWith("ko");
-    set_status_text(ko ? wxString::FromUTF8("원인 파악 중…") : _L("Figuring out the issue…"));
-    append_thinking_line(ko ? wxString::FromUTF8("1. 증상 확인 중…") : wxString("1. Reviewing what you reported…"));
-
-    std::vector<OllamaMessage> diag_msgs;
-    diag_msgs.push_back({"system", OllamaActionExecutor::build_diagnostic_system_prompt()});
-    diag_msgs.push_back({"user", OllamaActionExecutor::build_diagnostic_user_message(user_utf8)});
-
-    const std::string   model = m_model.empty() ? std::string(kOllamaDefaultModel) : normalize_ollama_model_tag(m_model);
-    const auto          alive = m_alive;
-    wxWeakRef<wxWindow> weak_panel(this);
-    m_client.chat(model, diag_msgs,
-                  [alive, gen, weak_panel, user_utf8](const std::string& text, const std::string& error) {
-                      wxGetApp().CallAfter([alive, gen, weak_panel, user_utf8, text, error]() {
-                          if (!alive->load() || wxGetApp().is_closing())
-                              return;
-                          auto* panel = dynamic_cast<OllamaChatPanel*>(weak_panel.get());
-                          if (!panel || panel->m_request_gen != gen)
-                              return;
-                          panel->on_diagnosis_response(text, user_utf8, error);
-                      });
-                  },
-                  OllamaRequestKind::Planner);
-}
-
-void OllamaChatPanel::on_diagnosis_response(const std::string& diagnosis_text, const std::string& user_utf8,
-                                            const std::string& error)
-{
-    if (!error.empty()) {
-        clear_thinking_block();
-        set_busy(false);
-        append_chat(_L("Assistant"), format_chat_error(error));
-        set_status_text(format_chat_error(error));
-        return;
-    }
-
-    const OllamaDiagnosis diagnosis = OllamaDiagnosticPipeline::parse_diagnosis(diagnosis_text);
-    const bool            ko        = wxGetApp().current_language_code().StartsWith("ko");
-    append_thinking_text(thinking_diagnosis_lines(diagnosis, ko));
-    append_thinking_line(ko ? wxString::FromUTF8("2. 도움말 검색 중…") : wxString("2. Looking up guidance…"));
-    set_status_text(ko ? wxString::FromUTF8("도움말 검색 중…") : _L("Looking up guidance…"));
-
-    std::vector<std::string> keys = diagnosis.candidate_keys;
-    if (keys.empty())
-        keys = OllamaSettingSearch::candidate_keys_for_request(user_utf8, 3, 10);
-
-    const auto          alive = m_alive;
-    const uint64_t      gen   = m_request_gen;
-    wxWeakRef<wxWindow> weak_panel(this);
-    std::thread([alive, gen, weak_panel, user_utf8, diagnosis, keys = std::move(keys), ko]() mutable {
-        nlohmann::json wiki = nlohmann::json::array();
-        if (ollama_wiki_search_enabled())
-            wiki = OllamaDiagnosticPipeline::build_wiki_evidence(diagnosis, user_utf8, ko);
-        const wxString wiki_lines = thinking_wiki_lines(wiki, ko);
-        const nlohmann::json analysis =
-            OllamaDiagnosticPipeline::analyze_current_settings(keys, diagnosis, ko);
-        const wxString settings_lines = thinking_settings_lines(analysis, ko);
-
-        wxGetApp().CallAfter([alive, gen, weak_panel, user_utf8, diagnosis, keys = std::move(keys), wiki, analysis,
-                              wiki_lines, settings_lines, ko]() {
-            if (!alive->load() || wxGetApp().is_closing())
-                return;
-            auto* panel = dynamic_cast<OllamaChatPanel*>(weak_panel.get());
-            if (!panel || panel->m_request_gen != gen)
-                return;
-            if (!wiki_lines.IsEmpty())
-                panel->append_thinking_text(wiki_lines);
-            panel->append_thinking_line(ko ? wxString::FromUTF8("3. 현재 설정 확인 중…")
-                                           : wxString("3. Checking current settings…"));
-            if (!settings_lines.IsEmpty())
-                panel->append_thinking_text(settings_lines);
-            panel->append_thinking_line(ko ? wxString::FromUTF8("4. 변경안 만들기…")
-                                           : wxString("4. Building a fix…"));
-            const bool ko_ui = wxGetApp().current_language_code().StartsWith("ko");
-            panel->set_status_text(ko_ui ? wxString::FromUTF8("변경안 만들기…") : _L("Building a fix…"));
-            panel->launch_proposal_llm(user_utf8, diagnosis, std::move(keys), wiki, analysis, 0);
-        });
-    }).detach();
-}
-
-void OllamaChatPanel::launch_proposal_llm(const std::string& user_utf8, const OllamaDiagnosis& diagnosis,
-                                          std::vector<std::string> keys, const nlohmann::json& wiki_context,
-                                          const nlohmann::json& settings_analysis, int critic_attempt)
-{
-    nlohmann::json diagnosis_summary = nlohmann::json::object();
-    diagnosis_summary["symptom"]       = diagnosis.symptom;
-    diagnosis_summary["diagnosis"]     = diagnosis.diagnosis;
-    diagnosis_summary["likely_causes"] = diagnosis.likely_causes;
-    diagnosis_summary["message"]     = diagnosis.user_message;
-    diagnosis_summary["step"] =
-        wxGetApp().current_language_code().StartsWith("ko") ? "문제 진단" : "Problem diagnosis";
-
-    std::vector<OllamaMessage> proposal_msgs;
-    proposal_msgs.push_back({"system", OllamaActionExecutor::build_system_prompt(true)});
-    proposal_msgs.push_back({"user", OllamaActionExecutor::build_proposal_user_message(
-                                        user_utf8, keys, diagnosis_summary, wiki_context, settings_analysis)});
-
-    const std::string   model = m_model.empty() ? std::string(kOllamaDefaultModel) : normalize_ollama_model_tag(m_model);
-    const auto          alive = m_alive;
-    const uint64_t      gen   = m_request_gen;
-    wxWeakRef<wxWindow> weak_panel(this);
-    m_client.chat(model, proposal_msgs,
-                  [alive, gen, weak_panel, user_utf8, keys, wiki_context, critic_attempt](const std::string& text,
-                                                                                            const std::string& error) {
-                      wxGetApp().CallAfter([alive, gen, weak_panel, user_utf8, keys, wiki_context, critic_attempt, text,
-                                            error]() {
-                          if (!alive->load() || wxGetApp().is_closing())
-                              return;
-                          auto* panel = dynamic_cast<OllamaChatPanel*>(weak_panel.get());
-                          if (!panel || panel->m_request_gen != gen)
-                              return;
-                          panel->on_proposal_llm_response(text, error, user_utf8, keys, wiki_context, critic_attempt);
-                      });
-                  },
-                  OllamaRequestKind::Resolver);
-}
-
-void OllamaChatPanel::on_proposal_llm_response(const std::string& assistant_text, const std::string& error,
-                                               const std::string& user_utf8, std::vector<std::string> keys,
-                                               const nlohmann::json& wiki_context, int critic_attempt)
-{
-    if (!error.empty()) {
-        clear_thinking_block();
-        set_busy(false);
-        append_chat(_L("Assistant"), format_chat_error(error));
-        set_status_text(format_chat_error(error));
-        return;
-    }
-
-    const bool use_critic =
-        ollama_critic_enabled() || OllamaRequestRouter::classify(user_utf8) == OllamaRequestRoute::Deep;
-    if (use_critic && critic_attempt < 1) {
-        try {
-            nlohmann::json root = OllamaActionPipeline::extract_from_assistant_text(assistant_text);
-            OllamaResponseNormalizer::normalize(root, user_utf8, /*include_makerworld*/ true);
-            const OllamaCriticResult critic =
-                OllamaActionCritic::review(root, user_utf8, wiki_context);
-            if (critic.verdict == OllamaCriticVerdict::Revise && !critic.suggested_keys.empty()) {
-                std::unordered_set<std::string> merged(keys.begin(), keys.end());
-                for (const std::string& k : critic.suggested_keys)
-                    merged.insert(k);
-                keys.assign(merged.begin(), merged.end());
-                OllamaDiagnosis      diag = OllamaDiagnosticPipeline::parse_diagnosis("{}");
-                const bool           ko   = wxGetApp().current_language_code().StartsWith("ko");
-                append_thinking_line(ko ? wxString::FromUTF8("답변 다듬는 중…") : wxString("Refining answer…"));
-                const nlohmann::json analysis =
-                    OllamaDiagnosticPipeline::analyze_current_settings(keys, diag, ko);
-                launch_proposal_llm(user_utf8, diag, std::move(keys), wiki_context, analysis, critic_attempt + 1);
-                return;
-            }
-        } catch (...) {
-        }
-    }
-
-    on_chat_response(assistant_text, error);
-}
-
 void OllamaChatPanel::retry_last_chat_simple()
 {
     if (m_busy || m_messages.empty())
@@ -1636,8 +1700,8 @@ void OllamaChatPanel::retry_last_chat_simple()
     }
 
     set_busy(true);
-    set_status_text(ui_is_korean() ? wxString::FromUTF8("다시 시도 중…") : _L("Retrying…"));
-    append_thinking_line(ui_is_korean() ? wxString::FromUTF8("다시 시도 중…") : _L("Retrying…"));
+    set_status_text(AiLocale::korean() ? wxString::FromUTF8("다시 시도 중…") : _L("Retrying…"));
+    append_thinking_line(AiLocale::korean() ? wxString::FromUTF8("다시 시도 중…") : _L("Retrying…"));
 
     const std::string model = m_model.empty() ? std::string(kOllamaDefaultModel) : normalize_ollama_model_tag(m_model);
     const auto alive        = m_alive;
@@ -1652,7 +1716,7 @@ void OllamaChatPanel::retry_last_chat_simple()
                 return;
             panel->on_chat_response(text, error);
         });
-    });
+    }, OllamaRequestKind::Chat, make_stream_callback(gen));
 }
 
 void OllamaChatPanel::on_models_loaded(const std::vector<std::string>& models, const std::string& error)
@@ -1674,7 +1738,7 @@ void OllamaChatPanel::on_models_loaded(const std::vector<std::string>& models, c
     update_model_label_ui();
     save_settings();
     ensure_default_model_ready(models);
-    set_status_text(ui_is_korean()
+    set_status_text(AiLocale::korean()
         ? wxString::Format(wxString::FromUTF8("준비됨 — 모델 %u개"), unsigned(models.size()))
         : wxString::Format(_L("Ready — %u model(s)"), unsigned(models.size())));
 }
@@ -1698,7 +1762,7 @@ void OllamaChatPanel::ensure_default_model_ready(const std::vector<std::string>&
         return;
 
     m_pull_in_progress = true;
-    set_status_text(ui_is_korean() ? wxString::FromUTF8("모델 다운로드 중…") : _L("Downloading model…"));
+    set_status_text(AiLocale::korean() ? wxString::FromUTF8("모델 다운로드 중…") : _L("Downloading model…"));
     const wxString cmd = OllamaServerManager::resolve_ollama_command();
     wxExecute(cmd + " pull " + wxString::FromUTF8(want), wxEXEC_ASYNC);
     schedule_model_poll(5000);
@@ -1790,6 +1854,15 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
         m_messages.push_back({"assistant", assistant_history_content(assistant_text, m_apply_mode)});
         trim_message_history();
 
+        // Phase 3 (flag-gated): a full "find and print" intent is driven end-to-end
+        // by the PrintJobOrchestrator. Consumed actions are removed from `root`.
+        if (maybe_start_orchestrator_job(root, user_req)) {
+            if (!root.contains("actions") || !root["actions"].is_array() || root["actions"].empty()) {
+                append_chat(_L("Assistant"), display);
+                return;
+            }
+        }
+
         const auto mw_callbacks         = makerworld_flow_callbacks();
         const bool makerworld_handled = process_makerworld_actions(root, this, m_apply_mode, user_req, mw_callbacks);
 
@@ -1846,8 +1919,8 @@ void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const 
         }
     } catch (const std::exception& e) {
         const std::string user_req = last_user_request_text(m_messages);
-        if (m_apply_mode && MakerWorldSearchService::is_pure_makerworld_request(user_req)) {
-            const bool is_import = MakerWorldSearchService::user_wants_makerworld_import(user_req);
+        if (m_apply_mode && MakerWorldIntent::is_pure_makerworld_request(user_req)) {
+            const bool is_import = MakerWorldIntent::user_wants_makerworld_import(user_req);
             append_chat(_L("Assistant"), is_import ? _L("Importing from MakerWorld…") : _L("Searching MakerWorld…"));
             MakerWorldImportFlow::run_user_makerworld_request(this, user_req, m_apply_mode, makerworld_flow_callbacks());
             return;

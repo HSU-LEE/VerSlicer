@@ -62,13 +62,9 @@ OllamaAssistContextBuilder::PrefetchBundle OllamaAssistContextBuilder::prefetch_
         out.candidate_keys    = std::move(keys);
     }
 
-    if (should_prefetch_wiki(user_goal)) {
-        OllamaDiagnosis pseudo;
-        pseudo.symptom     = user_goal;
-        pseudo.diagnosis   = user_goal;
-        pseudo.wiki_queries.push_back(user_goal);
-        out.wiki = OllamaDiagnosticPipeline::build_wiki_evidence(pseudo, user_goal, korean);
-    }
+    // Wiki evidence is deliberately not fetched here: it is sync HTTP with long
+    // timeouts and this function runs on the main thread. Callers that want it
+    // run fetch_wiki_evidence() on a worker (see OllamaAgentController::run_goal).
 
 #ifndef OLLAMA_HEADLESS_TEST
     if (Plater* plater = wxGetApp().plater()) {
@@ -80,17 +76,48 @@ OllamaAssistContextBuilder::PrefetchBundle OllamaAssistContextBuilder::prefetch_
     return out;
 }
 
+bool OllamaAssistContextBuilder::wants_wiki_prefetch(const std::string& user_goal)
+{
+    return should_prefetch_wiki(user_goal);
+}
+
+nlohmann::json OllamaAssistContextBuilder::fetch_wiki_evidence(const std::string& user_goal, bool korean)
+{
+    if (!should_prefetch_wiki(user_goal))
+        return nlohmann::json::array();
+    OllamaDiagnosis pseudo;
+    pseudo.symptom   = user_goal;
+    pseudo.diagnosis = user_goal;
+    pseudo.wiki_queries.push_back(user_goal);
+    return OllamaDiagnosticPipeline::build_wiki_evidence(pseudo, user_goal, korean);
+}
+
 std::string OllamaAssistContextBuilder::build_initial_user_block(const std::string& user_goal,
                                                                  const nlohmann::json& plan_hint,
                                                                  const PrefetchBundle& prefetch, bool korean)
 {
+    nlohmann::json slicer_context = parse_context_json(OllamaActionExecutor::build_context_json());
+
     nlohmann::json block = {
         {"goal", user_goal},
-        {"slicer_context", parse_context_json(OllamaActionExecutor::build_context_json())},
         {"pro_tips", OllamaPrintingTips::tips_for_request(user_goal, korean)},
         {"config_digest", OllamaAgentStateService::config_digest(user_goal)},
         {"plan_hint", plan_hint},
     };
+
+    // Surface the deterministic print intent, geometry assessment, and config proposal at the
+    // top level so the LLM treats them as the baseline to refine. They are computed once by the
+    // executor context; hoist (move) them out of slicer_context to avoid duplicating payload.
+    if (slicer_context.is_object()) {
+        for (const char* key : {"print_intent", "geometry_assessment", "config_proposal"}) {
+            auto it = slicer_context.find(key);
+            if (it != slicer_context.end()) {
+                block[key] = *it;
+                slicer_context.erase(it);
+            }
+        }
+    }
+    block["slicer_context"] = std::move(slicer_context);
     if (!prefetch.candidate_keys.empty())
         block["candidate_keys"] = prefetch.candidate_keys;
     if (!prefetch.wiki.empty())

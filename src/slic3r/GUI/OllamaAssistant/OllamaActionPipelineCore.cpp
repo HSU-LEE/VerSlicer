@@ -28,6 +28,8 @@ std::string OllamaActionPipelineCore::action_fingerprint(const nlohmann::json& a
         return type;
     if (type == "makerworld_search")
         return type + "|" + action.value("query", "");
+    if (type == "makerworld_find_and_print")
+        return type + "|" + action.value("query", "");
     if (type == "import_makerworld")
         return type + "|" + action.value("url", "");
     return type + "|" + action.dump();

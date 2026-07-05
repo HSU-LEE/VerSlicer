@@ -8,18 +8,35 @@ OllamaAgentEventBus& OllamaAgentEventBus::instance()
     return bus;
 }
 
-void OllamaAgentEventBus::subscribe(OllamaAgentEventHandler handler)
+OllamaSubscriptionId OllamaAgentEventBus::subscribe(OllamaAgentEventHandler handler)
 {
     if (!handler)
+        return 0;
+    std::lock_guard<std::mutex> lock(m_mutex);
+    const OllamaSubscriptionId id = m_next_id++;
+    m_handlers.push_back({id, std::move(handler)});
+    return id;
+}
+
+void OllamaAgentEventBus::unsubscribe(OllamaSubscriptionId id)
+{
+    if (id == 0)
         return;
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_handlers.push_back(std::move(handler));
+    for (auto it = m_handlers.begin(); it != m_handlers.end(); ++it) {
+        if (it->id == id) {
+            m_handlers.erase(it);
+            return;
+        }
+    }
 }
 
 void OllamaAgentEventBus::publish(OllamaAgentEventKind kind, nlohmann::json payload)
 {
     OllamaAgentEvent evt{kind, std::move(payload)};
-    std::vector<OllamaAgentEventHandler> handlers;
+    // Copy handlers under the lock, then invoke without the lock held so a handler
+    // may safely unsubscribe itself (one-shot subscribers) without deadlocking.
+    std::vector<Subscriber> handlers;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_recent.push_back(evt);
@@ -28,7 +45,7 @@ void OllamaAgentEventBus::publish(OllamaAgentEventKind kind, nlohmann::json payl
         handlers = m_handlers;
     }
     for (const auto& h : handlers)
-        h(evt);
+        h.handler(evt);
 }
 
 std::vector<OllamaAgentEvent> OllamaAgentEventBus::recent_events(size_t max_count) const

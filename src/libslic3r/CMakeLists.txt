@@ -128,12 +128,32 @@ set(lisbslic3r_sources
     BambuSmartPrint/PrintGoalParser.hpp
     BambuSmartPrint/PrintGoalSession.cpp
     BambuSmartPrint/PrintGoalSession.hpp
+    BambuSmartPrint/PrintIntent.cpp
+    BambuSmartPrint/PrintIntent.hpp
+    BambuSmartPrint/PrintIntentExtractor.cpp
+    BambuSmartPrint/PrintIntentExtractor.hpp
+    BambuSmartPrint/PrintIntentClarifier.cpp
+    BambuSmartPrint/PrintIntentClarifier.hpp
+    BambuSmartPrint/PrintIntentSession.cpp
+    BambuSmartPrint/PrintIntentSession.hpp
+    BambuSmartPrint/AutoConfigEngine.cpp
+    BambuSmartPrint/AutoConfigEngine.hpp
     BambuSmartPrint/MaterialAdvisor.cpp
     BambuSmartPrint/MaterialAdvisor.hpp
     BambuSmartPrint/PlateBatchPlanner.cpp
     BambuSmartPrint/PlateBatchPlanner.hpp
     BambuSmartPrint/SmartPrintReportExporter.cpp
     BambuSmartPrint/SmartPrintReportExporter.hpp
+    BambuSmartPrint/StabilityAnalyzer.cpp
+    BambuSmartPrint/StabilityAnalyzer.hpp
+    BambuSmartPrint/OrientationOptimizer.cpp
+    BambuSmartPrint/OrientationOptimizer.hpp
+    BambuSmartPrint/GeometryAssessmentProducer.cpp
+    BambuSmartPrint/GeometryAssessmentProducer.hpp
+    BambuSmartPrint/MeshHealthService.cpp
+    BambuSmartPrint/MeshHealthService.hpp
+    BambuSmartPrint/PrintEstimateSummary.cpp
+    BambuSmartPrint/PrintEstimateSummary.hpp
     SlicePilot/SlicePilotRestrictions.cpp
     SlicePilot/SlicePilotRestrictions.hpp
     BoundingBox.cpp

@@ -1,7 +1,6 @@
 #include "OllamaDiagnosticPipeline.hpp"
 
 #include "BambuLabWikiSearch.hpp"
-#include "OllamaActionJsonExtract.hpp"
 #include "OllamaConfig.hpp"
 #include "OllamaIntentContext.hpp"
 #include "OllamaSettingSearch.hpp"
@@ -18,21 +17,6 @@
 namespace Slic3r { namespace GUI {
 
 namespace {
-
-std::vector<std::string> strings_from_json_array(const nlohmann::json& arr)
-{
-    std::vector<std::string> out;
-    if (!arr.is_array())
-        return out;
-    for (const auto& v : arr) {
-        if (v.is_string()) {
-            const std::string s = boost::trim_copy(v.get<std::string>());
-            if (!s.empty())
-                out.push_back(s);
-        }
-    }
-    return out;
-}
 
 std::string assess_key(const std::string& key, const std::string& current, const OllamaDiagnosis& diagnosis,
                        bool korean)
@@ -177,38 +161,6 @@ void localize_wiki_queries(std::vector<std::string>& queries)
 }
 
 } // namespace
-
-bool OllamaDiagnosticPipeline::needs_pipeline(const std::string& /*user_request*/, bool /*apply_mode*/)
-{
-    return false;
-}
-
-OllamaDiagnosis OllamaDiagnosticPipeline::parse_diagnosis(const std::string& llm_text)
-{
-    OllamaDiagnosis out;
-    try {
-        out.raw = extract_ollama_action_json_with_repair(llm_text);
-    } catch (...) {
-        out.raw = nlohmann::json::object();
-    }
-
-    if (out.raw.contains("symptom") && out.raw["symptom"].is_string())
-        out.symptom = out.raw["symptom"].get<std::string>();
-    if (out.raw.contains("diagnosis") && out.raw["diagnosis"].is_string())
-        out.diagnosis = out.raw["diagnosis"].get<std::string>();
-    if (out.raw.contains("root_cause") && out.raw["root_cause"].is_string() && out.diagnosis.empty())
-        out.diagnosis = out.raw["root_cause"].get<std::string>();
-    if (out.raw.contains("message") && out.raw["message"].is_string())
-        out.user_message = out.raw["message"].get<std::string>();
-
-    out.likely_causes  = strings_from_json_array(out.raw.value("likely_causes", nlohmann::json::array()));
-    out.wiki_queries   = strings_from_json_array(out.raw.value("wiki_search_queries", nlohmann::json::array()));
-    if (out.wiki_queries.empty())
-        out.wiki_queries = strings_from_json_array(out.raw.value("wiki_queries", nlohmann::json::array()));
-    out.candidate_keys = strings_from_json_array(out.raw.value("candidate_keys", nlohmann::json::array()));
-
-    return out;
-}
 
 nlohmann::json OllamaDiagnosticPipeline::build_wiki_evidence(const OllamaDiagnosis& diagnosis,
                                                              const std::string& user_request, bool korean)

@@ -104,6 +104,12 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaActionJsonExtract.hpp
     GUI/OllamaAssistant/OllamaActionExecutor.cpp
     GUI/OllamaAssistant/OllamaActionExecutor.hpp
+    GUI/OllamaAssistant/OllamaContextBuilder.cpp
+    GUI/OllamaAssistant/OllamaContextBuilder.hpp
+    GUI/OllamaAssistant/OllamaMakerWorldActions.cpp
+    GUI/OllamaAssistant/OllamaMakerWorldActions.hpp
+    GUI/OllamaAssistant/OllamaSendRouter.cpp
+    GUI/OllamaAssistant/OllamaSendRouter.hpp
     GUI/OllamaAssistant/OllamaSystemPrompts.cpp
     GUI/OllamaAssistant/OllamaSystemPrompts.hpp
     GUI/OllamaAssistant/OllamaUserFlow.cpp
@@ -124,6 +130,10 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaAgentStateService.hpp
     GUI/OllamaAssistant/OllamaAssistContextBuilder.cpp
     GUI/OllamaAssistant/OllamaAssistContextBuilder.hpp
+    GUI/OllamaAssistant/OllamaConfigProposalCache.cpp
+    GUI/OllamaAssistant/OllamaConfigProposalCache.hpp
+    GUI/OllamaAssistant/OllamaConfigProposalBuilder.cpp
+    GUI/OllamaAssistant/OllamaConfigProposalBuilder.hpp
     GUI/OllamaAssistant/OllamaAssistRouter.cpp
     GUI/OllamaAssistant/OllamaAssistRouter.hpp
     GUI/OllamaAssistant/OllamaExecutionPolicy.cpp
@@ -140,6 +150,10 @@ set(SLIC3R_GUI_SOURCES
     GUI/AIModelCreate/AIModelCreateEngine.hpp
     GUI/AIModelCreate/AIModelCreateSketchPanel.cpp
     GUI/AIModelCreate/AIModelCreateSketchPanel.hpp
+    GUI/OllamaAssistant/AiLocale.cpp
+    GUI/OllamaAssistant/AiLocale.hpp
+    GUI/OllamaAssistant/OllamaChatMessageList.cpp
+    GUI/OllamaAssistant/OllamaChatMessageList.hpp
     GUI/OllamaAssistant/OllamaChatPanel.cpp
     GUI/OllamaAssistant/OllamaChatPanel.hpp
     GUI/OllamaAssistant/OllamaClient.cpp
@@ -188,8 +202,12 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaVoiceTranscript.hpp
     GUI/MakerWorld/MakerWorldImportFlow.cpp
     GUI/MakerWorld/MakerWorldImportFlow.hpp
+    GUI/MakerWorld/MakerWorldIntent.cpp
+    GUI/MakerWorld/MakerWorldIntent.hpp
     GUI/MakerWorld/MakerWorldPickDialog.cpp
     GUI/MakerWorld/MakerWorldPickDialog.hpp
+    GUI/MakerWorld/MakerWorldPrintOfferDialog.cpp
+    GUI/MakerWorld/MakerWorldPrintOfferDialog.hpp
     GUI/MakerWorld/MakerWorldQueryTranslator.cpp
     GUI/MakerWorld/MakerWorldQueryTranslator.hpp
     GUI/MakerWorld/MakerWorldSearchCore.cpp
@@ -201,6 +219,25 @@ set(SLIC3R_GUI_SOURCES
     GUI/MakerWorld/MakerWorldTypes.hpp
     GUI/MakerWorld/MakerWorldUrl.cpp
     GUI/MakerWorld/MakerWorldUrl.hpp
+    GUI/ModelSearch/ModelSearchTypes.hpp
+    GUI/ModelSearch/IModelProvider.hpp
+    GUI/ModelSearch/ModelSearchQueryBuilder.cpp
+    GUI/ModelSearch/ModelSearchQueryBuilder.hpp
+    GUI/ModelSearch/CandidateRanker.cpp
+    GUI/ModelSearch/CandidateRanker.hpp
+    GUI/ModelSearch/ModelSearchDedupe.cpp
+    GUI/ModelSearch/ModelSearchDedupe.hpp
+    GUI/ModelSearch/MakerWorldProvider.cpp
+    GUI/ModelSearch/MakerWorldProvider.hpp
+    GUI/ModelSearch/ModelSearchService.cpp
+    GUI/ModelSearch/ModelSearchService.hpp
+    GUI/AIPipeline/PrintJobState.hpp
+    GUI/AIPipeline/PrintJob.hpp
+    GUI/AIPipeline/PrintJobUiAdapter.hpp
+    GUI/AIPipeline/PrintJobStepExecutors.cpp
+    GUI/AIPipeline/PrintJobStepExecutors.hpp
+    GUI/AIPipeline/PrintJobOrchestrator.cpp
+    GUI/AIPipeline/PrintJobOrchestrator.hpp
     GUI/BedShapeDialog.cpp
     GUI/BedShapeDialog.hpp
     GUI/BindDialog.cpp

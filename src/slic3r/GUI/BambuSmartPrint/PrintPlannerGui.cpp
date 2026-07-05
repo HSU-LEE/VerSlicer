@@ -1,6 +1,7 @@
 #include "PrintPlannerGui.hpp"
 
 #include "BambuSmartPrintService.hpp"
+#include "BambuSmartPrintUi.hpp"
 #include "BambuSmartPrintWorkflowDialog.hpp"
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
@@ -64,16 +65,6 @@ void enrich_cards(std::vector<AICoachCard>& cards, Plater* plater)
     }
 }
 
-static bool smart_print_ui_korean()
-{
-    const wxString code = wxGetApp().current_language_code();
-    wxString       lang = code.BeforeFirst('_').BeforeFirst('-').Lower();
-    if (lang == wxString("ko"))
-        return true;
-    lang = wxGetApp().current_language_code_safe().BeforeFirst('_').Lower();
-    return lang == wxString("ko");
-}
-
 static bool is_generic_workflow_summary(const std::string& summary)
 {
     if (summary.empty())
@@ -98,7 +89,7 @@ static bool is_generic_workflow_summary(const std::string& summary)
 static std::string workflow_summary_from_changes(const std::vector<SettingChange>& changes,
                                                  const std::string& fallback_message)
 {
-    const bool ko = smart_print_ui_korean();
+    const bool ko = SlicePilotUi::smart_print_locale_korean();
     std::string fallback = fallback_message;
     if (is_generic_workflow_summary(fallback))
         fallback.clear();
@@ -354,7 +345,7 @@ void PrintPlannerGui::enrich_workflow_content(SmartPrintWorkflowContent& content
     content.success_rate       = readiness.score > 0.f ? readiness.score : content.success_rate;
     content.change_count       = changes.empty() ? content.change_count : changes.size();
     content.change_preview.clear();
-    const bool ko = smart_print_ui_korean();
+    const bool ko = SlicePilotUi::smart_print_locale_korean();
     for (const SettingChange& ch : changes) {
         if (content.change_preview.size() >= 8)
             break;

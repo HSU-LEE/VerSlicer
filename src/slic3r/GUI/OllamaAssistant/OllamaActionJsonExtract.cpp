@@ -328,6 +328,9 @@ static nlohmann::json try_parse_any_json_object(std::string text)
                 && !root["message"].get<std::string>().empty() && is_useful_action_root(root))
                 return root;
         } catch (...) {
+            // Expected: the scanner probes successive {...} slices and most are
+            // not valid JSON. Silence is intentional; the caller reports when no
+            // slice parses at all.
         }
 
         search_from = end;

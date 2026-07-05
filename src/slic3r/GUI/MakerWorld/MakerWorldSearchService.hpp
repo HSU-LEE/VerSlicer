@@ -41,14 +41,6 @@ public:
 
     /** MakerWorld web search URL (browser fallback). */
     static std::string makerworld_search_page_url(const std::string& query);
-
-    static bool user_wants_makerworld_search(const std::string& user_text);
-    static bool user_wants_makerworld_import(const std::string& user_text);
-
-    /** True when the message is only MakerWorld search/import (no other slicer actions). */
-    static bool is_pure_makerworld_request(const std::string& user_text);
-
-    static bool is_informational_makerworld_question(const std::string& user_text);
 };
 
 }} // namespace

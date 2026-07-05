@@ -3,7 +3,9 @@
 #include "OllamaActionJsonExtract.hpp"
 #include "OllamaActionValidator.hpp"
 #include "OllamaConfig.hpp"
+#include "OllamaContextBuilder.hpp"
 #include "OllamaIntentContext.hpp"
+#include "OllamaMakerWorldActions.hpp"
 #include "OllamaSettingRegistry.hpp"
 #include "OllamaSettingSearch.hpp"
 #include "OllamaSystemPrompts.hpp"
@@ -14,10 +16,8 @@
 #include "BambuLabWikiSearch.hpp"
 #include "OllamaTelemetry.hpp"
 
-#include "../AICoach/AICoachApplyDedup.hpp"
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
-#include "../BambuSmartPrint/BambuSmartPrintService.hpp"
 
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp"
@@ -39,16 +39,13 @@
 #include <boost/algorithm/string.hpp>
 #include <filesystem>
 #include <chrono>
-#include <mutex>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_set>
-#include <unordered_set>
 #include <wx/filefn.h>
 #include <wx/glcanvas.h>
 #include <wx/filename.h>
-#include <wx/menu.h>
 
 namespace Slic3r { namespace GUI {
 
@@ -309,6 +306,7 @@ static bool json_brim_width_positive(const nlohmann::json& options)
         try {
             return std::stod(options["brim_width"].get<std::string>()) > 0.0;
         } catch (...) {
+            BOOST_LOG_TRIVIAL(debug) << "Ollama executor: unparsable brim_width string";
         }
     }
     return false;
@@ -340,6 +338,7 @@ static void expand_brim_options(nlohmann::json& options)
                     try {
                         w = std::stod(options["brim_width"].get<std::string>());
                     } catch (...) {
+                        BOOST_LOG_TRIVIAL(debug) << "Ollama executor: unparsable brim_width string";
                     }
             }
             if (!has_width || w <= 0.0)
@@ -482,62 +481,12 @@ static DynamicPrintConfig* edited_config_for_action(const nlohmann::json& action
     return edited_config(ptype, fidx);
 }
 
-static bool is_calibration_menu_name(const std::string& name)
-{
-    return boost::icontains(name, "calib") || name.find("캘리브") != std::string::npos ||
-           name.find("보정") != std::string::npos;
-}
-
 static bool is_blocked_calibration_menu_item(const std::string& menu, const std::string& item)
 {
-    if (is_calibration_menu_name(menu))
+    if (OllamaContextBuilder::is_calibration_menu_name(menu))
         return true;
     return boost::icontains(item, "VFA") || item.find("캘리브") != std::string::npos ||
            boost::icontains(item, "calibration");
-}
-
-static nlohmann::json build_menu_context_json()
-{
-    nlohmann::json out = nlohmann::json::array();
-    if (!wxGetApp().mainframe)
-        return out;
-    wxMenuBar* mb = wxGetApp().mainframe->GetMenuBar();
-    if (!mb)
-        return out;
-
-    const int menu_count = (int)mb->GetMenuCount();
-    for (int mi = 0; mi < menu_count; ++mi) {
-        wxMenu* menu = mb->GetMenu(mi);
-        if (!menu)
-            continue;
-        const std::string menu_name = mb->GetMenuLabelText(mi).utf8_string();
-        if (is_calibration_menu_name(menu_name))
-            continue;
-        nlohmann::json m;
-        m["menu"] = menu_name;
-        m["items"] = nlohmann::json::array();
-
-        const auto& items = menu->GetMenuItems();
-        for (wxMenuItem* it : items) {
-            if (!it)
-                continue;
-            if (it->IsSeparator())
-                continue;
-            if (it->IsSubMenu()) {
-                // Represent submenus by their label; the LLM can open them by calling menu_item with "Export" etc.
-                nlohmann::json si;
-                si["label"] = it->GetItemLabelText().utf8_string();
-                si["submenu"] = true;
-                m["items"].push_back(si);
-            } else {
-                nlohmann::json ii;
-                ii["label"] = it->GetItemLabelText().utf8_string();
-                m["items"].push_back(ii);
-            }
-        }
-        out.push_back(m);
-    }
-    return out;
 }
 
 std::string json_value_to_config_string(const nlohmann::json& v)
@@ -697,6 +646,7 @@ static SetConfigMutateResult mutate_set_config_on_config(DynamicPrintConfig& cfg
                 if (cfg.opt_serialize(key) == next.opt_serialize(key))
                     continue;
             } catch (...) {
+                BOOST_LOG_TRIVIAL(warning) << "Ollama executor: opt_serialize failed comparing key " << key;
             }
         }
 
@@ -706,6 +656,7 @@ static SetConfigMutateResult mutate_set_config_on_config(DynamicPrintConfig& cfg
         try {
             stored = trial.opt_serialize(key);
         } catch (...) {
+            BOOST_LOG_TRIVIAL(warning) << "Ollama executor: opt_serialize failed for key " << key;
         }
         out.applied_kvs.push_back(key + "=" + stored);
     }
@@ -1383,349 +1334,24 @@ void OllamaActionExecutor::apply_set_config_actions_to_config(DynamicPrintConfig
     }
 }
 
-static bool ui_prefers_korean()
-{
-    const wxString code = GUI::wxGetApp().current_language_code();
-    wxString lang = code.BeforeFirst('_').BeforeFirst('-').Lower();
-    if (lang == wxString("ko"))
-        return true;
-    lang = GUI::wxGetApp().current_language_code_safe().BeforeFirst('_').Lower();
-    return lang == wxString("ko");
-}
-
-struct ContextCache
-{
-    std::mutex  mutex;
-    std::string signature;
-    std::string full_json;
-    std::string compact_json;
-};
-
-ContextCache& context_cache()
-{
-    static ContextCache cache;
-    return cache;
-}
-
 void OllamaActionExecutor::invalidate_context_cache()
 {
-    auto& cache = context_cache();
-    {
-        std::lock_guard<std::mutex> lock(cache.mutex);
-        cache.signature.clear();
-        cache.full_json.clear();
-        cache.compact_json.clear();
-    }
-    OllamaTelemetry::context_cache_invalidate();
+    OllamaContextBuilder::invalidate_context_cache();
 }
 
 void OllamaActionExecutor::notify_plater_context_changed(bool clear_coach_dedup)
 {
-    invalidate_context_cache();
-    OllamaIntentContext::refresh_cached_intent_signals();
-    if (clear_coach_dedup)
-        AICoachApplyDedup::instance().clear();
-}
-
-static std::string selection_bbox_signature(Plater* plater)
-{
-    GLCanvas3D* canvas = view3d_canvas_for_object_ops(plater);
-    if (!canvas)
-        return "none";
-    const Selection& sel = canvas->get_selection();
-    if (sel.is_empty())
-        return "empty";
-    const BoundingBoxf3 bb = sel.get_bounding_box();
-    std::ostringstream  sig;
-    sig << bb.min.x() << ',' << bb.min.y() << ',' << bb.min.z() << '|' << bb.size().x() << ',' << bb.size().y()
-        << ',' << bb.size().z();
-    return sig.str();
-}
-
-static std::string build_context_signature()
-{
-    std::ostringstream sig;
-    if (auto* bundle = wxGetApp().preset_bundle) {
-        sig << bundle->prints.get_edited_preset().name << '|';
-        sig << bundle->filaments.get_edited_preset().name << '|';
-        sig << bundle->printers.get_edited_preset().name << '|';
-        sig << OllamaSettingRegistry::config_fingerprint(&bundle->prints.get_edited_preset().config) << '|';
-        sig << OllamaSettingRegistry::config_fingerprint(&bundle->filaments.get_edited_preset().config) << '|';
-        sig << OllamaSettingRegistry::config_fingerprint(&bundle->printers.get_edited_preset().config) << '|';
-    }
-    if (Plater* plater = wxGetApp().plater()) {
-        sig << plater->model().objects.size() << '|';
-        sig << plater->get_partplate_list().get_curr_plate_index() << '|';
-        if (GLCanvas3D* v3 = view3d_canvas_for_object_ops(plater))
-            sig << v3->get_selection().volumes_count() << '|';
-        sig << selection_bbox_signature(plater) << '|';
-        const auto& slice_a = BambuSmartPrintService::instance().last_slice_analysis();
-        if (slice_a.valid) {
-            sig << slice_a.overhang_area_ratio << ',' << slice_a.unsupported_islands_count << '|';
-        }
-        const auto& readiness = BambuSmartPrintService::instance().last_readiness_report();
-        if (readiness.score > 0.f)
-            sig << readiness.score << '|';
-    }
-    return sig.str();
-}
-
-static void append_printer_capabilities(nlohmann::json& ctx, const DynamicPrintConfig* printer_cfg)
-{
-    if (!printer_cfg)
-        return;
-    nlohmann::json caps = nlohmann::json::object();
-    for (const char* key : {"printer_model", "nozzle_diameter", "printable_area", "printable_height"}) {
-        if (printer_cfg->has(key))
-            caps[key] = printer_cfg->opt_serialize(key);
-    }
-    if (!caps.empty())
-        ctx["printer_capabilities"] = caps;
-}
-
-static void append_slice_and_readiness(nlohmann::json& ctx, Plater* plater)
-{
-    BambuSmartPrintService::instance().update_plate_assessment_data(plater);
-    const auto& slice_a = BambuSmartPrintService::instance().last_slice_analysis();
-    if (slice_a.valid) {
-        ctx["slice_analysis"] = {
-            {"overhang_area_ratio", slice_a.overhang_area_ratio},
-            {"unsupported_islands", slice_a.unsupported_islands_count},
-        };
-    }
-    const auto& readiness = BambuSmartPrintService::instance().last_readiness_report();
-    if (readiness.score > 0.f)
-        ctx["readiness_score"] = readiness.score;
-}
-
-static nlohmann::json build_plate_objects_json(Plater* plater)
-{
-    nlohmann::json arr = nlohmann::json::array();
-    if (!plater)
-        return arr;
-    GLCanvas3D* canvas = view3d_canvas_for_object_ops(plater);
-    if (!canvas)
-        return arr;
-    const Selection& sel = canvas->get_selection();
-    Model&           model = plater->model();
-    PartPlateList&   ppl   = plater->get_partplate_list();
-    const int        plate = ppl.get_curr_plate_index();
-
-    auto object_selected = [&](unsigned int obj_idx) {
-        if (sel.is_empty())
-            return false;
-        for (unsigned int vid : sel.get_volume_idxs()) {
-            const GLVolume* v = sel.get_volume(vid);
-            if (v && static_cast<unsigned int>(v->object_idx()) == obj_idx)
-                return true;
-        }
-        return false;
-    };
-
-    for (size_t i = 0; i < model.objects.size(); ++i) {
-        ModelObject* obj = model.objects[i];
-        if (obj->instances.empty())
-            continue;
-        const int on_plate = ppl.find_instance_belongs(static_cast<int>(i), 0);
-        if (on_plate != plate)
-            continue;
-        const BoundingBoxf3 bb = obj->instance_bounding_box(0);
-        arr.push_back({
-            {"object_index", i},
-            {"name", obj->name},
-            {"plate_index", plate},
-            {"selected", object_selected(static_cast<unsigned int>(i))},
-            {"size_mm",
-             {{"x", bb.size().x()}, {"y", bb.size().y()}, {"z", bb.size().z()}}},
-        });
-    }
-    return arr;
-}
-
-static nlohmann::json build_context_object(bool compact)
-{
-    nlohmann::json ctx;
-    auto*          bundle  = wxGetApp().preset_bundle;
-    Plater*        plater  = wxGetApp().plater();
-    const bool     ko      = ui_prefers_korean();
-
-    if (bundle) {
-        const DynamicPrintConfig& print_cfg = bundle->prints.get_edited_preset().config;
-        nlohmann::json          print_opts  = nlohmann::json::object();
-        if (compact) {
-            static const char* kCompactKeys[] = {
-                "layer_height", "sparse_infill_density", "enable_support", "brim_width", "brim_type",
-            };
-            for (const char* key : kCompactKeys) {
-                if (print_cfg.has(key))
-                    print_opts[key] = print_cfg.opt_serialize(key);
-            }
-        } else {
-            static const char* kPrintKeys[] = {
-                "layer_height", "line_width", "sparse_infill_density", "sparse_infill_pattern",
-                "wall_loops", "top_shell_layers", "bottom_shell_layers", "enable_support",
-                "brim_width", "brim_type", "outer_wall_speed", "sparse_infill_speed", "initial_layer_print_height",
-            };
-            for (const char* key : kPrintKeys) {
-                if (print_cfg.has(key))
-                    print_opts[key] = print_cfg.opt_serialize(key);
-            }
-        }
-        ctx["print_preset"]    = bundle->prints.get_edited_preset().name;
-        ctx["print_options"]   = print_opts;
-        ctx["filament_preset"] = bundle->filaments.get_edited_preset().name;
-        ctx["printer_preset"]  = bundle->printers.get_edited_preset().name;
-        append_printer_capabilities(ctx, &bundle->printers.get_edited_preset().config);
-    }
-
-    if (plater) {
-        ctx["current_plate_index"] = plater->get_partplate_list().get_curr_plate_index();
-        ctx["plate_objects"]       = build_plate_objects_json(plater);
-        if (GLCanvas3D* v3 = view3d_canvas_for_object_ops(plater)) {
-            const Selection& sel = v3->get_selection();
-            ctx["selection_count"] = sel.volumes_count();
-            ctx["has_selection"]   = !sel.is_empty();
-            if (!sel.is_empty()) {
-                const BoundingBoxf3 bb = sel.get_bounding_box();
-                ctx["selection_size_mm"] = {
-                    {"x", bb.size().x()},
-                    {"y", bb.size().y()},
-                    {"z", bb.size().z()},
-                };
-                const int obj_idx = sel.get_object_idx();
-                if (obj_idx >= 0)
-                    ctx["selected_object_index"] = obj_idx;
-            }
-        }
-    }
-
-    if (!compact) {
-        if (ollama_auto_catalog_enabled()) {
-            ctx["setting_index"] = OllamaSettingRegistry::build_setting_index(3);
-            ctx["allowed_config_keys"] = OllamaSettingRegistry::allowed_keys_json();
-        }
-        if (bundle)
-            ctx["setting_catalog"] = OllamaSettingRegistry::build_catalog(&bundle->prints.get_edited_preset().config, ko);
-        else
-            ctx["setting_catalog"] = OllamaSettingRegistry::build_catalog(nullptr, ko);
-        ctx["audience"]            = "intermediate";
-        ctx["setting_rules"]       = ko
-            ? "결과 중심: current 값 기준 최소 변경. pro_tips·모델 지식·setting_catalog(고급 키 포함) 활용. 키는 catalog에 있을 때만."
-            : "Outcome-first: use pro_tips, your 3D printing knowledge, and setting_catalog (incl. advanced keys). Catalog keys only.";
-        nlohmann::json hints = nlohmann::json::object();
-        if (ko) {
-            hints["bed_adhesion"] =
-                "안 붙음/들뜸: 바닥 보조 테두리(브림) 또는 첫 층 — 접착 문제일 때.";
-            hints["overhang"]     = "공중/매달림: 받침 구조 또는 눕히기 — 오버행 문제일 때.";
-            hints["strength"]     = "부서짐/약함: 안쪽 채움·벽 두께 — 구조 문제일 때 (접착과 다름).";
-            hints["warp"]         = "모서리 들뜸: 접착·베드·브림.";
-            hints["stringing"]    = "실 늘어짐: 리트랙션·온도.";
-            hints["speed"]        = "느림: 레이어 두께·채움 — 품질 tradeoff 설명.";
-            hints["surface"]      = "거친 표면: 레이어 두께 감소.";
-        } else {
-            hints["bed_adhesion"] = "Won't stick: helper ring at bottom or first layer — adhesion issue.";
-            hints["overhang"]     = "Mid-air print: supports or lay flat — overhang issue.";
-            hints["strength"]     = "Breaks easily: tighter fill or thicker walls — structural, not brim.";
-            hints["warp"]         = "Corner lift: adhesion, bed, brim.";
-            hints["stringing"]    = "Stringing: retraction, temperature.";
-            hints["speed"]        = "Too slow: layer height, infill — mention quality tradeoff.";
-            hints["surface"]      = "Rough surface: lower layer height.";
-        }
-        ctx["plain_language_hints"] = hints;
-        const nlohmann::json menu_ctx = build_menu_context_json();
-        if (!menu_ctx.empty())
-            ctx["menu_catalog"] = menu_ctx;
-    } else {
-        ctx["plain_language_hints"] = ko
-            ? nlohmann::json{{"bed_adhesion", "접착"}, {"overhang", "오버행"}, {"strength", "강도(채움·벽)"},
-                             {"speed", "속도"}, {"surface", "표면"}}
-            : nlohmann::json{{"bed_adhesion", "adhesion"}, {"overhang", "overhang"}, {"strength", "strength"},
-                             {"speed", "speed"}, {"surface", "surface"}};
-    }
-
-    ctx["engineering_hints"] = OllamaIntentContext::build_engineering_hints_json();
-    ctx["user_flow"]         = OllamaUserFlow::build_flow_context_json();
-
-    append_slice_and_readiness(ctx, plater);
-
-    OllamaIntentContext::consume_slice_feedback_if_ready();
-    ctx["intent_signals"] = OllamaIntentContext::build_intent_signals_json();
-    OllamaIntentContext::refresh_cached_intent_signals();
-
-    return ctx;
+    OllamaContextBuilder::notify_plater_context_changed(clear_coach_dedup);
 }
 
 std::string OllamaActionExecutor::fit_context_json_to_limit(std::string json, size_t max_chars)
 {
-    if (json.size() <= max_chars)
-        return json;
-    try {
-        nlohmann::json ctx = nlohmann::json::parse(json);
-        auto drop_lowest_priority_catalog_entry = [&]() -> bool {
-            if (!ctx.contains("setting_catalog") || !ctx["setting_catalog"].is_array()
-                || ctx["setting_catalog"].empty())
-                return false;
-            auto& catalog = ctx["setting_catalog"];
-            size_t drop_idx = 0;
-            int    lowest   = 1000;
-            for (size_t i = 0; i < catalog.size(); ++i) {
-                if (!catalog[i].is_object() || !catalog[i].contains("key") || !catalog[i]["key"].is_string())
-                    continue;
-                const std::string key = catalog[i]["key"].get<std::string>();
-                int               pri = 50;
-                if (const OllamaSettingSpec* sp = OllamaSettingRegistry::find_spec(key))
-                    pri = sp->context_priority;
-                if (pri < lowest) {
-                    lowest   = pri;
-                    drop_idx = i;
-                }
-            }
-            catalog.erase(drop_idx);
-            return true;
-        };
-
-        json = ctx.dump(2);
-        while (json.size() > max_chars && drop_lowest_priority_catalog_entry())
-            json = ctx.dump(2);
-
-        if (json.size() > max_chars && ctx.contains("setting_index") && ctx["setting_index"].is_array()
-            && ctx["setting_index"].size() > 40) {
-            auto& idx = ctx["setting_index"];
-            idx.erase(idx.begin() + idx.size() / 2, idx.end());
-            json = ctx.dump(2);
-        }
-
-        if (json.size() > max_chars && ctx.contains("menu_catalog"))
-            ctx.erase("menu_catalog");
-        if (json.size() > max_chars && ctx.contains("plain_language_hints"))
-            ctx.erase("plain_language_hints");
-        if (json.size() > max_chars && ctx.contains("pro_tips") && ctx["pro_tips"].is_array()
-            && ctx["pro_tips"].size() > 2) {
-            auto& tips = ctx["pro_tips"];
-            tips.erase(tips.begin() + tips.size() / 2, tips.end());
-        }
-        json = ctx.dump(2);
-        if (json.size() > max_chars) {
-            const std::string compact = build_compact_context_json();
-            if (compact.size() <= max_chars)
-                return compact;
-            json = compact;
-        }
-    } catch (...) {
-    }
-    if (json.size() > max_chars) {
-        const size_t cut = json.rfind('}', max_chars);
-        if (cut != std::string::npos && cut > max_chars / 2)
-            json = json.substr(0, cut + 1);
-        else
-            json = json.substr(0, max_chars);
-    }
-    return json;
+    return OllamaContextBuilder::fit_context_json_to_limit(std::move(json), max_chars);
 }
 
 std::string OllamaActionExecutor::build_system_prompt(bool apply_mode)
 {
-    const bool ko = ui_prefers_korean();
+    const bool ko = OllamaContextBuilder::ui_prefers_korean();
     if (apply_mode) {
         std::string prompt = OllamaSystemPrompts::apply_system_prompt(ko);
         prompt += OllamaUserFlow::flow_prompt_block(ko);
@@ -1734,127 +1360,14 @@ std::string OllamaActionExecutor::build_system_prompt(bool apply_mode)
     return OllamaSystemPrompts::question_system_prompt(ko);
 }
 
-std::string OllamaActionExecutor::build_diagnostic_system_prompt()
-{
-    return OllamaSystemPrompts::diagnostic_system_prompt(ui_prefers_korean());
-}
-
-std::string OllamaActionExecutor::build_diagnostic_user_message(const std::string& user_request)
-{
-    const bool     ko  = ui_prefers_korean();
-    nlohmann::json ctx = build_context_object(/*compact*/ true);
-    ctx["setting_index"] = OllamaSettingRegistry::build_setting_index(3);
-    ctx["pro_tips"]      = OllamaPrintingTips::tips_for_request(user_request, ko);
-    ctx["suggested_candidate_keys"] =
-        OllamaSettingSearch::candidate_keys_for_request(user_request, 2, 10);
-    std::string body     = ctx.dump(2);
-    std::string packed =
-        std::string("Pipeline step 1 — problem diagnosis.\n\nCurrent slicer context (JSON):\n") + body
-        + "\n\nUser request:\n" + user_request;
-    return fit_context_json_to_limit(std::move(packed), 8000);
-}
-
-std::string OllamaActionExecutor::build_proposal_user_message(const std::string& user_request,
-                                                              const std::vector<std::string>& candidate_keys,
-                                                              const nlohmann::json& diagnosis_summary,
-                                                              const nlohmann::json& wiki_context,
-                                                              const nlohmann::json& settings_analysis)
-{
-    nlohmann::json ctx = build_context_object(/*compact*/ true);
-    const bool     ko  = ui_prefers_korean();
-    const DynamicPrintConfig* print_cfg    = nullptr;
-    const DynamicPrintConfig* filament_cfg = nullptr;
-    if (auto* bundle = wxGetApp().preset_bundle) {
-        print_cfg    = &bundle->prints.get_edited_preset().config;
-        filament_cfg = &bundle->filaments.get_edited_preset().config;
-    }
-    ctx["pipeline"] = ko ? nlohmann::json{{"step", 4}, {"name", "설정 변경 제안"}}
-                         : nlohmann::json{{"step", 4}, {"name", "Setting change proposal"}};
-    ctx["diagnosis_summary"] = diagnosis_summary;
-    ctx["settings_analysis"] = settings_analysis;
-    ctx["setting_catalog"]   = OllamaSettingSearch::lookup(candidate_keys, print_cfg, filament_cfg, ko);
-    if (wiki_context.is_array() && !wiki_context.empty()) {
-        ctx["wiki_context"] = wiki_context;
-        ctx["wiki_rules"]   = ko ? "Bambu Lab Wiki 근거 — setting_catalog 키와 맞을 때만 적용"
-                                 : "Bambu Lab Wiki evidence — apply only matching setting_catalog keys";
-    }
-    ctx["pro_tips"] = OllamaPrintingTips::tips_for_request(user_request, ko);
-    std::string body = ctx.dump(2);
-    return OllamaSystemPrompts::proposal_turn_instructions(ko) + "\n\nProposal context (JSON):\n" + body
-           + "\n\nUser request:\n" + user_request;
-}
-
-std::string OllamaActionExecutor::build_planner_system_prompt()
-{
-    return OllamaSystemPrompts::planner_system_prompt(ui_prefers_korean());
-}
-
-std::string OllamaActionExecutor::build_planner_user_message(const std::string& user_request)
-{
-    nlohmann::json ctx = build_context_object(/*compact*/ true);
-    ctx["setting_index"] = OllamaSettingRegistry::build_setting_index(3);
-    std::string body     = ctx.dump(2);
-    std::string packed   = std::string("Current slicer context (JSON):\n") + body + "\n\nUser request:\n" + user_request;
-    return fit_context_json_to_limit(std::move(packed), 8000);
-}
-
-std::string OllamaActionExecutor::build_resolver_user_message(const std::string& user_request,
-                                                              const std::vector<std::string>& candidate_keys,
-                                                              const nlohmann::json& wiki_context)
-{
-    nlohmann::json ctx = build_context_object(/*compact*/ true);
-    const bool     ko  = ui_prefers_korean();
-    const DynamicPrintConfig* print_cfg    = nullptr;
-    const DynamicPrintConfig* filament_cfg = nullptr;
-    if (auto* bundle = wxGetApp().preset_bundle) {
-        print_cfg    = &bundle->prints.get_edited_preset().config;
-        filament_cfg = &bundle->filaments.get_edited_preset().config;
-    }
-    ctx["setting_catalog"]        = OllamaSettingSearch::lookup(candidate_keys, print_cfg, filament_cfg, ko);
-    ctx["planner_candidate_keys"] = candidate_keys;
-    if (wiki_context.is_array() && !wiki_context.empty()) {
-        ctx["wiki_context"] = wiki_context;
-        ctx["wiki_rules"]   = ko
-            ? "wiki_context는 Bambu Lab 위키 발췌입니다. 증상 해결에 맞는 setting_catalog 키만 set_config로 적용하세요."
-            : "wiki_context excerpts are from Bambu Lab Wiki. Apply only matching keys from setting_catalog.";
-    }
-    std::string body = ctx.dump(2);
-    return OllamaSystemPrompts::proposal_turn_instructions(ko) + "\n\nResolver context (JSON):\n" + body
-           + "\n\nUser request:\n" + user_request;
-}
-
 std::string OllamaActionExecutor::build_context_json()
 {
-    auto& cache = context_cache();
-    std::lock_guard<std::mutex> lock(cache.mutex);
-    const std::string sig = build_context_signature();
-    if (sig != cache.signature) {
-        cache.signature.clear();
-        cache.full_json.clear();
-        cache.compact_json.clear();
-    }
-    if (cache.full_json.empty()) {
-        cache.signature  = sig;
-        cache.full_json  = build_context_object(/*compact*/ false).dump(2);
-    }
-    return cache.full_json;
+    return OllamaContextBuilder::build_context_json();
 }
 
 std::string OllamaActionExecutor::build_compact_context_json()
 {
-    auto& cache = context_cache();
-    std::lock_guard<std::mutex> lock(cache.mutex);
-    const std::string sig = build_context_signature();
-    if (sig != cache.signature) {
-        cache.signature.clear();
-        cache.full_json.clear();
-        cache.compact_json.clear();
-    }
-    if (cache.compact_json.empty()) {
-        cache.signature    = sig;
-        cache.compact_json = build_context_object(/*compact*/ true).dump(2);
-    }
-    return cache.compact_json;
+    return OllamaContextBuilder::build_compact_context_json();
 }
 
 nlohmann::json OllamaActionExecutor::extract_action_json(const std::string& assistant_text)
@@ -1991,6 +1504,8 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
         else if (type == "open_smart_print" || type == "run_smart_print" || type == "open_setup" || type == "send_print"
                  || type == "export_gcode" || type == "rollback_apply")
             result = OllamaUserFlow::apply_flow_action(action, wxGetApp().plater());
+        else if (type == "makerworld_search" || type == "makerworld_find_and_print" || type == "import_makerworld")
+            result = OllamaMakerWorldActions::apply(action);
         else
             result = OllamaActionResult{false, false, "Unknown action: " + type};
 

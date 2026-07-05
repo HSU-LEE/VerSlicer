@@ -7,6 +7,7 @@
 #include "../OllamaAssistant/OllamaActionPipeline.hpp"
 #include "../OllamaAssistant/OllamaAgentEventBus.hpp"
 #include "../OllamaAssistant/OllamaModelLoadAdvisor.hpp"
+#include "../AIPipeline/PrintJobOrchestrator.hpp"
 
 #include "../I18N.hpp"
 
@@ -103,6 +104,12 @@ void AIGuiOrchestrator::on_slice_completed(Plater* plater, const Print* print, b
 {
     if (plater) {
         nlohmann::json payload = {{"success", success}};
+        // Phase 3: stamp the slicing job id (when a PrintJobOrchestrator job is
+        // slicing) so its job-scoped SliceDone subscription can match. Backward
+        // compatible: the field is absent/empty when no orchestrator job slices.
+        const std::string slicing_job_id = AIPipeline::PrintJobOrchestrator::current_slicing_job_id();
+        if (!slicing_job_id.empty())
+            payload["job_id"] = slicing_job_id;
         OllamaAgentEventBus::instance().publish(OllamaAgentEventKind::SliceDone, std::move(payload));
     }
     if (!AICoachController::is_enabled_for_current_mode())

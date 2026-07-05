@@ -13,7 +13,8 @@ struct OllamaConfigVerifyReport
 {
     bool                     all_ok{true};
     std::vector<std::string> mismatches;
-    nlohmann::json           tool_results{nlohmann::json::array()};
+    // Copy-init: brace-init json{ json::array() } would create [[]] (a nested array).
+    nlohmann::json           tool_results = nlohmann::json::array();
     nlohmann::json           config_digest;
 };
 

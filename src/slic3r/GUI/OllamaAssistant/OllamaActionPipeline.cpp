@@ -34,7 +34,7 @@ void strip_non_makerworld_actions(nlohmann::json& root)
         if (!a.is_object() || !a.contains("type") || !a["type"].is_string())
             continue;
         const std::string t = a["type"].get<std::string>();
-        if (t == "makerworld_search" || t == "import_makerworld")
+        if (t == "makerworld_search" || t == "import_makerworld" || t == "makerworld_find_and_print")
             kept.push_back(a);
     }
     root["actions"] = std::move(kept);

@@ -52,7 +52,31 @@ static void set_opt(DynamicPrintConfig& cfg, const char* key, bool val)
         opt->deserialize(val ? "1" : "0");
 }
 
-static void apply_goal_patches(DynamicPrintConfig& cfg, const PrintGoal& goal, const ModelAnalysis& mesh)
+static std::string action_key(const nlohmann::json& action)
+{
+    if (!action.is_object() || !action.contains("type"))
+        return {};
+    const std::string type = action["type"].get<std::string>();
+    if (type == "set_config" && action.contains("options") && action["options"].is_object()) {
+        std::string keys;
+        for (auto it = action["options"].begin(); it != action["options"].end(); ++it) {
+            if (!keys.empty())
+                keys += ",";
+            keys += it.key();
+        }
+        return "set_config:" + keys;
+    }
+    return type;
+}
+
+} // namespace
+
+PrintGoal PrintPlanner::parse_goal(const std::string& user_text)
+{
+    return PrintGoalParser::parse(user_text);
+}
+
+void PrintPlanner::apply_goal_patches(DynamicPrintConfig& cfg, const PrintGoal& goal, const ModelAnalysis& mesh)
 {
     const bool wants_strong   = goal.has_intent(PrintGoalIntent::Strong) || goal.has_intent(PrintGoalIntent::Outdoor);
     const bool wants_fast     = goal.has_intent(PrintGoalIntent::Fast);
@@ -63,9 +87,11 @@ static void apply_goal_patches(DynamicPrintConfig& cfg, const PrintGoal& goal, c
     if (wants_strong && !wants_fast) {
         if (!cfg.has("wall_loops") || cfg.opt_int("wall_loops") < 3)
             set_opt(cfg, "wall_loops", 3);
-        const std::string infill = cfg.opt_serialize("sparse_infill_density");
-        if (infill.empty() || infill == "15%" || infill == "10%" || infill == "5%")
-            set_opt(cfg, "sparse_infill_density", "20%");
+        if (cfg.has("sparse_infill_density")) {
+            const std::string infill = cfg.opt_serialize("sparse_infill_density");
+            if (infill.empty() || infill == "15%" || infill == "10%" || infill == "5%")
+                set_opt(cfg, "sparse_infill_density", "20%");
+        }
     }
 
     if (wants_fast && goal.weight_fast >= goal.weight_strong) {
@@ -117,30 +143,6 @@ static void apply_goal_patches(DynamicPrintConfig& cfg, const PrintGoal& goal, c
         if (cfg.has("support_type"))
             set_opt(cfg, "support_type", std::string("tree(auto)"));
     }
-}
-
-static std::string action_key(const nlohmann::json& action)
-{
-    if (!action.is_object() || !action.contains("type"))
-        return {};
-    const std::string type = action["type"].get<std::string>();
-    if (type == "set_config" && action.contains("options") && action["options"].is_object()) {
-        std::string keys;
-        for (auto it = action["options"].begin(); it != action["options"].end(); ++it) {
-            if (!keys.empty())
-                keys += ",";
-            keys += it.key();
-        }
-        return "set_config:" + keys;
-    }
-    return type;
-}
-
-} // namespace
-
-PrintGoal PrintPlanner::parse_goal(const std::string& user_text)
-{
-    return PrintGoalParser::parse(user_text);
 }
 
 void PrintPlanner::dedupe_actions(nlohmann::json& root)
@@ -297,12 +299,19 @@ nlohmann::json PrintPlanner::config_delta_to_actions(const DynamicPrintConfig& b
                     break;
                 }
             }
-            if (is_num && ch.new_value.find('.') != std::string::npos)
-                options[ch.key] = std::stod(ch.new_value);
-            else if (is_num)
-                options[ch.key] = std::stoi(ch.new_value);
-            else
+            // std::stod/std::stoi throw std::invalid_argument / std::out_of_range for
+            // strings like "-", "." or values outside the numeric range; fall back to the
+            // raw string so a stray value never unwinds the caller (and quits the app).
+            try {
+                if (is_num && ch.new_value.find('.') != std::string::npos)
+                    options[ch.key] = std::stod(ch.new_value);
+                else if (is_num)
+                    options[ch.key] = std::stoi(ch.new_value);
+                else
+                    options[ch.key] = ch.new_value;
+            } catch (const std::exception&) {
                 options[ch.key] = ch.new_value;
+            }
         }
     }
     if (options.empty())

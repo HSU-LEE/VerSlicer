@@ -41,6 +41,19 @@ if (ORCA_TOOLS)
     target_link_libraries(makerworld_search_test libslic3r boost_headeronly)
     target_compile_definitions(makerworld_search_test PRIVATE -DBOOST_ALL_NO_LIB)
 
+    add_executable(model_search_ranker_test
+        model_search_ranker_test.cpp
+        ../slic3r/GUI/ModelSearch/CandidateRanker.cpp
+        ../slic3r/GUI/ModelSearch/ModelSearchDedupe.cpp
+        ../slic3r/GUI/MakerWorld/MakerWorldSearchCore.cpp
+    )
+    target_include_directories(model_search_ranker_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/..
+        ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
+    )
+    target_link_libraries(model_search_ranker_test libslic3r boost_headeronly)
+    target_compile_definitions(model_search_ranker_test PRIVATE -DBOOST_ALL_NO_LIB)
+
     add_executable(ollama_assistant_test
         ollama_assistant_test.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
@@ -146,6 +159,7 @@ if (ORCA_TOOLS)
     add_test(NAME ollama_apply_golden_test COMMAND ollama_apply_golden_test)
     add_test(NAME bambu_wiki_search_test COMMAND bambu_wiki_search_test)
     add_test(NAME makerworld_search_test COMMAND makerworld_search_test)
+    add_test(NAME model_search_ranker_test COMMAND model_search_ranker_test)
 endif()
 
 function(encoding_check TARGET)

@@ -3,6 +3,8 @@
 
 #include "MakerWorldTypes.hpp"
 
+#include <nlohmann/json_fwd.hpp>
+
 #include <functional>
 #include <string>
 #include <vector>
@@ -33,8 +35,18 @@ public:
     static void run_user_makerworld_request(wxWindow* parent, const std::string& user_text, bool apply_mode,
                                             MakerWorldFlowUiCallbacks callbacks = {});
 
+    /** Search top 3, show numbered picks + countdown, then import, slice, and send to printer. */
+    static void run_search_and_offer_print(wxWindow* parent, const std::string& query, bool apply_mode,
+                                           MakerWorldFlowUiCallbacks callbacks = {});
+
     static bool confirm_and_import(wxWindow* parent, const MakerWorldCandidate& candidate, bool apply_mode,
                                    MakerWorldFlowUiCallbacks callbacks = {});
+
+    /** Dispatch a single MakerWorld agent action (makerworld_search / makerworld_find_and_print /
+     *  import_makerworld). Returns true when the action was a MakerWorld action and was handled.
+     *  Shared by the single-shot chat path and the agent-loop executor so routing lives in one place. */
+    static bool run_agent_action(const nlohmann::json& action, wxWindow* parent, bool apply_mode,
+                                 const std::string& user_req, MakerWorldFlowUiCallbacks callbacks = {});
 
     static void import_download_info(const std::string& download_info, const std::string& design_id);
 

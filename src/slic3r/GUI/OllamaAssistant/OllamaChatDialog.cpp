@@ -1,4 +1,5 @@
 #include "OllamaChatDialog.hpp"
+#include "AiLocale.hpp"
 #include "OllamaChatPanel.hpp"
 #include "OllamaProcessingNotice.hpp"
 
@@ -17,8 +18,7 @@ namespace {
 
 wxString assistant_dialog_title()
 {
-    return wxGetApp().current_language_code().StartsWith("ko") ? wxString::FromUTF8("AI 도우미")
-                                                               : _L("AI Assistant");
+    return AiLocale::text(_L("AI Assistant"), "AI 도우미");
 }
 
 } // namespace
@@ -83,6 +83,8 @@ void OllamaChatDialog::toggle()
     ensure_visible_near_canvas();
     Show();
     Raise();
+    if (m_panel)
+        m_panel->focus_input();
 }
 
 void OllamaChatDialog::ensure_visible_near_canvas()

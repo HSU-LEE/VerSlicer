@@ -6,6 +6,7 @@
 #include "OllamaSettingRegistry.hpp"
 #include "OllamaTelemetry.hpp"
 
+#include "../MakerWorld/MakerWorldIntent.hpp"
 #include "../MakerWorld/MakerWorldSearchService.hpp"
 
 #include <boost/algorithm/string.hpp>
@@ -171,7 +172,7 @@ OllamaNormalizeResult OllamaResponseNormalizer::normalize(nlohmann::json& root, 
             normalize_set_config_shape(a);
     }
 
-    if (include_makerworld && MakerWorldSearchService::is_pure_makerworld_request(user_req)) {
+    if (include_makerworld && MakerWorldIntent::is_pure_makerworld_request(user_req)) {
         bool has_makerworld = false;
         for (const auto& a : root["actions"]) {
             if (a.is_object()) {
@@ -198,7 +199,7 @@ OllamaNormalizeResult OllamaResponseNormalizer::normalize(nlohmann::json& root, 
             if (!a.is_object() || a.value("type", "") != "makerworld_search")
                 continue;
             const std::string existing = a.value("query", "");
-            if (existing.empty() || MakerWorldSearchService::is_pure_makerworld_request(user_req))
+            if (existing.empty() || MakerWorldIntent::is_pure_makerworld_request(user_req))
                 a["query"] = norm_q;
         }
     }

@@ -11,12 +11,19 @@
 #include "OllamaExecutionPolicy.hpp"
 #include "OllamaToolRegistry.hpp"
 #include "OllamaToolResult.hpp"
+#include "OllamaConfigProposalBuilder.hpp"
 
 #include "../AICoach/AIGuiOrchestrator.hpp"
+#include "../BambuSmartPrint/PrintPlannerGui.hpp"
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
 
+#include "libslic3r/BambuSmartPrint/PrintIntentSession.hpp"
+
+#include <boost/log/trivial.hpp>
+
 #include <atomic>
+#include <thread>
 
 namespace Slic3r { namespace GUI {
 
@@ -31,7 +38,8 @@ std::string build_assist_loop_system_prompt(bool korean)
           "- slicer_context가 이미 제공되면 get_state를 반복하지 마세요. 확인이 꼭 필요할 때만 호출.\n"
           "- JSON에 \"done\":false 를 유지하고, 목표 달성 시에만 done:true 와 요약 message.\n"
           "- **형상 요청**(크기·회전·구멍): scale/rotate/mesh_boolean 등만 — set_config·slice 금지(슬라이스 요청 시 제외).\n"
-          "- **인쇄 증상/품질**: set_config만 — 형상 도구 금지(이동·편집 요청 없으면).\n"
+          "- **인쇄 증상/품질**(현재 플레이트에 있는 출력물의 문제): set_config만 — 형상 도구 금지(이동·편집 요청 없으면).\n"
+          "- **새 물건 출력 요청**(\"용 피규어 출력해줘\"처럼 플레이트에 없는 물건 이름): makerworld_find_and_print (영어 query) — set_config·slice 금지.\n"
           "- 50% 축소 → scale factor 0.5. 구멍 → mesh_boolean subtract_cylinder.\n"
           "- 증상/품질 요청: slicer_context·wiki_evidence·settings_analysis·candidate_keys를 읽고 원인→최소 변경.\n"
           "- 메쉬 요청: mesh_health 확인 후 repair_mesh/mesh_boolean/mirror_mesh/scale/split_mesh.\n"
@@ -41,7 +49,8 @@ std::string build_assist_loop_system_prompt(bool korean)
           "- Do not repeat get_state when slicer_context is already provided — only when verification is needed.\n"
           "- Keep \"done\":false until the goal is fully met; then done:true with summary message.\n"
           "- **Model shape** (resize, rotate, hole): scale/rotate/mesh_boolean only — no set_config or slice unless user asked to slice.\n"
-          "- **Print symptoms/quality**: set_config only — no geometry tools unless user asked to move or edit the model.\n"
+          "- **Print symptoms/quality** (issues with the model already on the CURRENT plate): set_config only — no geometry tools unless user asked to move or edit the model.\n"
+          "- **Print a new named object** (e.g. \"print me a dragon figure\" and it is not on the plate): makerworld_find_and_print with an English query — never set_config/slice for this.\n"
           "- 50% smaller → scale factor 0.5. Drill hole → mesh_boolean subtract_cylinder.\n"
           "- For symptoms/quality: read slicer_context, wiki_evidence, settings_analysis, candidate_keys; infer cause → minimal fix.\n"
           "- For mesh: check mesh_health, then repair_mesh / mesh_boolean / mirror_mesh / scale / split_mesh.\n"
@@ -147,6 +156,22 @@ OllamaAgentController::OllamaAgentController(OllamaClient& client, std::string m
 {
 }
 
+OllamaAgentController::~OllamaAgentController()
+{
+    // Invalidate the liveness token BEFORE the object is gone. All async
+    // continuations (client callbacks, scheduled verifications, the global
+    // SliceDone hook) run on the main thread via CallAfter and check
+    // m_alive / g_active_agent first; this destructor also runs on the main
+    // thread, so flipping the token here makes any captured raw `this`
+    // unreachable after the check.
+    m_alive->store(false);
+    m_running        = false;
+    m_awaiting_slice = false;
+    if (g_active_agent == this)
+        g_active_agent = nullptr;
+    OllamaClient::cancel_active_requests(OllamaCancelDomain::Chat);
+}
+
 void OllamaAgentController::set_model(std::string model)
 {
     m_model = std::move(model);
@@ -184,14 +209,71 @@ void OllamaAgentController::run_goal(const std::string& user_goal, OllamaExecuti
     m_mutations_applied     = false;
 
     const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+    refresh_print_intent_and_proposal(ko);
+    // Local-only prefetch (settings analysis, mesh health) — no network.
     m_prefetch    = OllamaAssistContextBuilder::prefetch_for_goal(user_goal, ko);
     m_messages.push_back({"system", build_assist_loop_system_prompt(ko)});
 
     const nlohmann::json plan_hint = OllamaAgentGoalPlanner::build_plan_hint(user_goal, ko);
+
+    // Wiki evidence uses sync HTTP with 20s+ timeouts, so it must never run on
+    // the main thread. Approach: fetch it on a detached worker BEFORE the first
+    // LLM call and delay that call until the fetch completes — the UI stays
+    // responsive and the first LLM turn still sees the evidence. begin_step()
+    // re-checks cancellation, so a cancel during the fetch finishes cleanly.
+    if (OllamaAssistContextBuilder::wants_wiki_prefetch(user_goal)) {
+        if (m_callbacks.on_thinking)
+            m_callbacks.on_thinking(ko ? wxString::FromUTF8("관련 도움말을 찾는 중…")
+                                       : wxString("Looking up guidance…"));
+        const auto alive = m_alive;
+        std::thread([this, alive, user_goal, plan_hint, ko]() {
+            nlohmann::json wiki = nlohmann::json::array();
+            try {
+                wiki = OllamaAssistContextBuilder::fetch_wiki_evidence(user_goal, ko);
+            } catch (const std::exception& ex) {
+                BOOST_LOG_TRIVIAL(warning) << "Ollama agent wiki prefetch failed: " << ex.what();
+            } catch (...) {
+                BOOST_LOG_TRIVIAL(warning) << "Ollama agent wiki prefetch failed: unknown error";
+            }
+            if (wxGetApp().is_closing())
+                return; // shutting down: never post to a dying main loop
+            wxGetApp().CallAfter([this, alive, wiki, user_goal, plan_hint, ko]() {
+                if (!alive->load() || wxGetApp().is_closing())
+                    return;
+                m_prefetch.wiki = wiki;
+                m_messages.push_back({"user", OllamaAssistContextBuilder::build_initial_user_block(
+                                                  user_goal, plan_hint, m_prefetch, ko)});
+                begin_step();
+            });
+        }).detach();
+        return;
+    }
+
     m_messages.push_back(
         {"user", OllamaAssistContextBuilder::build_initial_user_block(user_goal, plan_hint, m_prefetch, ko)});
 
     begin_step();
+}
+
+void OllamaAgentController::refresh_print_intent_and_proposal(bool korean)
+{
+    // Best-effort deterministic proposal. Never let an exception escape here: this runs on
+    // the main thread inside the agent loop, and an uncaught throw would unwind the wx main
+    // loop (OnExceptionInMainLoop rethrows) and quit the whole app.
+    try {
+        auto& session = BambuSmartPrint::PrintIntentSession::instance();
+        if (Plater* plater = wxGetApp().plater()) {
+            const BambuSmartPrint::PlateContext ctx = PrintPlannerGui::build_plate_context(plater);
+            session.merge_turn(m_user_goal, ctx.mesh, ctx.base_config);
+            OllamaConfigProposalBuilder::build_from_context(plater, ctx, session.intent(), korean);
+        } else {
+            session.merge_turn(m_user_goal);
+        }
+    } catch (const std::exception& ex) {
+        BOOST_LOG_TRIVIAL(error) << "Ollama agent proposal build failed: " << ex.what();
+    } catch (...) {
+        BOOST_LOG_TRIVIAL(error) << "Ollama agent proposal build failed: unknown error";
+    }
 }
 
 void OllamaAgentController::begin_step()
@@ -546,6 +628,12 @@ void OllamaAgentController::proceed_after_tool_execution(const nlohmann::json& e
         feedback += std::string("\n\nAssistant note:\n") + assistant_msg;
     feedback += std::string("\n\nContinue toward goal (done:false until complete):\n") + m_user_goal;
     m_messages.push_back({"user", std::move(feedback)});
+
+    // Applied actions may have changed the baseline config; re-derive the proposal so the
+    // next step's context reflects the updated geometry/config state.
+    const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+    refresh_print_intent_and_proposal(ko);
+
     begin_step();
 }
 
@@ -557,40 +645,6 @@ void OllamaAgentController::finish(OllamaAgentRunResult result)
         g_active_agent = nullptr;
     if (m_callbacks.on_finished)
         m_callbacks.on_finished(result);
-}
-
-bool OllamaAgentController::execute_agent_root(const nlohmann::json& root)
-{
-    nlohmann::json work = root;
-    reorder_actions_readonly_first(work);
-
-    OllamaPipelineOptions opt = pipeline_options();
-    OllamaActionPipeline::process_actions(work, opt);
-    if (!OllamaActionWorkflow::has_executable_actions(work))
-        return false;
-
-    AIGuiOrchestrator::instance().on_chat_apply_begin();
-    const OllamaWorkflowRun workflow = OllamaActionWorkflow::execute_with_policy(work, m_parent, m_policy);
-    note_workflow_mutations(workflow);
-    const nlohmann::json    tool_results = ollama_tool_results_from_workflow(work, workflow);
-    m_step_tool_results.push_back(tool_results);
-
-    bool applied = false;
-    for (const auto& r : workflow.results) {
-        if (r.effective_change)
-            applied = true;
-    }
-    AIGuiOrchestrator::instance().on_chat_apply_end(applied, work, "ollama_assist_loop");
-
-    if (workflow.cancelled || workflow.preview_only)
-        return false;
-
-    const OllamaConfigVerifyReport report = OllamaAgentStateService::verify_set_config_actions(work, m_user_goal);
-    if (!m_step_tool_results.empty() && report.tool_results.is_array() && !report.tool_results.empty())
-        m_step_tool_results.back().insert(m_step_tool_results.back().end(), report.tool_results.begin(),
-                                          report.tool_results.end());
-
-    return report.all_ok;
 }
 
 }} // namespace

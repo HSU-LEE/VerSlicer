@@ -46,6 +46,7 @@ public:
     static constexpr int kDefaultMaxSteps = 8;
 
     OllamaAgentController(OllamaClient& client, std::string model);
+    ~OllamaAgentController();
 
     void run_goal(const std::string& user_goal, OllamaExecutionPolicy policy, wxWindow* parent,
                   OllamaAgentCallbacks callbacks, int max_steps = kDefaultMaxSteps);
@@ -61,9 +62,10 @@ public:
 
 private:
     void begin_step();
+    /** Merge the goal into the print-intent session and refresh the deterministic proposal. */
+    void refresh_print_intent_and_proposal(bool korean);
     void on_llm_response(const std::string& text, const std::string& error);
     void finish(OllamaAgentRunResult result);
-    bool execute_agent_root(const nlohmann::json& root);
     void continue_after_slice(bool slice_ok);
     void proceed_after_tool_execution(const nlohmann::json& executed_root, const std::string& assistant_msg,
                                       const std::string& raw_text);

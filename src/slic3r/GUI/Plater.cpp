@@ -80,6 +80,7 @@
 #include "AICoach/AIGuiOrchestrator.hpp"
 #include "AICoach/BeginnerJourney.hpp"
 #include "MakerWorld/MakerWorldImportFlow.hpp"
+#include "AIPipeline/PrintJobOrchestrator.hpp"
 #include "MakerWorld/MakerWorldSearchService.hpp"
 #include "slic3r/Utils/Http.hpp"
 #include "AICoach/BeginnerTour.hpp"
@@ -12651,7 +12652,12 @@ void Plater::import_model_id(wxString download_info)
         // show save new project
         p->set_project_filename(target_path.wstring());
         p->notification_manager->push_import_finished_notification(target_path.string(), target_path.parent_path().string(), false);
-        MakerWorldImportFlow::notify_plater_import_done(true);
+        // Single dispatch gate: an active Phase 3 orchestrator import takes the
+        // callback; otherwise the legacy MakerWorld flow handles it.
+        if (AIPipeline::PrintJobOrchestrator::has_active_import())
+            AIPipeline::PrintJobOrchestrator::dispatch_import_done(true, {});
+        else
+            MakerWorldImportFlow::notify_plater_import_done(true);
     }
     else {
         if (!msg.empty()) {
@@ -12659,7 +12665,10 @@ void Plater::import_model_id(wxString download_info)
             msg_wingow.SetSize(wxSize(FromDIP(480), -1));
             msg_wingow.ShowModal();
         }
-        MakerWorldImportFlow::notify_plater_import_done(false, msg.utf8_string());
+        if (AIPipeline::PrintJobOrchestrator::has_active_import())
+            AIPipeline::PrintJobOrchestrator::dispatch_import_done(false, msg.utf8_string());
+        else
+            MakerWorldImportFlow::notify_plater_import_done(false, msg.utf8_string());
         return;
     }
 }

@@ -140,6 +140,31 @@ SuccessPrediction SuccessPredictor::predict(const std::string& printer_id, const
         p.risk_factors.push_back("Very tall print — warping and adhesion matter");
     }
 
+    // Static-stability penalties (only when stability was actually measured on a watertight mesh;
+    // open / non-manifold meshes report stability_known == false and are left untouched).
+    if (model.stability_known) {
+        constexpr float TIPOVER_HIGH_THRESHOLD   = 0.6f;
+        constexpr float TIPOVER_MED_THRESHOLD    = 0.35f;
+        constexpr float TIPOVER_HIGH_PENALTY     = 16.f;
+        constexpr float TIPOVER_MED_PENALTY      = 8.f;
+        constexpr double SMALL_CONTACT_MM2       = 25.0;
+        constexpr float SMALL_CONTACT_PENALTY    = 7.f;
+
+        const float tip = float(model.tip_over_risk);
+        if (tip >= TIPOVER_HIGH_THRESHOLD) {
+            score -= TIPOVER_HIGH_PENALTY;
+            p.risk_factors.push_back("High tip-over risk — reorient or add a brim");
+        } else if (tip >= TIPOVER_MED_THRESHOLD) {
+            score -= TIPOVER_MED_PENALTY;
+            p.risk_factors.push_back("Moderate tip-over risk from center-of-mass position");
+        }
+
+        if (model.base_contact_area_mm2 > 0.0 && model.base_contact_area_mm2 < SMALL_CONTACT_MM2) {
+            score -= SMALL_CONTACT_PENALTY;
+            p.risk_factors.push_back("Very small base contact area — bed adhesion at risk");
+        }
+    }
+
     p.success_rate = std::max(5.f, std::min(99.f, score));
     p.summary = "Estimated success rate: " + std::to_string(int(std::round(p.success_rate))) + "%";
 

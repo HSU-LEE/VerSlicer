@@ -3,8 +3,8 @@
 
 #include "../GUI_Utils.hpp"
 #include "../MakerWorld/MakerWorldImportFlow.hpp"
+#include "../AIPipeline/PrintJobState.hpp"
 #include "OllamaClient.hpp"
-#include "OllamaDiagnosticPipeline.hpp"
 #include "OllamaAgentController.hpp"
 #include "OllamaExecutionPolicy.hpp"
 
@@ -14,18 +14,29 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 class Button;
+class ComboBox;
+class ProgressBar;
 class TextInput;
 class wxButton;
-class wxChoice;
 class wxPanel;
 class wxStaticText;
 class wxTextCtrl;
 class wxTimer;
 
 namespace Slic3r { namespace GUI {
+
+class OllamaChatMessageList;
+enum class ChatMessageRole;
+enum class ChatMessageKind;
+
+namespace AIPipeline {
+class PrintJobOrchestrator;
+struct PrintJobUiCallbacks;
+}
 
 class OllamaChatPanel : public wxPanel
 {
@@ -36,9 +47,20 @@ public:
     void refresh_models(); // keeps Ollama warm / triggers auto-pull if needed
     void submit_text_and_send(const wxString& text);
     void set_input_text(const wxString& text);
+    void focus_input();
 
     void set_collapsed(bool collapsed);
     bool is_collapsed() const { return m_collapsed; }
+
+    /** Most recently created chat panel (nullptr when none is alive). Lets the
+     *  agent loop route makerworld_find_and_print through the panel-owned
+     *  orchestrator (with real chat/busy callbacks) instead of a detached one. */
+    static OllamaChatPanel* active_panel();
+
+    /** Start an end-to-end find-and-print job on the panel-owned orchestrator
+     *  with this panel's UI callbacks. Returns false when the orchestrator flag
+     *  is off, a job is already active, or start fails. Main thread only. */
+    bool start_orchestrator_find_and_print(const std::string& query);
 
 private:
     void load_settings();
@@ -46,41 +68,43 @@ private:
     void ensure_ollama_running();
     void ensure_default_model_ready(const std::vector<std::string>& models);
     void append_chat(const wxString& role, const wxString& text);
+    void append_chat_message(ChatMessageRole role, const wxString& text,
+                             ChatMessageKind kind /* = Normal; see .cpp */);
     void begin_thinking_block();
     void append_thinking_line(const wxString& line);
     void append_thinking_text(const wxString& text);
     void clear_thinking_block();
-    void refresh_chat_display();
     wxString thinking_role_label() const;
     void set_busy(bool busy);
     void on_send(wxCommandEvent& event);
     void on_models_loaded(const std::vector<std::string>& models, const std::string& error);
-    void on_diagnosis_response(const std::string& diagnosis_text, const std::string& user_utf8, const std::string& error);
-    void start_diagnostic_turn(const std::string& user_utf8);
-    void launch_proposal_llm(const std::string& user_utf8, const OllamaDiagnosis& diagnosis,
-                             std::vector<std::string> keys, const nlohmann::json& wiki_context,
-                             const nlohmann::json& settings_analysis, int critic_attempt);
-    void on_proposal_llm_response(const std::string& assistant_text, const std::string& error,
-                                    const std::string& user_utf8, std::vector<std::string> keys,
-                                    const nlohmann::json& wiki_context, int critic_attempt);
     void start_assist_loop_turn(const std::string& user_utf8);
     void on_assist_loop_finished(const OllamaAgentRunResult& result);
-    void start_two_hop_turn(const std::string& user_utf8);
-    void on_two_hop_planner_response(const std::string& planner_text, const std::string& user_utf8,
-                                     const std::string& error);
     void on_chat_response(const std::string& assistant_text, const std::string& error);
-    void launch_single_chat_llm(std::string final_user_msg);
     void schedule_model_poll(int delay_ms);
     void trim_message_history();
-    void trim_history_display();
     void reset_conversation();
     void set_assistant_mode(bool apply_mode);
     void update_system_welcome_in_chat();
     bool apply_mode() const { return m_apply_mode; }
     void refresh_mode_ui();
+    // Re-apply the (possibly elided) input placeholder for the current width.
+    void update_input_hint();
     wxString system_welcome_message() const;
     void set_status_text(const wxString& text);
     MakerWorldFlowUiCallbacks makerworld_flow_callbacks();
+    // Orchestrator-facing callbacks: progress bubbles + step channel + stop UI.
+    AIPipeline::PrintJobUiCallbacks orchestrator_ui_callbacks();
+    void on_pipeline_step(AIPipeline::PrintJobState state, const wxString& detail);
+    void hide_pipeline_progress();
+    // Token streaming into the pending bubble (single-chat path).
+    OllamaClient::StreamCallback make_stream_callback(uint64_t gen);
+    void on_stream_chunk(const std::string& chunk);
+    // Phase 3: when the orchestrator flag is on and the LLM proposes a full
+    // "find and print" intent, start the end-to-end job instead of the legacy
+    // single-shot MakerWorld flow. Consumed find_and_print actions are removed
+    // from `root`. Returns true when a job was started.
+    bool maybe_start_orchestrator_job(nlohmann::json& root, const std::string& user_req);
     void retry_last_chat_simple();
     void update_model_label_ui();
     std::string resolve_installed_model(const std::vector<std::string>& models, const std::string& want) const;
@@ -92,20 +116,31 @@ private:
     bool          m_show_header{true};
 
     wxPanel*      m_body{nullptr};
-    wxTextCtrl*   m_history_ctrl{nullptr};
-    wxString      m_persistent_chat;
-    wxString      m_thinking_block;
+    OllamaChatMessageList* m_history_list{nullptr};
     TextInput*    m_input_field{nullptr};
     wxTextCtrl*   m_input_ctrl{nullptr};
     Button*       m_send_btn{nullptr};
     Button*       m_reset_btn{nullptr};
-    wxChoice*     m_mode_choice{nullptr};
+    ComboBox*     m_mode_combo{nullptr};
     wxStaticText* m_mode_label{nullptr};
-    wxStaticText* m_model_label{nullptr};
+    ComboBox*     m_model_combo{nullptr};
     wxStaticText* m_status{nullptr};
     bool          m_apply_mode{true};
 
-    std::unique_ptr<OllamaAgentController> m_assist_controller;
+    // B3: compact pipeline progress strip (visible only during an active job).
+    wxPanel*      m_pipeline_panel{nullptr};
+    wxStaticText* m_pipeline_step_label{nullptr};
+    ProgressBar*  m_pipeline_gauge{nullptr};
+    Button*       m_pipeline_stop_btn{nullptr};
+
+    // Streaming state for the in-flight request (guarded by m_request_gen).
+    std::string   m_stream_buf;
+
+    // Full placeholder text for the input field (elided to fit on narrow widths).
+    wxString      m_input_hint_full;
+
+    std::unique_ptr<OllamaAgentController>            m_assist_controller;
+    std::unique_ptr<AIPipeline::PrintJobOrchestrator> m_orchestrator;
 
     OllamaClient               m_client;
     std::string                m_model;

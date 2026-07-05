@@ -9,6 +9,7 @@
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
 #include "../MainFrame.hpp"
+#include "../MakerWorld/MakerWorldSearchService.hpp"
 #include "../Plater.hpp"
 #include "OllamaActionWorkflow.hpp"
 #include "OllamaActionExecutor.hpp"
@@ -250,7 +251,7 @@ context.user_flow: active_tab, setup_steps, setup_next, suggested_next.
 설정 미완(printer/plugin/connect/model)이면 print/send 전에 open_setup 또는 open_smart_print.
 
 | 사용자 의도 | actions |
-| 프린트/출력/보내기 | setup 미완 → open_setup; 모델 없음 → open_setup(model) 또는 makerworld_search; else send_print (+ 필요 시 slice, ui_select_tab preview) |
+| 프린트/출력/보내기 | setup 미완 → open_setup; 모델 없음+특정 모델명 → makerworld_find_and_print; 모델 없음 일반 → makerworld_search; else send_print (+ 필요 시 slice) |
 | 설정/연결/플러그인 | open_setup |
 | 스마트 프린트 | open_smart_print |
 | 미리보기 | ui_select_tab preview (+ slice if needed) |
@@ -274,7 +275,7 @@ Standard journey: model → Prepare (tune) → slice → Preview → send_print 
 If setup incomplete, use open_setup or open_smart_print before send_print.
 
 | User intent | actions |
-| print / send | incomplete setup → open_setup; no model → open_setup or makerworld_search; else send_print (+ slice, ui_select_tab preview if needed) |
+| print / send | incomplete setup → open_setup; no model + named thing to print → makerworld_find_and_print; no model → makerworld_search; else send_print (+ slice if needed) |
 | setup / connect / plugin | open_setup |
 | smart print | open_smart_print |
 | preview | ui_select_tab preview (+ slice if needed) |
@@ -332,9 +333,83 @@ OllamaFlowDispatchResult OllamaUserFlow::dispatch_coach_action(const std::string
     return out;
 }
 
-void OllamaUserFlow::ensure_flow_actions_from_user_text(nlohmann::json& /*root*/, const std::string& /*user_request*/)
+bool OllamaUserFlow::is_acquisition_print_request(const std::string& user_utf8, bool plate_has_model)
 {
-    // Flow/tab actions come from the LLM response — not keyword injection.
+    std::string lower = user_utf8;
+    boost::algorithm::to_lower(lower);
+    auto has = [&lower](const char* needle) { return lower.find(needle) != std::string::npos; };
+
+    // 1) Must contain a print/acquisition verb ("print me X", "X 출력해줘", …).
+    static const char* kAcquireVerbs[] = {
+        "출력해줘", "출력해 줘", "출력 해줘", "출력해주", "출력하고 싶", "출력해 주", "출력하고싶",
+        "프린트해줘", "프린트 해줘", "프린트하고 싶", "프린트해 줘",
+        "인쇄해줘", "인쇄해 줘", "인쇄 해줘", "인쇄하고 싶",
+        "뽑아줘", "뽑아 줘", "뽑고 싶", "만들어줘", "만들어 줘", "만들고 싶",
+        "print me", "i want to print", "want to print", "print a ", "print an ", "print the ",
+        "print out a", "make me a",
+    };
+    bool has_verb = false;
+    for (const char* v : kAcquireVerbs) {
+        if (has(v)) {
+            has_verb = true;
+            break;
+        }
+    }
+    if (!has_verb)
+        return false;
+
+    // 2) Config/setting requests belong to the assist loop ("인필 올려서 출력해줘").
+    static const char* kConfigWords[] = {
+        "인필", "채움", "레이어", "서포트", "브림", "온도", "속도", "리트랙션", "노즐", "프리셋", "설정",
+        "벽 두께", "익스트루", "냉각", "팬 ",
+        "infill", "layer", "support", "brim", "temperature", "speed", "wall", "retraction",
+        "nozzle", "preset", "config", "setting", "cooling",
+    };
+    for (const char* w : kConfigWords) {
+        if (has(w))
+            return false;
+    }
+
+    // 3) Symptom / quality complaints are about the CURRENT plate — never hijack.
+    static const char* kSymptomWords[] = {
+        "안 붙", "안붙", "않", "못 ", "문제", "실패", "떨어", "들뜸", "들떠", "부서", "파손", "갈라",
+        "느려", "느리", "휘어", "휨", "거칠", "울퉁", "실이", "번져", "밀려",
+        "won't", "wont", "doesn't", "does not", "not stick", "fail", "warp", "stringing",
+        "too slow", "rough", "brittle", "break",
+    };
+    for (const char* w : kSymptomWords) {
+        if (has(w))
+            return false;
+    }
+
+    // 4) Questions get explanations, not a print job.
+    static const char* kQuestionWords[] = {"?", "？", "뭐야", "뭐예요", "뭔가요", "무엇", "어떻게", "왜 ",
+                                           "what is", "what's", "how do", "how does", "why "};
+    for (const char* w : kQuestionWords) {
+        if (has(w))
+            return false;
+    }
+
+    // 5) "Print THIS" refers to the plate content, not a new object.
+    static const char* kCurrentRefs[] = {"이거", "이것", "그거", "저거", "이 모델", "현재", "지금 있는",
+                                         "print this", "print it", "print them", "print these"};
+    for (const char* w : kCurrentRefs) {
+        if (has(w))
+            return false;
+    }
+
+    // 6) Must name an object: after stripping verbs/filler a noun phrase remains.
+    //    A bare "출력해줘"/"print it" (= act on the current plate) never passes.
+    const std::string noun_phrase = MakerWorldSearchService::normalize_search_query(user_utf8);
+    if (noun_phrase.size() < 2)
+        return false;
+
+    // With an empty plate any named object is an acquisition. With a model
+    // already loaded the checks above (object noun phrase present, no
+    // current-plate reference, no symptom/config words) already discriminate
+    // "print me a NEW dragon" from "print/tune what I have".
+    (void) plate_has_model;
+    return true;
 }
 
 void OllamaUserFlow::prune_navigation_for_config_fixes(nlohmann::json& root, const std::string& user_request)

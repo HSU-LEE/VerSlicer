@@ -24,11 +24,6 @@ struct OllamaDiagnosis
 class OllamaDiagnosticPipeline
 {
 public:
-    /** True when request should use the 4-step pipeline (not rotate/arrange/explicit fast paths). */
-    static bool needs_pipeline(const std::string& user_request, bool apply_mode);
-
-    static OllamaDiagnosis parse_diagnosis(const std::string& llm_text);
-
     /** Step 2: fetch Bambu Wiki excerpts from diagnosis queries (+ user fallback). */
     static nlohmann::json build_wiki_evidence(const OllamaDiagnosis& diagnosis, const std::string& user_request,
                                               bool korean);

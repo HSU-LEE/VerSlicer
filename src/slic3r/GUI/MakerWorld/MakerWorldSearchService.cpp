@@ -6,6 +6,7 @@
 
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
+#include "../OllamaAssistant/AiLocale.hpp"
 
 #include "slic3r/Utils/BBLCloudServiceAgent.hpp"
 #include "slic3r/Utils/BBLNetworkPlugin.hpp"
@@ -182,8 +183,9 @@ const nlohmann::json* api_payload_node(const nlohmann::json& root)
 
 void apply_makerworld_http_headers(Slic3r::Http& http)
 {
-    for (const auto& hdr : BBLCloudServiceAgent::get_extra_header())
-        http.header(hdr.first, hdr.second);
+    // Http() already injects BBLCloudServiceAgent::get_extra_header() via the global
+    // extra_headers map (set by set_extra_http_header). Re-adding X-BBL-* here duplicates
+    // them and MakerWorld design/search endpoints reject the request with HTTP 400.
     http.header("accept", "application/json");
     const std::string token = resolve_cloud_access_token();
     if (!token.empty())
@@ -206,6 +208,7 @@ std::string parse_api_error_message(const std::string& body, unsigned http_statu
             }
         }
     } catch (...) {
+        BOOST_LOG_TRIVIAL(debug) << "[MakerWorld] api error body was not valid JSON (http " << http_status << ")";
     }
     return "HTTP " + std::to_string(http_status);
 }
@@ -507,6 +510,12 @@ DesignDownloadMeta fetch_design_download_meta(const std::string& design_id, cons
                 meta.profile_id = std::to_string((*chosen)["profileId"].get<int64_t>());
             else
                 meta.profile_id = safe_string(*chosen, "profileId");
+            // Some design payloads carry the model id per-instance instead of at
+            // the design level; without it the iot-profile download is skipped.
+            if (meta.model_id.empty())
+                meta.model_id = safe_string(*chosen, "modelId");
+            if (meta.model_id.empty())
+                meta.model_id = safe_string(*chosen, "model_id");
             if (meta.title.empty())
                 meta.title = safe_string(*chosen, "title");
             for (const char* key : {"download_url", "downloadUrl", "url", "f3mfUrl", "packUrl"}) {
@@ -517,9 +526,20 @@ DesignDownloadMeta fetch_design_download_meta(const std::string& design_id, cons
                 }
             }
         }
+        // Design-level direct file URL (rare, but returned for some public designs).
+        if (meta.direct_url.empty()) {
+            for (const char* key : {"download_url", "downloadUrl", "f3mfUrl", "packUrl", "fileUrl"}) {
+                const std::string direct = safe_string(d, key);
+                if (!direct.empty() && direct.find(".3mf") != std::string::npos) {
+                    meta.direct_url = direct;
+                    break;
+                }
+            }
+        }
 
         meta.ok = !meta.model_id.empty() && !meta.profile_id.empty();
     } catch (...) {
+        BOOST_LOG_TRIVIAL(warning) << "[MakerWorld] design meta parse failed design_id=" << design_id;
     }
     return meta;
 }
@@ -603,6 +623,7 @@ BackendSearchOutcome search_via_plugin(const std::string& query, const MakerWorl
                 return outcome;
             }
         } catch (...) {
+            BOOST_LOG_TRIVIAL(debug) << "[MakerWorld] plugin search body was not valid JSON";
         }
     }
     if (rc != 0 || body.empty()) {
@@ -1025,6 +1046,8 @@ void MakerWorldSearchService::search_async(const std::string& query, const Maker
     const uint64_t generation = ++search_request_generation();
     std::thread([query, ctx, cb = std::move(callback), generation]() {
         MakerWorldSearchResult r = MakerWorldSearchService::search_sync(query, ctx);
+        if (wxGetApp().is_closing())
+            return; // shutting down: never post to a dying main loop
         wxGetApp().CallAfter([r, cb, generation]() {
             if (wxGetApp().is_closing())
                 return;
@@ -1037,10 +1060,13 @@ void MakerWorldSearchService::search_async(const std::string& query, const Maker
 
 void MakerWorldSearchService::prefetch_staffpick_pool()
 {
-    std::thread([]() {
-        if (wxGetApp().is_closing())
-            return;
-        const MakerWorldSearchContext ctx = MakerWorldSearchService::build_context();
+    // build_context() reads app_config / presets / the network agent and is only
+    // safe on the main thread, so snapshot it here and hand the copy to the
+    // worker; only the network fetch runs off-thread.
+    if (wxGetApp().is_closing())
+        return;
+    const MakerWorldSearchContext ctx = MakerWorldSearchService::build_context();
+    std::thread([ctx]() {
         ensure_staffpick_pool(ctx);
     }).detach();
 }
@@ -1054,7 +1080,8 @@ MakerWorldImportPayload MakerWorldSearchService::resolve_import(const MakerWorld
     const bool                    has_auth = makerworld_download_auth_available(ctx);
 
     if (candidate.login_required && !has_auth) {
-        out.error = _u8L("Sign in to Bambu Cloud to download this model.");
+        out.error = AiLocale::text("Sign in to Bambu Cloud to download this model.",
+                                   "이 모델을 내려받으려면 Bambu Cloud에 로그인하세요.").utf8_string();
         return out;
     }
 
@@ -1091,18 +1118,29 @@ MakerWorldImportPayload MakerWorldSearchService::resolve_import(const MakerWorld
             url = fetch_download_via_iot_profile(profile_id, model_id, ctx, filename, http_status, login_required);
             if (url.empty() && login_required) {
                 out.error = has_auth
-                    ? _u8L("Bambu Cloud session expired. Sign out and sign in again to download this model.")
-                    : _u8L("Sign in to Bambu Cloud to download this model.");
+                    ? AiLocale::text("Bambu Cloud session expired. Sign out and sign in again to download this model.",
+                                     "Bambu Cloud 세션이 만료되었습니다. 로그아웃 후 다시 로그인하면 내려받을 수 있습니다.").utf8_string()
+                    : AiLocale::text("Sign in to Bambu Cloud to download this model.",
+                                     "이 모델을 내려받으려면 Bambu Cloud에 로그인하세요.").utf8_string();
                 return out;
             }
         }
     }
 
     if (url.empty()) {
+        BOOST_LOG_TRIVIAL(warning) << "[MakerWorld] resolve_import: no download url design_id="
+                                   << candidate.design_id << " model_id=" << model_id
+                                   << " profile_id=" << profile_id
+                                   << " plugin_dl=" << (ctx.plugin_download_available ? 1 : 0)
+                                   << " has_token=" << (resolve_cloud_access_token().empty() ? 0 : 1);
         if (resolve_cloud_access_token().empty())
-            out.error = _u8L("Sign in to Bambu Cloud (Settings → Online) to download. If already signed in, sign out and sign in again.");
+            out.error = AiLocale::text(
+                "Sign in to Bambu Cloud (Settings → Online) to download. If already signed in, sign out and sign in again.",
+                "내려받으려면 Bambu Cloud에 로그인하세요 (설정 → 온라인). 이미 로그인했다면 로그아웃 후 다시 로그인해 주세요.").utf8_string();
         else
-            out.error = _u8L("Could not get a download link. Open the model on MakerWorld and use Download, or paste the file link.");
+            out.error = AiLocale::text(
+                "Could not get a download link. Open the model on MakerWorld and use Download, or paste the file link.",
+                "다운로드 링크를 받지 못했습니다. MakerWorld에서 모델을 열어 내려받거나 파일 링크를 붙여넣어 주세요.").utf8_string();
         return out;
     }
 
@@ -1112,7 +1150,8 @@ MakerWorldImportPayload MakerWorldSearchService::resolve_import(const MakerWorld
     if (!is_allowed_makerworld_download_url(url) && url.find(".3mf") == std::string::npos) {
         // Allow CDN hosts returned by API even if not makerworld.com
         if (url.find("https://") != 0 && url.find("http://") != 0) {
-            out.error = _u8L("Download URL is not allowed.");
+            out.error = AiLocale::text("Download URL is not allowed.",
+                                       "허용되지 않는 다운로드 URL입니다.").utf8_string();
             return out;
         }
     }
@@ -1150,7 +1189,8 @@ MakerWorldImportPayload MakerWorldSearchService::resolve_import_from_url(const s
         return resolve_import(c);
     }
 
-    out.error = _u8L("Could not read a model ID from that MakerWorld link.");
+    out.error = AiLocale::text("Could not read a model ID from that MakerWorld link.",
+                               "MakerWorld 링크에서 모델 ID를 읽지 못했습니다.").utf8_string();
     return out;
 }
 
@@ -1171,113 +1211,6 @@ std::string MakerWorldSearchService::makerworld_search_page_url(const std::strin
 std::string MakerWorldSearchService::normalize_search_query(const std::string& user_text)
 {
     return normalize_makerworld_search_query(user_text);
-}
-
-namespace {
-
-bool has_compound_slicer_intent(const std::string& lower)
-{
-    static const char* kSlice[] = {
-        "brim", "support", "infill", "layer", "temperature", "speed", "raft", "skirt",
-        "브림", "서포트", "채움", "레이어", "온도", "속도", "지지", "채우",
-        "set_config", "add_model", "delete", "slice", "슬라이스",
-    };
-    for (const char* s : kSlice) {
-        if (lower.find(s) != std::string::npos)
-            return true;
-    }
-    return false;
-}
-
-} // namespace
-
-bool MakerWorldSearchService::is_informational_makerworld_question(const std::string& user_text)
-{
-    std::string lower = user_text;
-    boost::algorithm::to_lower(lower);
-    if (lower.find('?') == std::string::npos && lower.find("？") == std::string::npos)
-        return false;
-    static const char* kInfo[] = {
-        "what is", "what's", "how does", "how do", "explain", "tell me about",
-        "뭐야", "무엇", "설명", "알려", "어떻게", "뭐예요", "뭔가요",
-    };
-    for (const char* s : kInfo) {
-        if (lower.find(s) != std::string::npos)
-            return true;
-    }
-    return false;
-}
-
-bool MakerWorldSearchService::user_wants_makerworld_search(const std::string& user_text)
-{
-    if (is_informational_makerworld_question(user_text))
-        return false;
-    std::string lower = user_text;
-    boost::algorithm::to_lower(lower);
-    if (text_contains_makerworld_link(user_text))
-        return false;
-    if (has_compound_slicer_intent(lower))
-        return false;
-
-    const bool find_kw = lower.find("찾") != std::string::npos || lower.find("검색") != std::string::npos
-        || lower.find("search") != std::string::npos || lower.find("find") != std::string::npos
-        || lower.find("look for") != std::string::npos || lower.find("get me") != std::string::npos
-        || lower.find("show me") != std::string::npos;
-    const bool pick_kw = lower.find("뽑") != std::string::npos || lower.find("골라") != std::string::npos
-        || lower.find("추천") != std::string::npos || lower.find("보고 싶") != std::string::npos
-        || lower.find("pick") != std::string::npos || lower.find("choose") != std::string::npos
-        || lower.find("recommend") != std::string::npos || lower.find("suggest") != std::string::npos;
-    const bool model_kw = lower.find("모델") != std::string::npos || lower.find("model") != std::string::npos
-        || lower.find("디자인") != std::string::npos || lower.find("design") != std::string::npos;
-    const bool mw_kw = lower.find("makerworld") != std::string::npos || lower.find("메이커") != std::string::npos;
-
-    if ((find_kw && model_kw) || (find_kw && mw_kw) || (mw_kw && model_kw) || (pick_kw && model_kw))
-        return true;
-
-    // Natural language: "articulated dragon 찾아줘" without explicit "model"
-    const std::string keywords = normalize_makerworld_search_query(user_text);
-    if (keywords.size() < 2)
-        return false;
-    if (find_kw || pick_kw || mw_kw)
-        return true;
-    return false;
-}
-
-bool MakerWorldSearchService::user_wants_makerworld_import(const std::string& user_text)
-{
-    if (text_contains_makerworld_link(user_text)) {
-        std::string trimmed = user_text;
-        boost::algorithm::trim(trimmed);
-        if (trimmed.find(' ') == std::string::npos && trimmed.find("http") == 0) {
-            if (!parse_design_id_from_url(trimmed).empty())
-                return true;
-        }
-        std::string lower = user_text;
-        boost::algorithm::to_lower(lower);
-        const bool get_kw = lower.find("가져") != std::string::npos || lower.find("불러") != std::string::npos
-            || lower.find("download") != std::string::npos || lower.find("import") != std::string::npos
-            || lower.find("열어") != std::string::npos;
-        return get_kw || lower.find(".3mf") != std::string::npos;
-    }
-    std::string lower = user_text;
-    boost::algorithm::to_lower(lower);
-    const bool get_kw = lower.find("가져") != std::string::npos || lower.find("불러") != std::string::npos
-        || lower.find("download") != std::string::npos || lower.find("import") != std::string::npos
-        || lower.find("열어") != std::string::npos;
-    return get_kw && (lower.find("makerworld") != std::string::npos || lower.find("메이커") != std::string::npos);
-}
-
-bool MakerWorldSearchService::is_pure_makerworld_request(const std::string& user_text)
-{
-    if (is_informational_makerworld_question(user_text))
-        return false;
-    std::string lower = user_text;
-    boost::algorithm::to_lower(lower);
-    if (has_compound_slicer_intent(lower))
-        return false;
-    if (user_wants_makerworld_import(user_text))
-        return true;
-    return user_wants_makerworld_search(user_text);
 }
 
 void MakerWorldSearchService::apply_download_http_headers(Slic3r::Http& http)

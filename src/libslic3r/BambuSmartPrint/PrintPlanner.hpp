@@ -23,6 +23,9 @@ public:
     /** Incremental replan when session goal unchanged and mesh stable. */
     static PrintPlan replan(const PlateContext& ctx, PrintGoalSession& session);
 
+    /** Apply goal-driven config patches in place (shared with AutoConfigEngine). */
+    static void apply_goal_patches(DynamicPrintConfig& cfg, const PrintGoal& goal, const ModelAnalysis& mesh);
+
     static void dedupe_actions(nlohmann::json& root);
     static std::vector<PrintRisk> build_risks(const PlateContext& ctx);
     static PrintExplanation build_explanation(const PrintPlan& plan);

@@ -1,4 +1,6 @@
 #include "BambuLabWikiSearch.hpp"
+
+#include <boost/log/trivial.hpp>
 #include "BambuLabWikiSearchCore.hpp"
 
 #include "slic3r/Utils/Http.hpp"
@@ -135,6 +137,8 @@ std::vector<BambuWikiPageHit> BambuLabWikiSearch::search_pages(const std::string
                 break;
         }
     } catch (...) {
+        BOOST_LOG_TRIVIAL(warning) << "[BambuWiki] search result JSON parse failed; returning "
+                                   << hits.size() << " hits";
     }
 
     if (hits.empty() && locale != "en")

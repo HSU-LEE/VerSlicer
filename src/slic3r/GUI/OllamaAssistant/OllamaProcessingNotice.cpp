@@ -1,5 +1,7 @@
 #include "OllamaProcessingNotice.hpp"
 
+#include "AiLocale.hpp"
+
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
 #include "../NotificationManager.hpp"
@@ -17,11 +19,6 @@ bool plater_notifications_available(Plater* plater)
     if (app.is_closing() || !app.initialized())
         return false;
     return true;
-}
-
-bool ui_is_korean()
-{
-    return wxGetApp().current_language_code().StartsWith("ko");
 }
 
 } // namespace
@@ -44,12 +41,12 @@ void OllamaProcessingNotice::hide(Plater* plater)
 
 void OllamaProcessingNotice::show_thinking(Plater* plater)
 {
-    show(plater, ui_is_korean() ? std::string("요청을 처리하고 있습니다…") : std::string(_u8L("Working on your request…")));
+    show(plater, AiLocale::korean() ? std::string("요청을 처리하고 있습니다…") : std::string(_u8L("Working on your request…")));
 }
 
 void OllamaProcessingNotice::show_starting(Plater* plater)
 {
-    show(plater, ui_is_korean() ? std::string("AI를 시작하는 중…") : std::string(_u8L("Starting AI…")));
+    show(plater, AiLocale::korean() ? std::string("AI를 시작하는 중…") : std::string(_u8L("Starting AI…")));
 }
 
 }} // namespace

@@ -1,4 +1,6 @@
 #include "OllamaClient.hpp"
+
+#include <boost/log/trivial.hpp>
 #include "OllamaActionExecutor.hpp"
 #include "OllamaConfig.hpp"
 #include "OllamaIntentContext.hpp"
@@ -179,6 +181,7 @@ static std::string inject_priority_catalog_slice(std::string user_content)
             ctx["intent_signals"] = cached;
         context                = ctx.dump(2);
     } catch (...) {
+        BOOST_LOG_TRIVIAL(warning) << "Ollama client: context enrichment failed; sending original context";
     }
     return context + marker + request;
 }
@@ -415,6 +418,8 @@ ChatAttemptResult run_chat_http(const std::string& url, const std::string& model
                 if (j.value("done", false))
                     break;
             } catch (...) {
+                // Partial NDJSON lines are expected mid-stream; skip and keep reading.
+                BOOST_LOG_TRIVIAL(debug) << "Ollama client: skipped unparsable stream line";
             }
         }
         out.content        = accumulated;
@@ -560,6 +565,8 @@ void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessag
         const int latency_ms = static_cast<int>(
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count());
 
+        if (wxGetApp().is_closing())
+            return; // shutting down: never post to a dying main loop
         wxGetApp().CallAfter([job, tok, kind, result = std::move(result), latency_ms]() {
             if (tok != request_serial(kind).load() || wxGetApp().is_closing())
                 return;
