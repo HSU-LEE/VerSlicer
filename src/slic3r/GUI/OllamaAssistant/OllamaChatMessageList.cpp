@@ -4,6 +4,7 @@
 #include "../Widgets/Label.hpp"
 #include "../Widgets/StaticBox.hpp"
 
+#include <wx/dcclient.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
@@ -33,6 +34,25 @@ constexpr int kListPadDp = 8;
 int bubble_pad_y_dp(ChatMessageKind kind)
 {
     return kind == ChatMessageKind::Progress ? kProgressPadYDp : kBubblePadYDp;
+}
+
+int bubble_border_px(wxWindow* ref)
+{
+    return std::max(1, ref->FromDIP(1));
+}
+
+// wxStaticText::GetBestSize() after Wrap() can under-report CJK / multi-line
+// extent on macOS; cross-check with a DC measurement and keep the larger value.
+wxSize measure_wrapped_label(wxStaticText* label, int wrap_px, wxWindow* ref)
+{
+    label->Wrap(wrap_px);
+    const wxSize best = label->GetBestSize();
+    wxClientDC     dc(label);
+    dc.SetFont(label->GetFont());
+    const wxSize dc_sz = dc.GetMultiLineTextExtent(label->GetLabel());
+    const int slack = ref->FromDIP(2);
+    return wxSize(std::max(best.GetWidth(), dc_sz.GetWidth()) + slack,
+                  std::max(best.GetHeight(), dc_sz.GetHeight()) + slack);
 }
 
 } // namespace
@@ -185,19 +205,15 @@ void OllamaChatMessageList::rewrap_row(Row& row)
     if (!row.label || !row.bubble)
         return;
     row.label->SetLabel(row.text);
-    row.label->Wrap(bubble_wrap_width());
-    // Size the bubble to its wrapped text so short messages stay compact.
-    // Measure the label AFTER wrapping (Wrap inserted hard newlines, so
-    // GetBestSize reports the real multi-line extent in the label's own font —
-    // this also covers CJK lines that have no break opportunity and come out
-    // wider than the wrap width). The bubble must then add back EXACTLY the
-    // padding make_row placed around the label; anything less steals pixels
-    // from the label and clips the trailing glyph.
-    const wxSize text_sz = row.label->GetBestSize();
+    const wxSize text_sz = measure_wrapped_label(row.label, bubble_wrap_width(), this);
     row.label->SetMinSize(text_sz);
-    const int pad_x = FromDIP(kBubblePadXDp);
-    const int pad_y = FromDIP(bubble_pad_y_dp(row.kind));
-    row.bubble->SetMinSize(wxSize(text_sz.GetWidth() + 2 * pad_x, text_sz.GetHeight() + 2 * pad_y));
+    const int pad_x    = FromDIP(kBubblePadXDp);
+    const int pad_y    = FromDIP(bubble_pad_y_dp(row.kind));
+    const int border   = bubble_border_px(this);
+    // StaticBox draws its border inside the widget bounds (over the outermost
+    // pixels of the label), so reserve border width on every edge.
+    row.bubble->SetMinSize(wxSize(text_sz.GetWidth() + 2 * pad_x + 2 * border,
+                                  text_sz.GetHeight() + 2 * pad_y + 2 * border));
     row.bubble->Layout();
     row.row_panel->Layout();
 }

@@ -13,6 +13,7 @@
 #include <wx/image.h>
 #include <wx/mstream.h>
 #include <wx/panel.h>
+#include <wx/scrolwin.h>
 #include <wx/sizer.h>
 #include <wx/statbmp.h>
 #include <wx/statline.h>
@@ -63,11 +64,13 @@ MakerWorldPrintOfferDialog::MakerWorldPrintOfferDialog(wxWindow* parent,
         0, wxEXPAND);
 
     const int pad = FromDIP(12);
-    auto* body = new wxBoxSizer(wxVERTICAL);
+    wxBoxSizer* body = nullptr;
+    m_scroll = SlicePilotUi::create_scroll_body(this, &body);
     for (size_t i = 0; i < m_candidates.size(); ++i)
-        body->Add(build_candidate_card(this, m_candidates[i], static_cast<int>(i)),
+        body->Add(build_candidate_card(m_scroll, m_candidates[i], static_cast<int>(i)),
                   0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, pad);
-    root->Add(body, 1, wxEXPAND | wxBOTTOM, pad);
+    body->AddSpacer(pad);
+    root->Add(m_scroll, 1, wxEXPAND);
 
     root->Add(new wxStaticLine(this), 0, wxEXPAND);
     auto* buttons = new DialogButtons(this, {"cancel", "ok"});
@@ -93,7 +96,7 @@ MakerWorldPrintOfferDialog::MakerWorldPrintOfferDialog(wxWindow* parent,
     select(m_selected_index);
     update_confirm_label();
 
-    SlicePilotUi::finalize_modal_dialog(this, wxSize(440, 260), wxSize(500, 340));
+    SlicePilotUi::finalize_modal_dialog(this, wxSize(440, 260), wxSize(500, 340), m_scroll, 180);
     CentreOnParent();
     wxGetApp().UpdateDlgDarkUI(this);
 
@@ -121,6 +124,10 @@ MakerWorldPrintOfferDialog::~MakerWorldPrintOfferDialog()
 void MakerWorldPrintOfferDialog::on_dpi_changed(const wxRect& /*suggested_rect*/)
 {
     Layout();
+    if (m_scroll) {
+        m_scroll->FitInside();
+        m_scroll->Layout();
+    }
 }
 
 wxPanel* MakerWorldPrintOfferDialog::build_candidate_card(wxWindow* parent, const MakerWorldCandidate& c, int index)
@@ -287,6 +294,10 @@ void MakerWorldPrintOfferDialog::start_thumbnail_fetch(int index, const std::str
                 m_cards[index].thumb->SetBitmap(wxBitmap(img));
                 m_cards[index].thumb->Refresh();
                 Layout();
+                if (m_scroll) {
+                    m_scroll->FitInside();
+                    m_scroll->Layout();
+                }
             });
         })
         .perform();

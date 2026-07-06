@@ -13,6 +13,7 @@
 
 class Button;
 class wxPanel;
+class wxScrolledWindow;
 class wxStaticBitmap;
 class wxStaticText;
 class wxWindow;
@@ -58,6 +59,7 @@ private:
     std::vector<CandidateCard>         m_cards;
     int                                m_selected_index{-1};
     Button*                            m_confirm_btn{nullptr};
+    wxScrolledWindow*                  m_scroll{nullptr};
     wxTimer                            m_timer;
     int                                m_seconds_left{kDefaultCountdownSec};
     std::shared_ptr<std::atomic<bool>> m_alive; // guards async thumbnail callbacks
