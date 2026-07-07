@@ -7,16 +7,21 @@
 #include "OllamaAgentStateService.hpp"
 #include "OllamaAgentEventBus.hpp"
 #include "OllamaAssistContextBuilder.hpp"
+#include "OllamaChatPanel.hpp"
 #include "OllamaConfig.hpp"
 #include "OllamaExecutionPolicy.hpp"
+#include "OllamaSendRouter.hpp"
 #include "OllamaToolRegistry.hpp"
 #include "OllamaToolResult.hpp"
 #include "OllamaConfigProposalBuilder.hpp"
+#include "OllamaUserFlow.hpp"
 
 #include "../AICoach/AIGuiOrchestrator.hpp"
+#include "../AIPipeline/PrintJobOrchestrator.hpp"
 #include "../BambuSmartPrint/PrintPlannerGui.hpp"
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
+#include "../Plater.hpp"
 
 #include "libslic3r/BambuSmartPrint/PrintIntentSession.hpp"
 
@@ -98,6 +103,51 @@ void reorder_actions_readonly_first(nlohmann::json& root)
 bool root_is_done(const nlohmann::json& root)
 {
     return root.value("done", false) || root.value("status", "") == "complete";
+}
+
+bool plate_has_model_now()
+{
+    if (Plater* plater = wxGetApp().plater()) {
+        try {
+            return !plater->model().objects.empty();
+        } catch (...) {
+        }
+    }
+    return false;
+}
+
+bool acquisition_pipeline_started(const std::vector<nlohmann::json>& step_tool_results)
+{
+    for (const auto& step : step_tool_results) {
+        if (!step.is_array())
+            continue;
+        for (const auto& r : step) {
+            if (!r.is_object() || !r.value("ok", false))
+                continue;
+            const std::string tool = r.value("tool", "");
+            if (tool == "makerworld_find_and_print" || tool == "makerworld_search" || tool == "import_makerworld"
+                || tool == "slice")
+                return true;
+        }
+    }
+    return false;
+}
+
+bool try_orchestrator_fallback_for_acquisition(const std::string& user_goal, bool korean, std::string& message_out)
+{
+    if (!OllamaUserFlow::is_acquisition_print_request(user_goal, plate_has_model_now()))
+        return false;
+    if (!AIPipeline::print_job_orchestrator_enabled())
+        return false;
+    OllamaChatPanel* panel = OllamaChatPanel::active_panel();
+    if (!panel)
+        return false;
+    const std::string query = OllamaSendRouter::acquisition_query(user_goal);
+    if (query.empty() || !panel->start_orchestrator_find_and_print(query))
+        return false;
+    message_out = korean ? "MakerWorld에서 모델을 찾아 출력을 준비할게요…"
+                         : "I'll find a model on MakerWorld and get the print ready…";
+    return true;
 }
 
 OllamaAgentController* g_active_agent = nullptr;
@@ -580,11 +630,45 @@ void OllamaAgentController::proceed_after_tool_execution(const nlohmann::json& e
                                                          const std::string& assistant_msg, const std::string& raw_text)
 {
     if (root_is_done(executed_root)) {
+        const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+        if (OllamaUserFlow::is_acquisition_print_request(m_user_goal, plate_has_model_now())
+            && !acquisition_pipeline_started(m_step_tool_results)) {
+            std::string fallback_msg;
+            if (try_orchestrator_fallback_for_acquisition(m_user_goal, ko, fallback_msg)) {
+                OllamaAgentRunResult r;
+                r.completed         = true;
+                r.steps_taken       = m_step;
+                r.step_tool_results = m_step_tool_results;
+                r.final_message     = fallback_msg;
+                finish(std::move(r));
+                return;
+            }
+            if (m_step < m_max_steps) {
+                m_messages.push_back({"user",
+                    ko ? std::string("아직 MakerWorld에서 모델을 찾지 못했습니다. makerworld_find_and_print "
+                                     "action으로 영어 query를 넣어 실행하거나 done:true 없이 계속하세요.\n\nGoal:\n")
+                               + m_user_goal
+                         : std::string("The model has not been fetched yet. Run makerworld_find_and_print with an "
+                                       "English query, or continue without done:true.\n\nGoal:\n")
+                               + m_user_goal});
+                begin_step();
+                return;
+            }
+            OllamaAgentRunResult r;
+            r.blocked           = true;
+            r.steps_taken       = m_step;
+            r.step_tool_results = m_step_tool_results;
+            r.final_message     = ko ? "모델 검색·출력 파이프라인을 시작하지 못했습니다. "
+                                       "「화분 출력해줘」처럼 다시 시도해 주세요."
+                                     : "Could not start the find-and-print pipeline. Try again, e.g. \"print a vase\".";
+            finish(std::move(r));
+            return;
+        }
+
         OllamaAgentRunResult r;
         r.completed         = true;
         r.steps_taken       = m_step;
         r.step_tool_results = m_step_tool_results;
-        const bool ko       = wxGetApp().current_language_code().StartsWith("ko");
         r.final_message     = pick_user_facing_message(m_step_tool_results, assistant_msg, ko);
         if (r.final_message.empty()) {
             if (!m_step_tool_results.empty())

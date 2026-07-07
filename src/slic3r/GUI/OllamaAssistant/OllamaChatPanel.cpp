@@ -472,6 +472,12 @@ static wxString completion_status_for_reply(const wxString& reply, bool apply_mo
     if (reply.Contains(wxString::FromUTF8("플레이트")) || reply.Contains(_L("build plate")))
         return AiLocale::korean() ? wxString::FromUTF8("플레이트 추가 완료") : _L("Plate added");
 
+    // LLM-only "I'll print/slice…" without orchestrator progress evidence — do not
+    // read as a successful print job.
+    if (reply.Contains(wxString::FromUTF8("출력을 시작")) || reply.Contains(wxString::FromUTF8("슬라이스를 생성"))
+        || reply.Contains(wxString::FromUTF8("묶어서 실행")))
+        return AiLocale::korean() ? wxString::FromUTF8("확인 필요 — 플레이트를 확인하세요") : _L("Verify on the plate");
+
     return AiLocale::korean() ? wxString::FromUTF8("완료") : _L("Done");
 }
 
@@ -1434,6 +1440,15 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
 
     const std::string user_utf8 = user_text.utf8_string();
 
+    bool plate_has_model = false;
+    if (Plater* plater = wxGetApp().plater()) {
+        try {
+            plate_has_model = !plater->model().objects.empty();
+        } catch (...) {
+            BOOST_LOG_TRIVIAL(warning) << "Ollama chat: plate-model check failed; assuming empty plate";
+        }
+    }
+
     // Phase 3: while an orchestrator job is awaiting a clarifying answer, route
     // this turn to it instead of starting a fresh LLM request.
     if (AIPipeline::print_job_orchestrator_enabled() && m_orchestrator && m_orchestrator->is_active()
@@ -1461,15 +1476,7 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
     // the orchestrator; explicit URL/search requests still use the bypass below.
     if (OllamaSendRouter::acquisition_gate_open(m_apply_mode, AIPipeline::print_job_orchestrator_enabled(),
                                                 m_orchestrator && m_orchestrator->is_active())) {
-        bool has_model = false;
-        if (Plater* plater = wxGetApp().plater()) {
-            try {
-                has_model = !plater->model().objects.empty();
-            } catch (...) {
-                BOOST_LOG_TRIVIAL(warning) << "Ollama chat: plate-model check failed; assuming empty plate";
-            }
-        }
-        if (OllamaSendRouter::is_acquisition_request(user_utf8, has_model)) {
+        if (OllamaSendRouter::is_acquisition_request(user_utf8, plate_has_model)) {
             const std::string query = OllamaSendRouter::acquisition_query(user_utf8);
             if (start_orchestrator_find_and_print(query)) {
                 m_messages.push_back({"user", user_utf8});
@@ -1568,7 +1575,7 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
     if (!m_available_models.empty())
         m_model = resolve_installed_model(m_available_models, m_model);
 
-    if (OllamaSendRouter::should_use_assist_loop(user_utf8, m_apply_mode)) {
+    if (OllamaSendRouter::should_use_assist_loop(user_utf8, m_apply_mode, plate_has_model)) {
         m_messages.push_back({"user", user_msg});
         trim_message_history();
         start_assist_loop_turn(user_utf8);

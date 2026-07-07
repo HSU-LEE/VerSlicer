@@ -64,7 +64,9 @@ bool MakerWorldIntent::user_wants_makerworld_search(const std::string& user_text
     const bool model_kw = lower.find("모델") != std::string::npos || lower.find("model") != std::string::npos
         || lower.find("디자인") != std::string::npos || lower.find("design") != std::string::npos
         || lower.find("피규어") != std::string::npos || lower.find("figure") != std::string::npos
-        || lower.find("figurine") != std::string::npos;
+        || lower.find("figurine") != std::string::npos || lower.find("화분") != std::string::npos
+        || lower.find("vase") != std::string::npos || lower.find("flowerpot") != std::string::npos
+        || lower.find("flower pot") != std::string::npos;
     const bool mw_kw = lower.find("makerworld") != std::string::npos || lower.find("메이커") != std::string::npos;
     // Acquisition verbs ("print me …", "~ 출력해줘") count as search intent only
     // combined with an explicit model-ish noun, so symptom sentences containing
@@ -81,7 +83,7 @@ bool MakerWorldIntent::user_wants_makerworld_search(const std::string& user_text
     const std::string keywords = normalize_makerworld_search_query(user_text);
     if (keywords.size() < 2)
         return false;
-    if (find_kw || pick_kw || mw_kw)
+    if (find_kw || pick_kw || mw_kw || acquire_kw)
         return true;
     return false;
 }

@@ -31,9 +31,10 @@ bool OllamaSendRouter::should_bypass_to_makerworld(const std::string& user_utf8)
     return MakerWorldIntent::is_pure_makerworld_request(user_utf8);
 }
 
-bool OllamaSendRouter::should_use_assist_loop(const std::string& user_utf8, bool apply_mode)
+bool OllamaSendRouter::should_use_assist_loop(const std::string& user_utf8, bool apply_mode,
+                                             bool plate_has_model)
 {
-    return OllamaAssistRouter::should_use_assist_loop(user_utf8, apply_mode);
+    return OllamaAssistRouter::should_use_assist_loop(user_utf8, apply_mode, plate_has_model);
 }
 
 }} // namespace

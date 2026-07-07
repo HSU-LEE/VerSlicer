@@ -342,6 +342,8 @@ bool OllamaUserFlow::is_acquisition_print_request(const std::string& user_utf8, 
     // 1) Must contain a print/acquisition verb ("print me X", "X 출력해줘", …).
     static const char* kAcquireVerbs[] = {
         "출력해줘", "출력해 줘", "출력 해줘", "출력해주", "출력하고 싶", "출력해 주", "출력하고싶",
+        // Colloquial short forms ("화분 출력해", "출력 해") — longer phrases listed first above.
+        "출력해", "출력 해", "출력하", "프린트해", "프린트 해", "인쇄해", "인쇄 해",
         "프린트해줘", "프린트 해줘", "프린트하고 싶", "프린트해 줘",
         "인쇄해줘", "인쇄해 줘", "인쇄 해줘", "인쇄하고 싶",
         "뽑아줘", "뽑아 줘", "뽑고 싶", "만들어줘", "만들어 줘", "만들고 싶",

@@ -2,6 +2,7 @@
 
 #include "OllamaRequestRouter.hpp"
 #include "OllamaSettingSearch.hpp"
+#include "OllamaUserFlow.hpp"
 
 #include <boost/algorithm/string.hpp>
 
@@ -114,9 +115,11 @@ bool OllamaAgentGoalPlanner::is_single_shot_apply(const std::string& user_goal)
     return !goal_expects_multi_step(user_goal);
 }
 
-bool OllamaAgentGoalPlanner::goal_expects_multi_step(const std::string& /*user_goal*/)
+bool OllamaAgentGoalPlanner::goal_expects_multi_step(const std::string& user_goal)
 {
-    return false;
+    // Find-and-print (MakerWorld search → import → slice) must not auto-finish
+    // after a single set_config or a bare done:true from the model.
+    return OllamaUserFlow::is_acquisition_print_request(user_goal, /*plate_has_model=*/false);
 }
 
 bool OllamaAgentGoalPlanner::should_auto_finish_after_apply(const std::string& user_goal, bool applied,

@@ -9,6 +9,7 @@
 #include "OllamaPrintingTips.hpp"
 #include "OllamaRequestRouter.hpp"
 #include "OllamaSettingSearch.hpp"
+#include "OllamaUserFlow.hpp"
 
 #ifndef OLLAMA_HEADLESS_TEST
 #include "../GUI_App.hpp"
@@ -78,6 +79,17 @@ OllamaAssistContextBuilder::PrefetchBundle OllamaAssistContextBuilder::prefetch_
 
 bool OllamaAssistContextBuilder::wants_wiki_prefetch(const std::string& user_goal)
 {
+#ifndef OLLAMA_HEADLESS_TEST
+    bool plate_has_model = false;
+    if (Plater* plater = wxGetApp().plater()) {
+        try {
+            plate_has_model = !plater->model().objects.empty();
+        } catch (...) {
+        }
+    }
+    if (OllamaUserFlow::is_acquisition_print_request(user_goal, plate_has_model))
+        return false;
+#endif
     return should_prefetch_wiki(user_goal);
 }
 

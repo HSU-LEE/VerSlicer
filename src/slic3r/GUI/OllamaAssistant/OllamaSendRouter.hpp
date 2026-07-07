@@ -27,7 +27,7 @@ public:
     static bool should_bypass_to_makerworld(const std::string& user_utf8);
 
     /** Assist-loop vs single-hop dispatch decision for a chat turn. */
-    static bool should_use_assist_loop(const std::string& user_utf8, bool apply_mode);
+    static bool should_use_assist_loop(const std::string& user_utf8, bool apply_mode, bool plate_has_model);
 };
 
 }} // namespace

@@ -10,7 +10,7 @@ class OllamaAssistRouter
 {
 public:
     /** Multi-step observe→act loop (Cursor-style). */
-    static bool should_use_assist_loop(const std::string& user_request, bool apply_mode);
+    static bool should_use_assist_loop(const std::string& user_request, bool apply_mode, bool plate_has_model);
 };
 
 }} // namespace
