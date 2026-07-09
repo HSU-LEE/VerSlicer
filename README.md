@@ -2,7 +2,7 @@
   <img src="resources/images/Verslicer.svg" alt="VerSlicer" width="140" />
 </p>
 
-# VerSlicer
+# VerSlicer 3.1.1
 
 ### AI-Powered 3D Printing Slicer
 
@@ -28,7 +28,9 @@
 
 Type what you want, or use the mic on macOS. Ollama runs locally; the app turns the reply into real steps. No separate “advisor” window that only talks: it uses the same plater you already have.
 
-Bambu network plugin, cloud, Device tab, and Smart Print are still there. Builds are **macOS-only** right now.
+In **Assist** mode you can also say things like “print me a dragon figure” and the app will search MakerWorld, let you pick a model, import it, tune settings, slice, and send to the printer — end to end from one chat panel.
+
+Bambu network plugin, cloud, Device tab, and Smart Print are still there. Builds are **macOS-only** right now. GitHub Actions CI is disabled for this repo (local macOS builds only).
 
 ## Setup
 
@@ -53,7 +55,17 @@ Install [Ollama](https://ollama.com/), leave it running (`ollama serve` or the m
 | Mode | What it does |
 | --- | --- |
 | **Question** | Advice only — no settings or plate changes |
-| **Assist** | Applies changes: `set_config`, rotate, arrange, slice, MakerWorld import, and more |
+| **Assist** | Applies changes: `set_config`, rotate, arrange, slice, MakerWorld import, find-and-print orchestration, and more |
+
+### 5. Find and print (Assist)
+
+When the plate is empty and you ask to print something by name (e.g. “용 피규어 출력해줘” / “print me a vase”), Assist starts the **print job orchestrator**:
+
+1. Search MakerWorld for candidates
+2. Show a **pick dialog** (thumbnail cards, 10s countdown auto-confirms the top hit; keys `1`–`3`, Enter, Esc)
+3. Import → mesh check → auto-config → slice → time/filament estimate → optional send to printer
+
+Progress appears in the chat panel pipeline strip. Disable with `"print_job_orchestrator": "false"` under `"ollama"` in config (on by default).
 
 ### 4. Voice (macOS)
 
@@ -67,6 +79,7 @@ Assist mode picks a backend route automatically. The UI stays the same — only 
 
 | Route | When it runs |
 | --- | --- |
+| **Print job orchestrator** | Empty plate + “get me X and print it” — MakerWorld search through slice/send |
 | **Assist loop** | Multi-step observe → plan → act (slice + brim/support, multi-action goals, etc.) |
 | **Diagnostic pipeline** | Vague print-quality issues — 4 steps: diagnose → Wiki search → analyze current settings → propose `set_config` |
 | **Two-hop** | Planner LLM → resolver LLM for complex setting changes |
@@ -97,6 +110,7 @@ Assist 모드에서는 요청마다 **pro_tips**(gyroid, 아이어링, 브릿지
 | Two-hop planner | off | Deep routes can use planner when enabled |
 | Keyword inject | off | Fallback only when the model returns no `set_config` |
 | Wiki search / critic | on (wiki) / off (critic) | Wiki for vague quality issues; critic for second-pass review |
+| Print job orchestrator | on | End-to-end MakerWorld find → import → slice → send |
 
 Stored in `~/Library/Application Support/verslicer/verslicer.conf` under `"ollama"`:
 
@@ -110,11 +124,22 @@ Stored in `~/Library/Application Support/verslicer/verslicer.conf` under `"ollam
   "keyword_inject": "false",
   "two_hop": "false",
   "wiki_search": "true",
-  "critic": "false"
+  "critic": "false",
+  "print_job_orchestrator": "true"
 }
 ```
 
 Environment overrides: `OLLAMA_ASSIST_LOOP`, `OLLAMA_ASSIST_MAX_STEPS`, `OLLAMA_ADAPTIVE_ROUTING`, `OLLAMA_TWO_HOP`, `OLLAMA_KEYWORD_INJECT`, `OLLAMA_WIKI_SEARCH`, `OLLAMA_CRITIC` (`1` / `true` / `on`).
+
+## Dev tests (optional)
+
+Headless unit tests for the Ollama assistant and MakerWorld search logic (no GUI):
+
+```bash
+./scripts/run_orca_tools_test.sh
+```
+
+Builds with `-DORCA_TOOLS=ON` and runs `ollama_assistant_test`, `ollama_pipeline_test`, and `makerworld_search_test`.
 
 ## Build
 
@@ -164,7 +189,7 @@ Optional signing & notarization: set `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPL
 
 ## Where this is going
 
-Right now the assistant is good at everyday plate and preset work — tune, orient, slice — without treating the slicer like a settings encyclopedia.
+The assistant handles everyday plate and preset work — tune, orient, slice — and can now drive a full “find a model and print it” flow from chat when the plate is empty.
 
 Later I want to go further (e.g. helping when prints fail, from logs).
 
