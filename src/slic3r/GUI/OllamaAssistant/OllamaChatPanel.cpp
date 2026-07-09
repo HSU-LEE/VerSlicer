@@ -1367,8 +1367,13 @@ void OllamaChatPanel::set_busy(bool busy)
     Plater* plater = wxGetApp().plater();
     if (busy) {
         begin_thinking_block();
-        if (m_status)
-            set_status_text(AiLocale::korean() ? wxString::FromUTF8("요청 처리 중…") : _L("Working on your request…"));
+        // Pending bubble is the in-chat busy indicator; hide the footer line to
+        // avoid duplicating "처리 중…" / "요청 처리 중…".
+        if (m_status_host) {
+            m_status_host->Show(false);
+            if (m_body)
+                m_body->Layout();
+        }
         // Single source of busy truth: the pending bubble. The plater toast is
         // only shown when the chat window itself is not visible.
         if (!IsShownOnScreen())
@@ -1381,6 +1386,11 @@ void OllamaChatPanel::set_busy(bool busy)
         // (orchestrator finish/error/cancel/timeout, clarify hand-off, legacy
         // flow finish), not just when a chat reply arrives.
         clear_thinking_block();
+        if (m_status_host) {
+            m_status_host->Show(true);
+            if (m_body)
+                m_body->Layout();
+        }
         OllamaProcessingNotice::hide(plater);
     }
 }
@@ -1585,7 +1595,6 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
     trim_message_history();
 
     set_busy(true);
-    begin_thinking_block();
     const bool ko_fast = AiLocale::korean();
     if (m_apply_mode) {
         append_thinking_line(wxString::FromUTF8(ollama_thinking_goal_intro(user_utf8, ko_fast)));
@@ -1623,7 +1632,6 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
 void OllamaChatPanel::start_assist_loop_turn(const std::string& user_utf8)
 {
     set_busy(true);
-    begin_thinking_block();
     const bool ko = AiLocale::korean();
     append_thinking_line(wxString::FromUTF8(ollama_thinking_goal_intro(user_utf8, ko)));
     const nlohmann::json plan_hint = OllamaAgentGoalPlanner::build_plan_hint(user_utf8, ko);

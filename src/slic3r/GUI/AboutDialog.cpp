@@ -11,6 +11,23 @@
 
 #include <wx/clipbrd.h>
 
+namespace {
+
+wxString about_website_link_html(const wxColour& bgr_clr)
+{
+    const auto bgr = Slic3r::encode_color(Slic3r::ColorRGB(bgr_clr.Red(), bgr_clr.Green(), bgr_clr.Blue()));
+    return from_u8((boost::format(
+        "<html>"
+        "<body bgcolor=\"%1%\">"
+        "<p style=\"margin:0;padding:0;text-align:left\">"
+        "<a style=\"color:#009789\" href=\"https://www.orcaslicer.com\">https://www.orcaslicer.com</a>"
+        "</p>"
+        "</body>"
+        "</html>") % bgr).str());
+}
+
+} // namespace
+
 namespace Slic3r {
 namespace GUI {
 
@@ -212,9 +229,11 @@ AboutDialog::AboutDialog()
         wxDefaultSize, /*wxCAPTION*/wxDEFAULT_DIALOG_STYLE)
 {
     SetFont(wxGetApp().normal_font());
-	SetBackgroundColour(*wxWHITE);
+    const wxColour dlg_bg = wxGetApp().get_window_default_clr();
+	SetBackgroundColour(dlg_bg);
 
     wxPanel* m_panel = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(560), FromDIP(125)), wxTAB_TRAVERSAL);
+    m_panel->SetBackgroundColour(dlg_bg);
 
     wxBoxSizer *panel_versizer = new wxBoxSizer(wxVERTICAL);
     wxBoxSizer *vesizer  = new wxBoxSizer(wxVERTICAL);
@@ -252,8 +271,8 @@ AboutDialog::AboutDialog()
         version->SetFont(version_font);
         version->SetForegroundColour(wxColour("#949494"));
         credits_string->SetForegroundColour(wxColour("#949494"));
-        version->SetBackgroundColour(wxColour("#FFFFFF"));
-        credits_string->SetBackgroundColour(wxColour("#FFFFFF"));
+        version->SetBackgroundColour(dlg_bg);
+        credits_string->SetBackgroundColour(dlg_bg);
 
         vesizer->Add(version, 0, wxRIGHT | wxALIGN_RIGHT, FromDIP(20));
         vesizer->AddSpacer(FromDIP(5));
@@ -270,13 +289,13 @@ AboutDialog::AboutDialog()
     text_list.push_back(_L("OrcaSlicer began in that same spirit, drawing from PrusaSlicer, BambuStudio, SuperSlicer, and CuraSlicer. But it has since grown far beyond its origins — introducing advanced calibration tools, precise wall and seam control and hundreds of other features."));
     text_list.push_back(_L("Today, OrcaSlicer is the most widely used and actively developed open-source slicer in the 3D printing community. Many of its innovations have been adopted by other slicers, making it a driving force for the entire industry."));
 
-    text_sizer->Add( 0, 0, 0, wxTOP, FromDIP(33));
+    text_sizer->Add(0, 0, 0, wxTOP, FromDIP(20));
     bool is_zh = wxGetApp().app_config->get("language") == "zh_CN";
     for (int i = 0; i < text_list.size(); i++)
     {
         auto staticText = new wxStaticText( this, wxID_ANY, wxEmptyString,wxDefaultPosition,wxSize(FromDIP(520), -1), wxALIGN_LEFT );
         staticText->SetForegroundColour(wxColour(107, 107, 107));
-        staticText->SetBackgroundColour(*wxWHITE);
+        staticText->SetBackgroundColour(dlg_bg);
         staticText->SetMinSize(wxSize(FromDIP(520), -1));
         staticText->SetFont(Label::Body_12);
         if (is_zh) {
@@ -303,8 +322,8 @@ AboutDialog::AboutDialog()
     }
 
     text_sizer_horiz->Add(text_sizer, 1, wxALL,0);
-    ver_sizer->Add(text_sizer_horiz, 0, wxALL,0);
-    ver_sizer->Add( 0, 0, 0, wxTOP, FromDIP(43));
+    ver_sizer->Add(text_sizer_horiz, 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, FromDIP(16));
+    ver_sizer->Add( 0, 0, 0, wxTOP, FromDIP(24));
 
     wxBoxSizer *copyright_ver_sizer = new wxBoxSizer(wxVERTICAL);
     wxBoxSizer *copyright_hor_sizer = new wxBoxSizer(wxHORIZONTAL);
@@ -313,6 +332,7 @@ AboutDialog::AboutDialog()
 
     wxStaticText *html_text = new wxStaticText(this, wxID_ANY, "Copyright(C) 2026 OrcaSlicer Pte Ltd All Rights Reserved", wxDefaultPosition, wxDefaultSize);
     html_text->SetForegroundColour(wxColour(107, 107, 107));
+    html_text->SetBackgroundColour(dlg_bg);
 
     copyright_ver_sizer->Add(html_text, 0, wxALL , 0);
 
@@ -322,17 +342,10 @@ AboutDialog::AboutDialog()
           const int fs = font.GetPointSize()-1;
           int size[] = {fs,fs,fs,fs,fs,fs,fs};
           m_html->SetFonts(font.GetFaceName(), font.GetFaceName(), size);
-          m_html->SetMinSize(wxSize(FromDIP(-1), FromDIP(16)));
-          m_html->SetBorders(2);
-          const auto text = from_u8(
-              (boost::format(
-              "<html>"
-              "<body>"
-              "<p style=\"text-align:left\"><a style=\"color:#009789\" href=\"https://www.orcaslicer.com\">https://www.orcaslicer.com</ a></p>"
-              "</body>"
-              "</html>")
-            ).str());
-          m_html->SetPage(text);
+          m_html->SetMinSize(wxSize(FromDIP(280), FromDIP(18)));
+          m_html->SetBorders(0);
+          m_html->SetBackgroundColour(dlg_bg);
+          m_html->SetPage(about_website_link_html(dlg_bg));
           copyright_ver_sizer->Add(m_html, 0, wxEXPAND, 0);
           m_html->Bind(wxEVT_HTML_LINK_CLICKED, &AboutDialog::onLinkClicked, this);
       }
@@ -366,14 +379,21 @@ void AboutDialog::on_dpi_changed(const wxRect &suggested_rect)
     const wxFont& font = GetFont();
     const int fs = font.GetPointSize() - 1;
     int font_size[] = { fs, fs, fs, fs, fs, fs, fs };
-    m_html->SetFonts(font.GetFaceName(), font.GetFaceName(), font_size);
+    if (m_html) {
+        m_html->SetFonts(font.GetFaceName(), font.GetFaceName(), font_size);
+        const wxColour dlg_bg = wxGetApp().get_window_default_clr();
+        m_html->SetBackgroundColour(dlg_bg);
+        m_html->SetPage(about_website_link_html(dlg_bg));
+    }
 
     const int& em = em_unit();
 
     msw_buttons_rescale(this, em, { wxID_CLOSE, m_copy_rights_btn_id });
 
-    m_html->SetMinSize(wxSize(-1, 16 * em));
-    m_html->Refresh();
+    if (m_html) {
+        m_html->SetMinSize(wxSize(FromDIP(280), FromDIP(18)));
+        m_html->Refresh();
+    }
 
     const wxSize& size = wxSize(65 * em, 30 * em);
 

@@ -69,26 +69,37 @@ private:
 
     Row  make_row(ChatMessageRole role, ChatMessageKind kind, const wxString& text, bool pending);
     void style_bubble(const Row& row);
+    void destroy_row(Row& row);
+    int  row_align_flags(ChatMessageRole role, ChatMessageKind kind) const;
+    size_t insert_pos_before_pending() const;
+    void insert_row_before_pending(Row& row, int gap_dp, int align_flags);
+    int  viewport_content_width() const;
     int  bubble_wrap_width() const;
+    int  max_bubble_width() const;
     void rewrap_row(Row& row);
     void rewrap_all();
+    void maybe_rewrap_for_scrollbar();
+    void layout_transcript(bool scroll_to_end);
+    void clear_thinking_rows();
     void scroll_to_bottom();
     void drop_oldest_if_needed();
     void on_size(wxSizeEvent& evt);
     void on_pending_timer();
-    void refresh_pending_label();
+    void refresh_pending_caption(bool scroll_to_end);
 
     std::vector<Row> m_rows;
     wxBoxSizer*      m_sizer{nullptr};
     int              m_next_id{1};
     int              m_last_wrap_width{0};
+    bool             m_scrollbar_shown{false};
 
-    // Pending bubble state
+    // Pending / thinking UI (transient — removed by clear_pending)
     Row*             m_pending_row{nullptr};
     Row              m_pending_storage;
+    std::vector<Row> m_thinking_rows;
+    Row              m_stream_storage;
+    Row*             m_stream_row{nullptr};
     wxString         m_pending_caption;
-    wxString         m_pending_lines;
-    wxString         m_pending_stream;
     wxTimer*         m_pending_timer{nullptr};
     int              m_pending_dots{0};
 };

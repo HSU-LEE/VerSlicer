@@ -15,6 +15,7 @@
 #include "OllamaActionExecutor.hpp"
 
 #include <boost/algorithm/string.hpp>
+#include <cstring>
 
 namespace Slic3r { namespace GUI {
 
@@ -344,6 +345,8 @@ bool OllamaUserFlow::is_acquisition_print_request(const std::string& user_utf8, 
         "출력해줘", "출력해 줘", "출력 해줘", "출력해주", "출력하고 싶", "출력해 주", "출력하고싶",
         // Colloquial short forms ("화분 출력해", "출력 해") — longer phrases listed first above.
         "출력해", "출력 해", "출력하", "프린트해", "프린트 해", "인쇄해", "인쇄 해",
+        // Bare noun+verb ("화분 출력", "dragon print") — space-padded so "출력물" does not match.
+        " 출력", " 프린트", " 인쇄", " print",
         "프린트해줘", "프린트 해줘", "프린트하고 싶", "프린트해 줘",
         "인쇄해줘", "인쇄해 줘", "인쇄 해줘", "인쇄하고 싶",
         "뽑아줘", "뽑아 줘", "뽑고 싶", "만들어줘", "만들어 줘", "만들고 싶",
@@ -355,6 +358,19 @@ bool OllamaUserFlow::is_acquisition_print_request(const std::string& user_utf8, 
         if (has(v)) {
             has_verb = true;
             break;
+        }
+    }
+    // Trailing bare verb with no 해/줘 suffix ("화분 출력", "cat figurine print").
+    if (!has_verb) {
+        std::string trimmed = lower;
+        boost::algorithm::trim(trimmed);
+        static const char* kBareSuffix[] = {"출력", "프린트", "인쇄", "print"};
+        for (const char* suf : kBareSuffix) {
+            const size_t n = std::strlen(suf);
+            if (trimmed.size() >= n && trimmed.compare(trimmed.size() - n, n, suf) == 0) {
+                has_verb = true;
+                break;
+            }
         }
     }
     if (!has_verb)
