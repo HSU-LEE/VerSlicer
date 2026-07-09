@@ -2,17 +2,91 @@
   <img src="resources/images/Verslicer.svg" alt="VerSlicer" width="140" />
 </p>
 
-# VerSlicer 3.1.1
-
-### AI-Powered 3D Printing Slicer
-
-> [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer) fork with [Ollama](https://ollama.com/) on your Mac — chat and voice
+<h1 align="center">VerSlicer</h1>
 
 <p align="center">
-  <img src="docs/images/main-ui.png" alt="VerSlicer with Ollama chat open" width="900" />
+  <strong>Just describe what you want. VerSlicer handles the rest.</strong><br/>
+  Turn natural language into real slicing actions — on your Mac, with your printer, locally.
 </p>
 
-## Demo
+<p align="center">
+  An <a href="https://github.com/SoftFever/OrcaSlicer">OrcaSlicer</a> fork with a built-in <a href="https://ollama.com/">Ollama</a> assistant
+</p>
+
+<p align="center">
+  <img src="docs/images/main-ui.png" alt="VerSlicer with AI assistant open" width="900" />
+</p>
+
+---
+
+**Instead of learning hundreds of slicer settings, just describe what you want.**
+
+VerSlicer is a full OrcaSlicer build plus a local AI layer that understands your intent — in chat or by voice — and turns it into structured actions on the same plater you already use. Rotate a part, stiffen a print, find a model on MakerWorld, slice, and send to the printer. No separate “advisor” window that only talks.
+
+> **macOS only** for now · **Local-first** — Ollama runs on your machine · Inherits **all OrcaSlicer printer profiles and slicing engine**
+
+# From intent to print
+
+```
+  "Make this stronger."
+           │
+           ▼
+   AI understands intent
+           │
+           ▼
+   Automatically adjusts
+   infill · walls · supports
+   speed · temperature · …
+           │
+           ▼
+      Ready to print
+```
+
+Same idea for geometry (“rotate 45°”), acquisition (“print me a vase”), or quality (“layers look stringy”) — you state the goal; VerSlicer picks the route and applies real changes.
+
+# Why VerSlicer?
+
+| OrcaSlicer | VerSlicer |
+| --- | --- |
+| You learn and tune hundreds of parameters | You describe the outcome you want |
+| Expert knowledge in your head or the wiki | Context, wiki excerpts, and presets fed to a local model |
+| Manual search → import → configure → slice | **Find & print** from one chat panel when the plate is empty |
+| Same great slicing engine | **Same engine** — plus chat, voice, and guarded AI actions |
+
+VerSlicer does not replace Orca’s precision. It removes the gap between *what you mean* and *what the slicer does*.
+
+# How it works
+
+```mermaid
+flowchart TD
+    U[You] --> C[Chat / Voice]
+    C --> O[Ollama — local LLM]
+    O --> R[Router & Planner]
+    R --> A[Structured JSON Actions]
+    A --> V[Validation & Safety]
+    V --> E[OrcaSlicer Engine]
+    E --> P[Printer / G-code]
+```
+
+**Typical Assist path**
+
+1. **You** type or speak on the 3D view chat panel.
+2. **Router** classifies the request (single-shot, multi-step assist loop, diagnostic pipeline, or find-and-print orchestrator).
+3. **Ollama** returns a short message plus a list of typed actions — never raw G-code rewrites from hallucination.
+4. **Validator** checks action types, parameters, and preset keys against a fixed registry.
+5. **Executor** applies changes on the live plater (presets, transforms, slice, send, MakerWorld, etc.).
+
+# Main features
+
+- **Natural-language control** — Presets, plate layout, mesh ops, slice, export, and send through Assist mode.
+- **Question mode** — Explanations only; nothing on the plate changes.
+- **Find & print** — Empty plate + “print me a dragon” / “용 피규어 출력해줘” → MakerWorld search → pick dialog → import → mesh check → auto-config → slice → optional send.
+- **Voice (macOS)** — Mic input with garbled-transcript rejection.
+- **Print-quality diagnostics** — Symptom → Wiki evidence → current-setting analysis → `set_config` proposal.
+- **Rollback** — `rollback_apply` undoes the last AI settings apply.
+- **Full OrcaSlicer** — Calibration, seams, network printers, Bambu plugin, Smart Print, and the rest of the Orca feature set.
+
+# Demo
 
 <p align="center">
   <video src="docs/test.mp4" width="900" controls playsinline poster="docs/images/main-ui.png">
@@ -24,95 +98,160 @@
   <a href="docs/test.mp4"><strong>Watch demo (MP4)</strong></a>
 </p>
 
-**VerSlicer** starts from OrcaSlicer and adds an assistant that can change the slicer for you — presets, parts on the bed, slice, and the usual menus — from a chat window on the 3D view.
+# Getting started
 
-Type what you want, or use the mic on macOS. Ollama runs locally; the app turns the reply into real steps. No separate “advisor” window that only talks: it uses the same plater you already have.
-
-In **Assist** mode you can also say things like “print me a dragon figure” and the app will search MakerWorld, let you pick a model, import it, tune settings, slice, and send to the printer — end to end from one chat panel.
-
-Bambu network plugin, cloud, Device tab, and Smart Print are still there. Builds are **macOS-only** right now. GitHub Actions CI is disabled for this repo (local macOS builds only).
-
-## Setup
-
-### 1. Install Ollama and pull the default model
+## 1. Install Ollama and pull a model
 
 ```bash
-ollama pull qwen2.5:3b
+ollama pull qwen2.5:3b    # fast on Apple Silicon (recommended to start)
+ollama pull qwen2.5:7b    # higher quality, more VRAM/RAM
 ```
 
-Install [Ollama](https://ollama.com/), leave it running (`ollama serve` or the menu-bar app), then open VerSlicer and **Ollama chat** on the 3D toolbar.
+Install [Ollama](https://ollama.com/), keep it running, then open VerSlicer → **AI assistant** on the 3D toolbar.
 
-**Default model:** `qwen2.5:3b` — tuned for fast replies on Apple Silicon. For higher quality (slower), use `qwen2.5:7b` in the chat panel or in config (see below).
+## 2. First session
 
-### 2. First launch
+1. Set **Mode** to **Assist** to allow real changes.
+2. Confirm a model appears in the model dropdown.
+3. Try: *“Increase infill to 30%”* or *“Make this stronger.”*
 
-1. Open VerSlicer → 3D view → **Ollama chat**
-2. Set **Mode** to **Assist** to let the assistant change slicer settings and run actions
-3. Confirm the model label shows `qwen2.5:3b`
+## 3. Chat modes
 
-### 3. Chat modes
-
-| Mode | What it does |
+| Mode | Behavior |
 | --- | --- |
-| **Question** | Advice only — no settings or plate changes |
-| **Assist** | Applies changes: `set_config`, rotate, arrange, slice, MakerWorld import, find-and-print orchestration, and more |
+| **Question** | Advice only |
+| **Assist** | Applies validated actions on the slicer |
 
-### 5. Find and print (Assist)
+## 4. Find and print
 
-When the plate is empty and you ask to print something by name (e.g. “용 피규어 출력해줘” / “print me a vase”), Assist starts the **print job orchestrator**:
+When the plate is empty, name what you want printed. The **print job orchestrator** runs: MakerWorld search → thumbnail pick dialog (10 s auto-pick on top hit; keys `1`–`3`) → import → mesh health → auto-config → slice → estimate → optional send. Progress shows in the chat pipeline strip.
 
-1. Search MakerWorld for candidates
-2. Show a **pick dialog** (thumbnail cards, 10s countdown auto-confirms the top hit; keys `1`–`3`, Enter, Esc)
-3. Import → mesh check → auto-config → slice → time/filament estimate → optional send to printer
+## 5. Voice (macOS)
 
-Progress appears in the chat panel pipeline strip. Disable with `"print_job_orchestrator": "false"` under `"ollama"` in config (on by default).
+Allow Microphone and Speech Recognition. For Korean, add Korean in **System Settings → General → Language & Region** above English if needed.
 
-### 4. Voice (macOS)
+---
 
-- Grant **Microphone** and **Speech Recognition** when prompted
-- For Korean voice, add Korean in **System Settings → General → Language & Region** (above English if you speak Korean)
-- Speak clearly; garbled transcripts are rejected instead of being sent to the model
+# AI architecture
 
-## Assist backend (v3.1.1)
-
-Assist mode picks a backend route automatically. The UI stays the same — only the pipeline changes.
-
-| Route | When it runs |
+| Layer | Role |
 | --- | --- |
-| **Print job orchestrator** | Empty plate + “get me X and print it” — MakerWorld search through slice/send |
-| **Assist loop** | Multi-step observe → plan → act (slice + brim/support, multi-action goals, etc.) |
-| **Diagnostic pipeline** | Vague print-quality issues — 4 steps: diagnose → Wiki search → analyze current settings → propose `set_config` |
-| **Two-hop** | Planner LLM → resolver LLM for complex setting changes |
-| **Single-shot** | Simple geometry / explicit numeric requests in one LLM call |
+| **Chat / Voice UI** | `OllamaChatPanel` — modes, streaming, pipeline stepper, MakerWorld offer dialog |
+| **Send router** | Deterministic pre-router for acquisition intent (“화분 출력해줘”) before LLM |
+| **Assist loop** | Multi-step agent: observe → plan → act (up to 8 steps) |
+| **Diagnostic pipeline** | 4-step quality flow with Bambu Lab Wiki prefetch |
+| **Print job orchestrator** | End-to-end find → import → slice → send with UI adapter |
+| **Action executor** | Maps JSON actions to real `Plater` / preset / network calls |
+| **OrcaSlicer core** | Unchanged slicing, profiles, and device stack |
 
-Assist 모드에서는 품질·설정 요청에 **4단계 진단 파이프라인**을 사용할 수 있습니다:
+**Request routing (Assist)**
 
-1. **문제 진단** — LLM이 증상·원인·검색할 Wiki 키워드·후보 설정 추출
-2. **근거 검색** — Bambu Lab Wiki에서 관련 문서 발췌
-3. **현재 설정 분석** — 후보 키의 현재값과 진단 대조 (코드)
-4. **설정 변경 제안** — 진단+Wiki+분석을 바탕으로 `set_config` 제안
+| Route | When |
+| --- | --- |
+| Print job orchestrator | Empty plate + named object to print |
+| Assist loop | Multi-step or tool-heavy goals |
+| Diagnostic pipeline | Vague print-quality complaints |
+| Two-hop planner | Deep setting changes (optional, off by default) |
+| Single-shot | Simple geometry or explicit numbers |
 
-회전·배치·명시적 수치 지정 등 단순 요청은 1회 LLM으로 바로 처리합니다.
+# JSON action format
 
-Assist 모드에서는 요청마다 **pro_tips**(gyroid, 아이어링, 브릿지 팬 등)와 고급 설정 카탈로그를 LLM에 전달합니다. 모델이 `set_config`를 반환하면 키워드 시나리오로 덮어쓰지 않습니다.
+The model replies with **one JSON object** — not free-form shell commands:
 
-## AI assistant defaults
+```json
+{
+  "message": "I'll stiffen the part with more walls and higher infill.",
+  "actions": [
+    {
+      "type": "set_config",
+      "preset": "print",
+      "options": { "sparse_infill_density": "30%", "wall_loops": 4 }
+    }
+  ]
+}
+```
+
+Agent loop variant (multi-step):
+
+```json
+{
+  "message": "Checking the plate first…",
+  "done": false,
+  "actions": [{ "type": "get_state" }]
+}
+```
+
+**Common action types:** `set_config`, `rotate`, `translate`, `scale`, `arrange`, `slice`, `send_print`, `makerworld_find_and_print`, `import_makerworld`, `repair_mesh`, `rollback_apply`, and more — see `OllamaActionRegistry` for the full allow-list.
+
+# Action safety
+
+- **Allow-list registry** — Only registered `actions[].type` values run; unknown types are dropped.
+- **Canonicalization** — Aliases normalize to a single type name before execution.
+- **Category gates** — Tools marked *Dangerous* (e.g. `set_config`, `send_print`) and *Mutating* (geometry, slice) follow stricter policies in the assist loop.
+- **Preset key validation** — `set_config` keys are checked against `OllamaSettingRegistry` (no arbitrary option names).
+- **Question mode** — Parser strips mutating actions even if the model returns them.
+- **Rollback** — Last AI-driven preset apply can be undone via `rollback_apply`.
+- **False-completion guard** — Agent cannot claim “done” on acquisition goals without running the right tools.
+
+# Local-first privacy
+
+- **Ollama on localhost** — Default host `http://127.0.0.1:11434`; chat goes to your machine, not a VerSlicer cloud.
+- **No training upload** — Conversation stays in the app session and local config; no built-in telemetry for prompts.
+- **Wiki prefetch** — Quality help may fetch public Bambu Lab Wiki pages; that is the main optional network use besides MakerWorld/printer APIs you already use in Orca.
+- **MakerWorld / printer** — Find-and-print and send use the same Bambu/MakerWorld paths as Orca; optional and user-initiated.
+
+# Models & performance
+
+| Item | Default / notes |
+| --- | --- |
+| **Recommended models** | `qwen2.5:3b` (fast), `qwen2.5:7b` (balanced default in config) |
+| **Also works** | Other Ollama chat models; JSON action quality varies by model |
+| **Context window** | 8192 tokens (`num_ctx`) |
+| **Max reply tokens** | 768 (`num_predict`) — sized for JSON + short message |
+| **Keep-alive** | 30 min — avoids cold-start between messages |
+| **Memory** | Dominated by Ollama model size (~2 GB class for 3B, ~4–5 GB for 7B on Apple Silicon — depends on quant and system) |
+| **Latency** | 3B typically sub-second to a few seconds per turn on M-series; assist loops multiply by step count (max 8) |
+
+Tune in `~/Library/Application Support/verslicer/verslicer.conf` under `"ollama"` or the chat model dropdown.
+
+# Supported printers
+
+VerSlicer inherits **OrcaSlicer’s full printer compatibility** — Bambu Lab, Prusa, Creality, Voron, Klipper, OctoPrint, PrusaLink, and hundreds of profiles from the Orca ecosystem. AI actions operate on whichever printer and presets you have selected; no separate AI printer list.
+
+# Roadmap
+
+**Shipped (v3.1.x)**
+
+- [x] AI chat on the 3D view (Question + Assist)
+- [x] Voice input (macOS)
+- [x] Structured JSON action executor with validation
+- [x] Assist loop (multi-step agent)
+- [x] Diagnostic pipeline + Wiki grounding
+- [x] Find & print orchestrator (MakerWorld → slice → send)
+- [x] Auto configuration & mesh health in print pipeline
+- [x] Settings rollback (`rollback_apply`)
+
+**Planned**
+
+- [ ] Multi-agent planning (longer jobs split across specialized agents)
+- [ ] Print history learning (suggest fixes from past jobs)
+- [ ] Cloud sync for assistant preferences (optional; local-first remains default)
+- [ ] AI failure prediction from logs and print telemetry
+- [ ] Material recommendation from model geometry and intent
+- [ ] Deeper failure-doctor flow (“my print failed” → log-aware diagnosis)
+
+# Configuration
 
 | Setting | Default | Notes |
 | --- | --- | --- |
-| Model | `qwen2.5:3b` | `qwen2.5:7b` still works if installed |
-| Context window | 8192 tokens | Smaller = faster |
-| Max reply tokens | 768 | Enough for JSON actions |
-| Keep-alive | 30 min | Avoids reload delay between messages |
-| Assist loop | on | Multi-step agent; up to 8 steps |
-| Assist max steps | 8 | `OLLAMA_ASSIST_MAX_STEPS` env override |
-| Adaptive routing | on | Fast / Standard / Deep request classification |
-| Two-hop planner | off | Deep routes can use planner when enabled |
-| Keyword inject | off | Fallback only when the model returns no `set_config` |
-| Wiki search / critic | on (wiki) / off (critic) | Wiki for vague quality issues; critic for second-pass review |
-| Print job orchestrator | on | End-to-end MakerWorld find → import → slice → send |
-
-Stored in `~/Library/Application Support/verslicer/verslicer.conf` under `"ollama"`:
+| Model | `qwen2.5:7b` | Use `qwen2.5:3b` for speed |
+| Assist loop | on | Up to 8 steps |
+| Adaptive routing | on | Fast / Standard / Deep |
+| Wiki search | on | Quality diagnostics |
+| Print job orchestrator | on | Find & print |
+| Two-hop planner | off | Deep setting changes |
+| Critic | off | Second-pass review |
+| Keyword inject | off | Fallback only |
 
 ```json
 "ollama": {
@@ -129,32 +268,19 @@ Stored in `~/Library/Application Support/verslicer/verslicer.conf` under `"ollam
 }
 ```
 
-Environment overrides: `OLLAMA_ASSIST_LOOP`, `OLLAMA_ASSIST_MAX_STEPS`, `OLLAMA_ADAPTIVE_ROUTING`, `OLLAMA_TWO_HOP`, `OLLAMA_KEYWORD_INJECT`, `OLLAMA_WIKI_SEARCH`, `OLLAMA_CRITIC` (`1` / `true` / `on`).
+Environment overrides: `OLLAMA_ASSIST_LOOP`, `OLLAMA_ASSIST_MAX_STEPS`, `OLLAMA_ADAPTIVE_ROUTING`, `OLLAMA_TWO_HOP`, `OLLAMA_KEYWORD_INJECT`, `OLLAMA_WIKI_SEARCH`, `OLLAMA_CRITIC`.
 
-## Dev tests (optional)
+# How to build
 
-Headless unit tests for the Ollama assistant and MakerWorld search logic (no GUI):
-
-```bash
-./scripts/run_orca_tools_test.sh
-```
-
-Builds with `-DORCA_TOOLS=ON` and runs `ollama_assistant_test`, `ollama_pipeline_test`, and `makerworld_search_test`.
-
-## Build
-
-macOS 11.3+, Xcode or CLT, CMake 3.13+.
+**Requirements:** macOS 11.3+, Xcode or CLT, CMake 3.13+.
 
 ```bash
-./build_release_macos.sh       # deps + app
-./build_release_macos.sh -x    # Ninja, nicer for dev
-./build_release_macos.sh -s    # app only (after deps are built)
+./build_release_macos.sh       # dependencies + app
+./build_release_macos.sh -x    # Ninja (recommended)
+./build_release_macos.sh -s    # app only
 ```
 
-Output: `build/<arch>/src/Release/verslicer.app`  
-Symlink: `build/<arch>/OrcaSlicer/Verslicer.app`
-
-Quick rebuild after code changes (Ninja):
+**Output:** `build/<arch>/src/Release/verslicer.app`
 
 ```bash
 cd build/arm64
@@ -162,46 +288,35 @@ ninja -f build-Release.ninja -j4 src/Release/verslicer.app/Contents/MacOS/versli
 open src/Release/verslicer.app
 ```
 
-## Installer (DMG)
-
-Package an existing Release build for another Mac (no dev tools required):
+# Installer (DMG)
 
 ```bash
 ./scripts/make_macos_installer.sh              # package existing build
-./scripts/make_macos_installer.sh --build      # rebuild app, then package
-./scripts/make_macos_installer.sh --build-only # portable .app only (no .dmg)
-./build_release_macos.sh -s -x -M              # same as --build + .dmg
+./scripts/make_macos_installer.sh --build      # rebuild + package
+./build_release_macos.sh -s -x -M              # build + DMG
 ```
 
-**Output:** `build/<arch>/dist/VerSlicer-macOS-<arch>-<version>.dmg`  
-Example: `build/arm64/dist/VerSlicer-macOS-arm64-3.1.1.dmg`
+**On another Mac:** Open DMG → Applications → install Ollama → `ollama pull qwen2.5:3b`. If blocked: right-click **Open**, or `xattr -dr com.apple.quarantine /Applications/VerSlicer.app`.
 
-**On another Mac:**
+# Dev tests
 
-1. Open the DMG → drag **VerSlicer** to **Applications**
-2. Install [Ollama](https://ollama.com/download) and run `ollama pull qwen2.5:3b`
-3. If macOS blocks the app (unsigned build): **Right-click → Open** once, or:
-   ```bash
-   xattr -dr com.apple.quarantine /Applications/VerSlicer.app
-   ```
+```bash
+./scripts/run_orca_tools_test.sh
+```
 
-Optional signing & notarization: set `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD` before running `make_macos_installer.sh` (see `scripts/package_macos_dmg.sh`).
+Headless tests: `ollama_assistant_test`, `ollama_pipeline_test`, `makerworld_search_test`.
 
-## Where this is going
+# Some background
 
-The assistant handles everyday plate and preset work — tune, orient, slice — and can now drive a full “find a model and print it” flow from chat when the plate is empty.
+Open-source slicing has always been built on collaboration and attribution. [Slic3r](https://github.com/Slic3r/Slic3r) laid the foundation; [PrusaSlicer](https://github.com/prusa3d/PrusaSlicer), [Bambu Studio](https://github.com/bambulab/BambuStudio), and [SuperSlicer](https://github.com/supermerill/SuperSlicer) carried it forward. [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer) grew into one of the most widely used open-source slicers.
 
-Later I want to go further (e.g. helping when prints fail, from logs).
+**VerSlicer** adds a local natural-language control layer on top of that engine — so you spend less time hunting settings and more time printing.
 
-## License & copyright
+# License
 
-VerSlicer is developed based on OrcaSlicer.
+VerSlicer is based on OrcaSlicer; upstream code remains under its original licenses. Additional AI and UI work is copyright **Lee Hee Seung**. See [LICENSE](LICENSE).
 
-OrcaSlicer and related upstream code remain under their original open-source licenses; copyright belongs to the upstream authors.
+# Links
 
-Additional features, UI improvements, and AI-related functionality in VerSlicer are copyright **Lee Hee Seung**. See [LICENSE](LICENSE).
-
-## Links
-
-- [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer)
+- [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer) · [Wiki](https://www.orcaslicer.com/wiki)
 - [Ollama](https://ollama.com/) · [API docs](https://github.com/ollama/ollama/blob/main/docs/api.md)
