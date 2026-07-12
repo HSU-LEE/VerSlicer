@@ -58,6 +58,9 @@ private:
 
 // Waiting-state deadlines: import waits on Plater's download/import hook,
 // slicing waits on the SliceDone event — both can silently never arrive.
+// Search waits on a detached worker (Ollama translation + MakerWorld HTTP) and
+// can also hang without a deadline, leaving the UI stuck on "1/6 검색".
+constexpr int kSearchTimeoutMs = 60 * 1000;
 constexpr int kImportTimeoutMs = 120 * 1000;
 constexpr int kSliceTimeoutMs  = 300 * 1000;
 
@@ -395,6 +398,10 @@ void PrintJobOrchestrator::step_search()
 
     set_busy(true, AiLocale::text("Searching for models…", "모델을 검색하는 중…"));
 
+    arm_watchdog(PrintJobState::Searching, kSearchTimeoutMs, "search_timeout",
+                 AiLocale::text("Model search timed out. Check your network or try again.",
+                                "모델 검색 시간이 초과되었습니다. 네트워크를 확인하거나 다시 시도해 주세요."));
+
     std::weak_ptr<std::atomic<bool>> weak_alive = m_alive;
     std::weak_ptr<PrintJob>          weak_job   = m_job;
     const std::uint64_t              jid        = job.job_id;
@@ -407,6 +414,8 @@ void PrintJobOrchestrator::step_search()
             auto j = weak_job.lock();
             if (!is_current(j, jid))
                 return;
+
+            disarm_watchdog();
 
             if (!result.ok || result.candidates.empty()) {
                 finish_error("search_empty",

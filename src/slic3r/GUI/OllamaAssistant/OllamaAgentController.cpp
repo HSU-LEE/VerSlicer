@@ -397,6 +397,37 @@ void OllamaAgentController::on_llm_response(const std::string& text, const std::
         return;
     }
 
+    // Action extraction, normalization, and execution run on the wx main thread. An
+    // uncaught throw (JSON type errors, mesh/plater edge cases in a tool) would unwind
+    // the wx main loop (OnExceptionInMainLoop rethrows) and terminate the whole app.
+    // Contain it here and end the turn gracefully with a user-visible message.
+    try {
+        dispatch_llm_actions(text);
+    } catch (const std::exception& ex) {
+        BOOST_LOG_TRIVIAL(error) << "Ollama assist loop: action dispatch failed: " << ex.what();
+        AIGuiOrchestrator::instance().on_chat_apply_end(false);
+        fail_turn_after_exception();
+    } catch (...) {
+        BOOST_LOG_TRIVIAL(error) << "Ollama assist loop: action dispatch failed: unknown error";
+        AIGuiOrchestrator::instance().on_chat_apply_end(false);
+        fail_turn_after_exception();
+    }
+}
+
+void OllamaAgentController::fail_turn_after_exception()
+{
+    const bool           ko = wxGetApp().current_language_code().StartsWith("ko");
+    OllamaAgentRunResult r;
+    r.blocked           = true;
+    r.steps_taken       = m_step;
+    r.step_tool_results = m_step_tool_results;
+    r.final_message     = ko ? std::string("작업을 처리하는 중 오류가 발생했습니다. 다시 시도해 주세요.")
+                             : std::string("Something went wrong while processing that. Please try again.");
+    finish(std::move(r));
+}
+
+void OllamaAgentController::dispatch_llm_actions(const std::string& text)
+{
     m_messages.push_back({"assistant", text});
 
     nlohmann::json root;

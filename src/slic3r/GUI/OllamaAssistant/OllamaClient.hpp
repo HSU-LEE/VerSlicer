@@ -45,8 +45,6 @@ public:
     void chat(const std::string& model, const std::vector<OllamaMessage>& messages, ChatCallback callback,
               OllamaRequestKind kind = OllamaRequestKind::Chat, StreamCallback stream = nullptr);
     void list_models(ModelsCallback callback);
-    /** Blocking; for model validation before chat. */
-    std::vector<std::string> list_models_sync() const;
 
     static void cancel_active_requests(OllamaCancelDomain domain = OllamaCancelDomain::All);
 

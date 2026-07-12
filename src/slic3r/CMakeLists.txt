@@ -192,8 +192,6 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/BambuLabWikiSearchCore.hpp
     GUI/OllamaAssistant/OllamaActionCritic.cpp
     GUI/OllamaAssistant/OllamaActionCritic.hpp
-    GUI/OllamaAssistant/OllamaBenchmarkScenarios.cpp
-    GUI/OllamaAssistant/OllamaBenchmarkScenarios.hpp
     GUI/OllamaAssistant/OllamaTelemetry.cpp
     GUI/OllamaAssistant/OllamaTelemetry.hpp
     GUI/OllamaAssistant/OllamaVoiceInput.cpp

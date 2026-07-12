@@ -45,9 +45,11 @@ wxSize measure_wrapped_label(wxStaticText* label, int wrap_px, wxWindow* ref)
     wxClientDC     dc(label);
     dc.SetFont(label->GetFont());
     const wxSize dc_sz = dc.GetMultiLineTextExtent(label->GetLabel());
-    const int    slack = ref->FromDIP(2);
-    const int    w     = std::min(std::max(best.GetWidth(), dc_sz.GetWidth()) + slack, wrap_px);
-    const int    h     = std::max(best.GetHeight(), dc_sz.GetHeight()) + slack;
+    // Extra vertical slack: on macOS GetBestSize often under-reports wrapped Hangul
+    // height by a few pixels, which clips the last line of system welcome bubbles.
+    const int slack = ref->FromDIP(6);
+    const int w     = std::min(std::max(best.GetWidth(), dc_sz.GetWidth()) + ref->FromDIP(2), wrap_px);
+    const int h     = std::max(best.GetHeight(), dc_sz.GetHeight()) + slack;
     return wxSize(w, h);
 }
 

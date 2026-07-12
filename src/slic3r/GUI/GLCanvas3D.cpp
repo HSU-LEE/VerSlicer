@@ -1,6 +1,5 @@
 #include "libslic3r/libslic3r.h"
 #include "GLCanvas3D.hpp"
-#include "OllamaAssistant/OllamaChatDialog.hpp"
 #include "AIModelCreate/AIModelCreateDialog.hpp"
 #include "OllamaAssistant/OllamaVoiceInput.hpp"
 
@@ -129,19 +128,6 @@ float RetinaHelper::get_scale_factor() { return float(m_window->GetContentScaleF
 #undef Convex
 #endif
 
-namespace {
-void ensure_ollama_chat_dialog(GUI_App& app)
-{
-    if (app.ollama_chat_dialog != nullptr || app.mainframe == nullptr)
-        return;
-    app.ollama_chat_dialog = new OllamaChatDialog(app.mainframe);
-    app.ollama_chat_dialog->Bind(wxEVT_DESTROY, [](wxWindowDestroyEvent& e) {
-        GUI_App& a = wxGetApp();
-        if (a.ollama_chat_dialog == e.GetEventObject())
-            a.ollama_chat_dialog = nullptr;
-    });
-}
-} // namespace
 
 std::string& get_object_limited_text() {
     static std::string object_limited_text = _u8L("An object is placed in the left/right nozzle-only area or exceeds the printable height of the left nozzle.\n"
@@ -8770,9 +8756,8 @@ void GLCanvas3D::_render_canvas_toolbar()
                 auto& app = wxGetApp();
                 if (app.is_closing() || app.mainframe == nullptr)
                     return;
-                ensure_ollama_chat_dialog(app);
-                if (app.ollama_chat_dialog)
-                    app.ollama_chat_dialog->toggle();
+                if (app.plater())
+                    app.plater()->toggle_ai_assistant();
             });
         }
     } else if (ImGui::IsItemHovered()) {
@@ -8815,12 +8800,8 @@ void GLCanvas3D::_render_canvas_toolbar()
                             wxGetApp().CallAfter([text] {
                                 if (wxGetApp().is_closing() || wxGetApp().mainframe == nullptr)
                                     return;
-                                ensure_ollama_chat_dialog(wxGetApp());
-                                if (wxGetApp().ollama_chat_dialog == nullptr)
-                                    return;
-                                wxGetApp().ollama_chat_dialog->Show();
-                                wxGetApp().ollama_chat_dialog->Raise();
-                                wxGetApp().ollama_chat_dialog->submit_text_and_send(wxString::FromUTF8(text));
+                                if (wxGetApp().plater())
+                                    wxGetApp().plater()->ai_assistant_submit(wxString::FromUTF8(text));
                             });
                         });
                     }

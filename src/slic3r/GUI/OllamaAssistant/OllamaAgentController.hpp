@@ -65,6 +65,11 @@ private:
     /** Merge the goal into the print-intent session and refresh the deterministic proposal. */
     void refresh_print_intent_and_proposal(bool korean);
     void on_llm_response(const std::string& text, const std::string& error);
+    // Extracted body of on_llm_response: action extraction, normalization, and
+    // execution — all of which run on the wx main thread. on_llm_response wraps this
+    // in a try/catch so an uncaught throw cannot unwind the main loop and quit the app.
+    void dispatch_llm_actions(const std::string& text);
+    void fail_turn_after_exception();
     void finish(OllamaAgentRunResult result);
     void continue_after_slice(bool slice_ok);
     void proceed_after_tool_execution(const nlohmann::json& executed_root, const std::string& assistant_msg,

@@ -74,6 +74,9 @@ struct ModelSearchContext
     bool        network_agent_ok{false};
     bool        plugin_search_available{false};
     bool        plugin_download_available{false};
+    // Pre-resolved on the main thread (see MakerWorldSearchService::build_context).
+    // Worker-thread HTTP must not call NetworkAgent / app_config for tokens.
+    std::string access_token;
 };
 
 /** Normalized query plus recall-broadening variants (built via MakerWorld helpers). */

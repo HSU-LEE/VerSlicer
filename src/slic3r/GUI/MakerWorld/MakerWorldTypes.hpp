@@ -11,6 +11,10 @@ struct MakerWorldSearchContext
     std::string locale;
     std::string country_code;
     std::string printer_model;
+    // Bearer token resolved on the MAIN thread in build_context() (manual token or
+    // fresh cloud token). Worker-thread HTTP helpers must consume this snapshot
+    // instead of touching NetworkAgent / app_config off the main thread.
+    std::string access_token;
     bool        user_logged_in{false};
     bool        network_agent_ok{false};
     bool        plugin_search_available{false};

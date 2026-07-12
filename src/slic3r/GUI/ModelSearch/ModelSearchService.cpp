@@ -89,6 +89,7 @@ ModelSearchContext ModelSearchService::build_context()
     ctx.network_agent_ok          = mw.network_agent_ok;
     ctx.plugin_search_available   = mw.plugin_search_available;
     ctx.plugin_download_available = mw.plugin_download_available;
+    ctx.access_token              = mw.access_token;
     return ctx;
 }
 

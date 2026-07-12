@@ -110,6 +110,7 @@ MakerWorldSearchContext MakerWorldProvider::to_makerworld_context(const ModelSea
     mw.network_agent_ok          = ctx.network_agent_ok;
     mw.plugin_search_available   = ctx.plugin_search_available;
     mw.plugin_download_available = ctx.plugin_download_available;
+    mw.access_token              = ctx.access_token;
     return mw;
 }
 

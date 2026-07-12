@@ -614,48 +614,69 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     m_body = new wxPanel(this);
     m_body->SetBackgroundColour(SlicePilotUi::Theme::background());
     auto* body_sizer = new wxBoxSizer(wxVERTICAL);
+    // Toolbar — two rows so the narrow right-docked panel doesn't clip the
+    // Korean "초기화" label or squeeze the model/mode combos into double-border
+    // looking boxes.
     const int pad       = SlicePilotUi::content_side_margin_dip(m_body, false);
     const int gap       = FromDIP(8);
-    const int row_h     = FromDIP(26);
+    const int row_h     = FromDIP(28);
     const int compose_h = FromDIP(32);
 
-    // Toolbar: model | mode | reset
-    auto* toolbar = new wxBoxSizer(wxHORIZONTAL);
+    auto* toolbar = new wxBoxSizer(wxVERTICAL);
+
+    auto* model_row = new wxBoxSizer(wxHORIZONTAL);
     auto* model_key = new wxStaticText(m_body, wxID_ANY, _L("Model"));
     model_key->SetForegroundColour(SlicePilotUi::Theme::text_muted());
     model_key->SetFont(Label::Body_13);
     m_model_combo = new ComboBox(m_body, wxID_ANY, wxEmptyString, wxDefaultPosition,
-                                 wxSize(FromDIP(150), row_h), 0, nullptr, wxCB_READONLY);
+                                 wxDefaultSize, 0, nullptr, wxCB_READONLY);
     SlicePilotUi::style_orca_combobox(m_model_combo);
     m_model_combo->SetFont(Label::Body_13);
     m_model_combo->GetDropDown().SetFont(Label::Body_13);
+    m_model_combo->SetMinSize(wxSize(FromDIP(120), row_h));
+    m_model_combo->SetMaxSize(wxSize(-1, row_h));
     m_model_combo->Append(wxString::FromUTF8(kOllamaDefaultModel));
     SlicePilotUi::sync_combobox_selection(m_model_combo, 0);
-    toolbar->Add(model_key, 0, wxALIGN_CENTER_VERTICAL);
-    toolbar->Add(m_model_combo, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(4));
+    model_row->Add(model_key, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(6));
+    model_row->Add(m_model_combo, 1, wxALIGN_CENTER_VERTICAL);
 
-    toolbar->AddStretchSpacer(1);
-
+    auto* mode_row = new wxBoxSizer(wxHORIZONTAL);
     m_mode_label = new wxStaticText(m_body, wxID_ANY, _L("Mode"));
     m_mode_label->SetForegroundColour(SlicePilotUi::Theme::text_muted());
     m_mode_label->SetFont(Label::Body_13);
     m_mode_combo = new ComboBox(m_body, wxID_ANY, wxEmptyString, wxDefaultPosition,
-                                wxSize(FromDIP(96), row_h), 0, nullptr, wxCB_READONLY);
+                                wxDefaultSize, 0, nullptr, wxCB_READONLY);
     SlicePilotUi::style_orca_combobox(m_mode_combo);
     m_mode_combo->SetFont(Label::Body_13);
     m_mode_combo->GetDropDown().SetFont(Label::Body_13);
+    m_mode_combo->SetMinSize(wxSize(FromDIP(88), row_h));
+    m_mode_combo->SetMaxSize(wxSize(FromDIP(120), row_h));
     m_mode_combo->Append(AiLocale::text(_L("Question"), "질문"));
     m_mode_combo->Append(AiLocale::text(_L("Apply"), "적용"));
     SlicePilotUi::sync_combobox_selection(m_mode_combo, 1);
 
-    m_reset_btn = new Button(m_body, _L("Reset"));
+    m_reset_btn = new Button(m_body, AiLocale::text(_L("Reset"), "초기화"));
     SlicePilotUi::style_secondary_button(m_reset_btn);
     m_reset_btn->SetStyle(ButtonStyle::Regular, ButtonType::Compact);
-    SlicePilotUi::size_compact_toolbar_button(m_body, m_reset_btn);
+    m_reset_btn->SetFont(Label::Body_13);
+    m_reset_btn->SetPaddingSize(wxSize(FromDIP(10), FromDIP(4)));
+    {
+        wxClientDC dc(m_reset_btn);
+        dc.SetFont(m_reset_btn->GetFont());
+        wxSize te;
+        dc.GetTextExtent(m_reset_btn->GetLabel(), &te.x, &te.y);
+        // Width must fit Korean "초기화"; do not clamp MaxSize or Compact padding clips it.
+        const int reset_w = std::max(te.x + FromDIP(20), FromDIP(56));
+        m_reset_btn->SetMinSize(wxSize(reset_w, row_h));
+    }
 
-    toolbar->Add(m_mode_label, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, gap);
-    toolbar->Add(m_mode_combo, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(4));
-    toolbar->Add(m_reset_btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(6));
+    mode_row->Add(m_mode_label, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(6));
+    mode_row->Add(m_mode_combo, 0, wxALIGN_CENTER_VERTICAL);
+    mode_row->AddStretchSpacer(1);
+    mode_row->Add(m_reset_btn, 0, wxALIGN_CENTER_VERTICAL);
+
+    toolbar->Add(model_row, 0, wxEXPAND);
+    toolbar->Add(mode_row, 0, wxEXPAND | wxTOP, FromDIP(6));
     body_sizer->Add(toolbar, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, pad);
 
     auto* toolbar_rule = new wxPanel(m_body, wxID_ANY, wxDefaultPosition, wxSize(-1, std::max(1, FromDIP(1))));
@@ -677,26 +698,42 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
         m_pipeline_step_label->SetForegroundColour(SlicePilotUi::Theme::text());
         m_pipeline_step_label->SetFont(Label::Body_13);
         m_pipeline_step_label->SetBackgroundColour(SlicePilotUi::Theme::surface_alt());
+        // Keep the step label from stealing width from the gauge on narrow panels.
+        m_pipeline_step_label->SetMinSize(wxSize(FromDIP(72), -1));
 
-        const int gauge_h = FromDIP(8);
+        // ProgressBar clamps its height to a 14px minimum, so pass a matching
+        // height and set the radius to half of it for a clean pill shape (a smaller
+        // radius on the clamped height renders as a boxy outline). The widget's own
+        // background defaults to white, which bleeds through the rounded corners on
+        // the dark strip — repaint it with the strip colour so corners blend.
+        const int gauge_h = std::max(FromDIP(14), 14);
         m_pipeline_gauge  = new ProgressBar(m_pipeline_panel, wxID_ANY, 100, wxDefaultPosition,
-                                            wxSize(FromDIP(120), gauge_h));
-        m_pipeline_gauge->SetMinSize(wxSize(FromDIP(120), gauge_h));
-        m_pipeline_gauge->SetRadius(gauge_h / 2.0);
+                                            wxSize(FromDIP(80), gauge_h));
+        m_pipeline_gauge->SetBackgroundColour(SlicePilotUi::Theme::surface_alt());
+        m_pipeline_gauge->SetMinSize(wxSize(FromDIP(64), gauge_h));
         m_pipeline_gauge->SetProgressBackgroundColour(SlicePilotUi::Theme::border());
         m_pipeline_gauge->SetProgressForedColour(SlicePilotUi::Theme::primary());
+        m_pipeline_gauge->SetRadius(gauge_h / 2.0);
 
         m_pipeline_stop_btn = new Button(m_pipeline_panel, AiLocale::text(_L("Stop"), "중지"));
         SlicePilotUi::style_secondary_button(m_pipeline_stop_btn);
         m_pipeline_stop_btn->SetStyle(ButtonStyle::Regular, ButtonType::Compact);
-        SlicePilotUi::size_compact_toolbar_button(m_pipeline_panel, m_pipeline_stop_btn);
+        m_pipeline_stop_btn->SetFont(Label::Body_13);
+        m_pipeline_stop_btn->SetPaddingSize(wxSize(FromDIP(10), FromDIP(4)));
+        {
+            wxClientDC dc(m_pipeline_stop_btn);
+            dc.SetFont(m_pipeline_stop_btn->GetFont());
+            wxSize te;
+            dc.GetTextExtent(m_pipeline_stop_btn->GetLabel(), &te.x, &te.y);
+            m_pipeline_stop_btn->SetMinSize(wxSize(std::max(te.x + FromDIP(20), FromDIP(48)), row_h));
+        }
 
-        strip->Add(m_pipeline_step_label, 1, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(8));
-        strip->Add(m_pipeline_gauge, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(8));
-        strip->Add(m_pipeline_stop_btn, 0, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, FromDIP(8));
+        strip->Add(m_pipeline_step_label, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, FromDIP(10));
+        strip->Add(m_pipeline_gauge, 1, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, FromDIP(10));
+        strip->Add(m_pipeline_stop_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(10));
 
         auto* strip_col = new wxBoxSizer(wxVERTICAL);
-        strip_col->Add(strip, 0, wxEXPAND | wxTOP | wxBOTTOM, FromDIP(6));
+        strip_col->Add(strip, 0, wxEXPAND | wxTOP | wxBOTTOM, FromDIP(8));
         m_pipeline_panel->SetSizer(strip_col);
     }
     m_pipeline_panel->Hide();
@@ -1429,97 +1466,89 @@ void OllamaChatPanel::on_stream_chunk(const std::string& chunk)
     m_history_list->set_pending_stream_text(preview);
 }
 
-void OllamaChatPanel::on_send(wxCommandEvent&)
+bool OllamaChatPanel::current_plate_has_model() const
 {
-    if (m_assist_controller && m_assist_controller->is_running()) {
-        m_assist_controller->cancel();
-        clear_thinking_block();
-        set_busy(false);
-    }
-    if (m_busy)
-        return;
-    const wxString user_text = m_input_ctrl->GetValue().Trim();
-    if (user_text.empty())
-        return;
-
-    save_settings();
-    OllamaClient::cancel_active_requests(OllamaCancelDomain::Chat);
-    m_input_ctrl->Clear();
-    append_chat(_L("You"), user_text);
-    m_empty_reply_retries = 0;
-
-    const std::string user_utf8 = user_text.utf8_string();
-
-    bool plate_has_model = false;
     if (Plater* plater = wxGetApp().plater()) {
         try {
-            plate_has_model = !plater->model().objects.empty();
+            return !plater->model().objects.empty();
         } catch (...) {
             BOOST_LOG_TRIVIAL(warning) << "Ollama chat: plate-model check failed; assuming empty plate";
         }
     }
+    return false;
+}
 
+bool OllamaChatPanel::route_orchestrator_reply(const std::string& user_utf8)
+{
     // Phase 3: while an orchestrator job is awaiting a clarifying answer, route
     // this turn to it instead of starting a fresh LLM request.
     if (AIPipeline::print_job_orchestrator_enabled() && m_orchestrator && m_orchestrator->is_active()
         && m_orchestrator->state() == AIPipeline::PrintJobState::Clarifying) {
         m_orchestrator->on_user_reply(user_utf8);
-        return;
+        return true;
     }
+    return false;
+}
 
-    if (ollama_voice_looks_like_garbled_chat(user_utf8)) {
-        const bool ko = AiLocale::korean();
-        append_chat(_L("Assistant"),
-                    ko ? wxString::FromUTF8("음성/문장을 이해하지 못했습니다. 다시 말씀하시거나 직접 입력해 주세요.")
-                       : _L("I couldn't understand that. Try again or type your request."));
-        set_status_text(completion_status_for_reply(
-            ko ? wxString::FromUTF8("음성/문장을 이해하지 못했습니다. 다시 말씀하시거나 직접 입력해 주세요.")
-               : _L("I couldn't understand that. Try again or type your request."),
-            m_apply_mode));
-        return;
-    }
+bool OllamaChatPanel::route_garbled_input(const std::string& user_utf8)
+{
+    if (!ollama_voice_looks_like_garbled_chat(user_utf8))
+        return false;
+    const wxString msg = AiLocale::text("I couldn't understand that. Try again or type your request.",
+                                        "음성/문장을 이해하지 못했습니다. 다시 말씀하시거나 직접 입력해 주세요.");
+    append_chat(_L("Assistant"), msg);
+    set_status_text(completion_status_for_reply(msg, m_apply_mode));
+    return true;
+}
 
+bool OllamaChatPanel::route_acquisition(const std::string& user_utf8, bool plate_has_model)
+{
     // Deterministic acquisition-intent gate (pre-router): "get me X and print
     // it" (e.g. "용 피규어 출력해줘") starts the end-to-end orchestrator job
     // directly — no LLM, no PrintIntentSession/config-proposal injection this
     // turn. Runs before the MakerWorld bypass so find-and-print requests reach
     // the orchestrator; explicit URL/search requests still use the bypass below.
-    if (OllamaSendRouter::acquisition_gate_open(m_apply_mode, AIPipeline::print_job_orchestrator_enabled(),
-                                                m_orchestrator && m_orchestrator->is_active())) {
-        if (OllamaSendRouter::is_acquisition_request(user_utf8, plate_has_model)) {
-            const std::string query = OllamaSendRouter::acquisition_query(user_utf8);
-            if (start_orchestrator_find_and_print(query)) {
-                m_messages.push_back({"user", user_utf8});
-                trim_message_history();
-                const wxString stub = AiLocale::korean()
-                    ? wxString::FromUTF8("원하시는 모델을 찾아서 출력을 준비할게요…")
-                    : _L("I'll find a model and get the print ready…");
-                append_chat(_L("Assistant"), stub);
-                m_messages.push_back({"assistant", stub.utf8_string()});
-                trim_message_history();
-                return;
-            }
-        }
-    }
+    if (!OllamaSendRouter::acquisition_gate_open(m_apply_mode, AIPipeline::print_job_orchestrator_enabled(),
+                                                 m_orchestrator && m_orchestrator->is_active()))
+        return false;
+    if (!OllamaSendRouter::is_acquisition_request(user_utf8, plate_has_model))
+        return false;
+    const std::string query = OllamaSendRouter::acquisition_query(user_utf8);
+    if (!start_orchestrator_find_and_print(query))
+        return false;
+    m_messages.push_back({"user", user_utf8});
+    trim_message_history();
+    const wxString stub = AiLocale::text("I'll find a model and get the print ready…",
+                                         "원하시는 모델을 찾아서 출력을 준비할게요…");
+    append_chat(_L("Assistant"), stub);
+    m_messages.push_back({"assistant", stub.utf8_string()});
+    trim_message_history();
+    return true;
+}
 
-    if (OllamaSendRouter::should_bypass_to_makerworld(user_utf8)) {
-        m_messages.push_back({"user", user_utf8});
-        trim_message_history();
-        const bool is_import = MakerWorldIntent::user_wants_makerworld_import(user_utf8);
-        const wxString stub  = is_import ? _L("Importing from MakerWorld…") : _L("Searching MakerWorld…");
-        append_chat(_L("Assistant"), stub);
-        m_messages.push_back({"assistant", stub.utf8_string()});
-        trim_message_history();
-        MakerWorldImportFlow::run_user_makerworld_request(this, user_utf8, m_apply_mode, makerworld_flow_callbacks());
-        return;
-    }
+bool OllamaChatPanel::route_makerworld_bypass(const std::string& user_utf8)
+{
+    if (!OllamaSendRouter::should_bypass_to_makerworld(user_utf8))
+        return false;
+    m_messages.push_back({"user", user_utf8});
+    trim_message_history();
+    const bool     is_import = MakerWorldIntent::user_wants_makerworld_import(user_utf8);
+    const wxString stub      = is_import ? _L("Importing from MakerWorld…") : _L("Searching MakerWorld…");
+    append_chat(_L("Assistant"), stub);
+    m_messages.push_back({"assistant", stub.utf8_string()});
+    trim_message_history();
+    MakerWorldImportFlow::run_user_makerworld_request(this, user_utf8, m_apply_mode, makerworld_flow_callbacks());
+    return true;
+}
 
+std::string OllamaChatPanel::build_send_user_message(const wxString& user_text, const std::string& user_utf8)
+{
     size_t user_turns = 0;
     for (const auto& m : m_messages)
         if (m.role == "user")
             ++user_turns;
 
-    bool attach_context =
+    const bool attach_context =
         (user_turns == 0) || (m_apply_mode ? (user_turns % 2 == 0) : (user_turns % 4 == 0));
 
     std::string user_msg = user_text.utf8_string();
@@ -1581,16 +1610,21 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
             user_msg += std::string("\n\nApply plan hint (JSON):\n") + hint.dump(2);
         }
     }
+    return user_msg;
+}
 
-    if (!m_available_models.empty())
-        m_model = resolve_installed_model(m_available_models, m_model);
+bool OllamaChatPanel::route_assist_loop(const std::string& user_msg, const std::string& user_utf8, bool plate_has_model)
+{
+    if (!OllamaSendRouter::should_use_assist_loop(user_utf8, m_apply_mode, plate_has_model))
+        return false;
+    m_messages.push_back({"user", user_msg});
+    trim_message_history();
+    start_assist_loop_turn(user_utf8);
+    return true;
+}
 
-    if (OllamaSendRouter::should_use_assist_loop(user_utf8, m_apply_mode, plate_has_model)) {
-        m_messages.push_back({"user", user_msg});
-        trim_message_history();
-        start_assist_loop_turn(user_utf8);
-        return;
-    }
+void OllamaChatPanel::dispatch_single_shot_chat(const std::string& user_msg, const std::string& user_utf8)
+{
     m_messages.push_back({"user", user_msg});
     trim_message_history();
 
@@ -1627,6 +1661,48 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
             panel->on_chat_response(text, error);
         });
     }, OllamaRequestKind::Chat, make_stream_callback(gen));
+}
+
+void OllamaChatPanel::on_send(wxCommandEvent&)
+{
+    if (m_assist_controller && m_assist_controller->is_running()) {
+        m_assist_controller->cancel();
+        clear_thinking_block();
+        set_busy(false);
+    }
+    if (m_busy)
+        return;
+    const wxString user_text = m_input_ctrl->GetValue().Trim();
+    if (user_text.empty())
+        return;
+
+    save_settings();
+    OllamaClient::cancel_active_requests(OllamaCancelDomain::Chat);
+    m_input_ctrl->Clear();
+    append_chat(_L("You"), user_text);
+    m_empty_reply_retries = 0;
+
+    const std::string user_utf8       = user_text.utf8_string();
+    const bool        plate_has_model = current_plate_has_model();
+
+    // Ordered routing: the first handler that fully processes the turn wins.
+    if (route_orchestrator_reply(user_utf8))
+        return;
+    if (route_garbled_input(user_utf8))
+        return;
+    if (route_acquisition(user_utf8, plate_has_model))
+        return;
+    if (route_makerworld_bypass(user_utf8))
+        return;
+
+    std::string user_msg = build_send_user_message(user_text, user_utf8);
+
+    if (!m_available_models.empty())
+        m_model = resolve_installed_model(m_available_models, m_model);
+
+    if (route_assist_loop(user_msg, user_utf8, plate_has_model))
+        return;
+    dispatch_single_shot_chat(user_msg, user_utf8);
 }
 
 void OllamaChatPanel::start_assist_loop_turn(const std::string& user_utf8)

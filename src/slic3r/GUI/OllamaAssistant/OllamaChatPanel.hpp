@@ -77,6 +77,16 @@ private:
     wxString thinking_role_label() const;
     void set_busy(bool busy);
     void on_send(wxCommandEvent& event);
+    // on_send routing helpers (Extract-Method decomposition; behavior-preserving).
+    // Each route_* returns true when it fully handled the turn (on_send then returns).
+    bool current_plate_has_model() const;
+    bool route_orchestrator_reply(const std::string& user_utf8);
+    bool route_garbled_input(const std::string& user_utf8);
+    bool route_acquisition(const std::string& user_utf8, bool plate_has_model);
+    bool route_makerworld_bypass(const std::string& user_utf8);
+    std::string build_send_user_message(const wxString& user_text, const std::string& user_utf8);
+    bool route_assist_loop(const std::string& user_msg, const std::string& user_utf8, bool plate_has_model);
+    void dispatch_single_shot_chat(const std::string& user_msg, const std::string& user_utf8);
     void on_models_loaded(const std::vector<std::string>& models, const std::string& error);
     void start_assist_loop_turn(const std::string& user_utf8);
     void on_assist_loop_finished(const OllamaAgentRunResult& result);

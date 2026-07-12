@@ -37,11 +37,11 @@ bool get_flag(const char* key)
 
 bool show_journey_ui()
 {
-    if (wxGetApp().get_mode() != comSimple)
-        return false;
-    if (!AIGuiOrchestrator::instance().should_render_beginner_journey())
-        return false;
-    return BeginnerJourney::completed_step_count() < 4;
+    // The beginner onboarding checklist is hidden in Simple layout mode per user
+    // request. Since this overlay only ever surfaced in Simple mode, it no longer
+    // renders anywhere (enabling it in other modes would introduce an overlay that
+    // was never shown there before).
+    return false;
 }
 
 } // namespace

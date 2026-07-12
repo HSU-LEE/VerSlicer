@@ -583,11 +583,6 @@ void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessag
     }).detach();
 }
 
-std::vector<std::string> OllamaClient::list_models_sync() const
-{
-    return list_models_sync_impl(m_base_url);
-}
-
 void OllamaClient::list_models(ModelsCallback callback)
 {
     if (!callback)

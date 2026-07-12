@@ -123,7 +123,8 @@ std::string resolve_cloud_access_token()
 
 bool makerworld_download_auth_available(const MakerWorldSearchContext& ctx)
 {
-    return ctx.user_logged_in || !resolve_cloud_access_token().empty();
+    // Uses the main-thread token snapshot; safe to evaluate on a worker thread.
+    return ctx.user_logged_in || !ctx.access_token.empty();
 }
 
 bool makerworld_search_auth_available(const MakerWorldSearchContext& ctx)
@@ -136,22 +137,6 @@ std::string printer_model_query_suffix(const MakerWorldSearchContext& ctx)
     if (ctx.printer_model.empty())
         return {};
     return "&printer_model=" + Slic3r::Http::url_encode(ctx.printer_model);
-}
-
-MakerWorldSearchContext merge_search_context(const MakerWorldSearchContext& ctx_in)
-{
-    MakerWorldSearchContext ctx = MakerWorldSearchService::build_context();
-    if (!ctx_in.country_code.empty())
-        ctx.country_code = ctx_in.country_code;
-    if (!ctx_in.locale.empty())
-        ctx.locale = ctx_in.locale;
-    if (!ctx_in.printer_model.empty())
-        ctx.printer_model = ctx_in.printer_model;
-    if (NetworkAgent* agent = wxGetApp().getAgent()) {
-        ctx.network_agent_ok = true;
-        ctx.user_logged_in   = agent->is_user_login(BBL_CLOUD_PROVIDER);
-    }
-    return ctx;
 }
 
 bool api_json_login_required(const nlohmann::json& j, unsigned http_status)
@@ -181,15 +166,14 @@ const nlohmann::json* api_payload_node(const nlohmann::json& root)
     return &root;
 }
 
-void apply_makerworld_http_headers(Slic3r::Http& http)
+void apply_makerworld_http_headers(Slic3r::Http& http, const std::string& access_token)
 {
     // Http() already injects BBLCloudServiceAgent::get_extra_header() via the global
     // extra_headers map (set by set_extra_http_header). Re-adding X-BBL-* here duplicates
     // them and MakerWorld design/search endpoints reject the request with HTTP 400.
     http.header("accept", "application/json");
-    const std::string token = resolve_cloud_access_token();
-    if (!token.empty())
-        http.header("Authorization", "Bearer " + token);
+    if (!access_token.empty())
+        http.header("Authorization", "Bearer " + access_token);
 }
 
 std::string parse_api_error_message(const std::string& body, unsigned http_status)
@@ -242,11 +226,11 @@ bool http_should_retry(const HttpGetResult& r)
     return r.status == 0 || r.status == 502 || r.status == 503 || r.status == 429;
 }
 
-HttpGetResult http_get_sync_once(const std::string& url)
+HttpGetResult http_get_sync_once(const std::string& url, const std::string& access_token)
 {
     HttpGetResult out;
     auto          http = Slic3r::Http::get(url);
-    apply_makerworld_http_headers(http);
+    apply_makerworld_http_headers(http, access_token);
     http.timeout_connect(15).timeout_max(30);
     http.on_complete([&](std::string b, unsigned status) {
             out.body   = std::move(b);
@@ -262,19 +246,20 @@ HttpGetResult http_get_sync_once(const std::string& url)
     return out;
 }
 
-HttpGetResult http_get_sync_ex(const std::string& url)
+HttpGetResult http_get_sync_ex(const std::string& url, const std::string& access_token)
 {
-    HttpGetResult out = http_get_sync_once(url);
+    HttpGetResult out = http_get_sync_once(url, access_token);
     if (http_should_retry(out)) {
         std::this_thread::sleep_for(std::chrono::milliseconds(400));
-        out = http_get_sync_once(url);
+        out = http_get_sync_once(url, access_token);
     }
     return out;
 }
 
-std::string http_get_sync(const std::string& url, std::string& error, unsigned& http_status)
+std::string http_get_sync(const std::string& url, std::string& error, unsigned& http_status,
+                          const std::string& access_token)
 {
-    const HttpGetResult r = http_get_sync_ex(url);
+    const HttpGetResult r = http_get_sync_ex(url, access_token);
     error       = r.error;
     http_status = r.status;
     return r.body;
@@ -384,11 +369,11 @@ void load_staffpick_pool(const MakerWorldSearchContext& ctx, std::vector<MakerWo
         }
         if (batch.empty()) {
             const std::string url = (boost::format("%1%/?offset=%2%&limit=60") % host % offset).str();
-            HttpGetResult     r   = http_get_sync_ex(url);
+            HttpGetResult     r   = http_get_sync_ex(url, ctx.access_token);
             if (r.login_required())
                 break;
             if (r.failed() && r.body.empty()) {
-                r = http_get_sync_ex(url);
+                r = http_get_sync_ex(url, ctx.access_token);
             }
             if (!r.body.empty())
                 batch = parse_hits_json(r.body);
@@ -490,7 +475,7 @@ DesignDownloadMeta fetch_design_download_meta(const std::string& design_id, cons
         wxGetApp().get_http_url(ctx.country_code, "v1/design-service/design/" + design_id);
     std::string error;
     unsigned    status = 0;
-    const std::string body = http_get_sync(url, error, status);
+    const std::string body = http_get_sync(url, error, status, ctx.access_token);
     if (body.empty() || body.front() != '{') {
         BOOST_LOG_TRIVIAL(warning) << "[MakerWorld] design meta failed design_id=" << design_id
                                    << " http=" << status << " err=" << error;
@@ -598,12 +583,12 @@ BackendSearchOutcome search_via_plugin(const std::string& query, const MakerWorl
     BackendSearchOutcome outcome;
     if (!ctx.plugin_search_available)
         return outcome;
+    // The agent pointer is stable after init; search_makerworld() is a synchronous
+    // backend call designed to run off the main thread. The session refresh that used
+    // to run here now happens on the main thread in build_context().
     NetworkAgent* agent = wxGetApp().getAgent();
     if (!agent)
         return outcome;
-
-    if (makerworld_search_auth_available(ctx))
-        refresh_bbl_session_for_makerworld();
 
     std::string body;
     unsigned    http_code = 0;
@@ -639,7 +624,7 @@ BackendSearchOutcome fetch_search_service_page(const std::string& path, const Ma
 {
     BackendSearchOutcome outcome;
     const std::string    url = wxGetApp().get_http_url(ctx.country_code, path);
-    const HttpGetResult  r   = http_get_sync_ex(url);
+    const HttpGetResult  r   = http_get_sync_ex(url, ctx.access_token);
     outcome.http_status      = r.status;
     if (r.login_required()) {
         outcome.auth_denied = true;
@@ -709,7 +694,7 @@ BackendSearchOutcome search_via_http(const std::string& query, const MakerWorldS
     };
 
     for (const std::string& url : urls) {
-        const HttpGetResult r = http_get_sync_ex(url);
+        const HttpGetResult r = http_get_sync_ex(url, ctx.access_token);
         outcome.http_status   = r.status;
         if (r.login_required()) {
             outcome.auth_denied = true;
@@ -817,7 +802,7 @@ std::string fetch_download_via_iot_profile(const std::string& profile_id, const 
     login_required = false;
     if (!wxGetApp().app_config || profile_id.empty() || model_id.empty())
         return {};
-    if (resolve_cloud_access_token().empty()) {
+    if (ctx.access_token.empty()) {
         BOOST_LOG_TRIVIAL(warning) << "[MakerWorld] iot download skipped: no access token profile="
                                    << profile_id << " model=" << model_id;
         return {};
@@ -827,7 +812,7 @@ std::string fetch_download_via_iot_profile(const std::string& profile_id, const 
                               % Slic3r::Http::url_encode(model_id))
                                  .str();
     const std::string url  = wxGetApp().get_http_url(ctx.country_code, path);
-    const HttpGetResult r  = http_get_sync_ex(url);
+    const HttpGetResult r  = http_get_sync_ex(url, ctx.access_token);
     http_status            = r.status;
     if (r.body.empty() || r.body.front() != '{') {
         BOOST_LOG_TRIVIAL(warning) << "[MakerWorld] iot download empty body profile=" << profile_id
@@ -892,6 +877,13 @@ MakerWorldSearchContext MakerWorldSearchService::build_context()
     auto& plugin = BBLNetworkPlugin::instance();
     ctx.plugin_search_available   = plugin.get_search_makerworld() != nullptr;
     ctx.plugin_download_available = plugin.get_get_makerworld_download_url() != nullptr;
+    // Refresh the Bambu Cloud session and resolve the bearer token here (main thread)
+    // so worker-thread search paths never touch NetworkAgent / app_config off the main
+    // thread. refresh_bbl_session_for_makerworld() and resolve_cloud_access_token() call
+    // connect_server()/ensure_token_fresh(), which must run on the main thread.
+    if (ctx.user_logged_in)
+        refresh_bbl_session_for_makerworld();
+    ctx.access_token = resolve_cloud_access_token();
     return ctx;
 }
 
@@ -913,7 +905,14 @@ MakerWorldSearchResult MakerWorldSearchService::search_sync(const std::string& q
 {
     const auto t0 = std::chrono::steady_clock::now();
 
-    MakerWorldSearchContext ctx = merge_search_context(ctx_in);
+    // search_sync runs on a worker thread (search_async / ModelSearchService fan-out).
+    // Every caller builds the context on the main thread via build_context() before
+    // spawning the worker, so consume that snapshot directly. The snapshot carries
+    // locale, printer_model, login flags, and the resolved bearer token, so the HTTP
+    // backends no longer touch NetworkAgent / app_config off the main thread.
+    // (Remaining worker-thread agent calls -- refresh_bbl_session and the plugin
+    // search/staffpick backends -- are tracked separately as A-2b-ii.)
+    MakerWorldSearchContext ctx = ctx_in;
 
     const std::string normalized =
         sanitize_search_text(MakerWorldSearchService::normalize_search_query(query));
@@ -950,8 +949,8 @@ MakerWorldSearchResult MakerWorldSearchService::search_sync(const std::string& q
 
     MakerWorldTelemetry::search_started(normalized);
 
-    if (makerworld_search_auth_available(ctx))
-        refresh_bbl_session_for_makerworld();
+    // Session refresh happens on the main thread in build_context(); the worker must
+    // not touch NetworkAgent here.
 
     constexpr int kFetchLimit    = 24;
     constexpr int kDisplayLimit  = 8;
@@ -1215,8 +1214,9 @@ std::string MakerWorldSearchService::normalize_search_query(const std::string& u
 
 void MakerWorldSearchService::apply_download_http_headers(Slic3r::Http& http)
 {
+    // Main-thread download path: refresh the session and resolve a live token.
     refresh_bbl_session_for_makerworld();
-    apply_makerworld_http_headers(http);
+    apply_makerworld_http_headers(http, resolve_cloud_access_token());
 }
 
 bool MakerWorldSearchService::download_url_needs_auth(const std::string& url)

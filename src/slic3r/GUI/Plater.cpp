@@ -76,6 +76,9 @@
 #include "BambuSmartPrint/BambuSmartPrintService.hpp"
 #include "OllamaAssistant/OllamaModelLoadAdvisor.hpp"
 #include "OllamaAssistant/OllamaActionExecutor.hpp"
+#include "OllamaAssistant/OllamaChatPanel.hpp"
+#include "OllamaAssistant/AiLocale.hpp"
+#include "BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "AICoach/AICoachController.hpp"
 #include "AICoach/AIGuiOrchestrator.hpp"
 #include "AICoach/BeginnerJourney.hpp"
@@ -4372,6 +4375,43 @@ public:
     }
 };
 
+// Dark-theme dock art. The stock AUI close button renders as a muddy light-gray
+// box on our dark caption bar; draw a crisp themed "X" instead and delegate every
+// other element to the default provider. Only the AI assistant pane carries a
+// caption button, so this affects nothing else in the Plater layout.
+class ThemedDockArt : public wxAuiDefaultDockArt
+{
+public:
+    wxAuiDockArt* Clone() override { return new ThemedDockArt(*this); }
+
+    void DrawPaneButton(wxDC& dc, wxWindow* window, int button, int buttonState,
+                        const wxRect& rect, wxAuiPaneInfo& pane) override
+    {
+        if (button != wxAUI_BUTTON_CLOSE || buttonState == wxAUI_BUTTON_STATE_HIDDEN) {
+            wxAuiDefaultDockArt::DrawPaneButton(dc, window, button, buttonState, rect, pane);
+            return;
+        }
+
+        const bool pressed = buttonState == wxAUI_BUTTON_STATE_PRESSED;
+        const bool hot     = pressed || buttonState == wxAUI_BUTTON_STATE_HOVER;
+
+        const int  side = std::min(rect.width, rect.height);
+        const wxRect r(rect.x + (rect.width - side) / 2, rect.y + (rect.height - side) / 2, side, side);
+
+        if (hot) {
+            dc.SetPen(*wxTRANSPARENT_PEN);
+            dc.SetBrush(wxBrush(pressed ? SlicePilotUi::Theme::border() : SlicePilotUi::Theme::surface()));
+            dc.DrawRoundedRectangle(r, std::max(2, side / 4));
+        }
+
+        const int      m     = std::max(3, side / 3);
+        const wxColour glyph = hot ? SlicePilotUi::Theme::text() : SlicePilotUi::Theme::text_muted();
+        dc.SetPen(wxPen(glyph, std::max(1, side / 12)));
+        dc.DrawLine(r.x + m, r.y + m, r.x + r.width - m, r.y + r.height - m);
+        dc.DrawLine(r.x + r.width - m, r.y + m, r.x + m, r.y + r.height - m);
+    }
+};
+
 // Plater / private
 struct Plater::priv
 {
@@ -4400,6 +4440,9 @@ struct Plater::priv
     wxString m_default_window_layout;
     wxPanel* current_panel{ nullptr };
     std::vector<wxPanel*> panels;
+    // Fusion-style right-docked AI assistant, created lazily (its ctor starts the
+    // Ollama runtime, so we must not build it at Plater construction time).
+    OllamaChatPanel* ollama_assistant{ nullptr };
 
     struct SidebarLayout
     {
@@ -14690,6 +14733,114 @@ void Plater::enable_sidebar(bool enabled) { p->enable_sidebar(enabled); }
 bool Plater::is_sidebar_collapsed() const { return p->sidebar_layout.is_collapsed; }
 void Plater::collapse_sidebar(bool collapse) { p->collapse_sidebar(collapse); }
 Sidebar::DockingState Plater::get_sidebar_docking_state() const { return p->get_sidebar_docking_state(); }
+
+void Plater::dock_ai_assistant_right(bool show)
+{
+    auto& pane = p->m_aui_mgr.GetPane("ai_assistant");
+    if (!pane.IsOk())
+        return;
+
+    // Always re-pin to the right edge. Without this, wxAUI can leave the pane as a
+    // thin top/bottom strip (full width, tiny height) after float/redock or layout
+    // restore — which clips the chat body to a single truncated welcome line.
+    const int w = FromDIP(340);
+    const int min_h = FromDIP(420);
+    pane.Dock()
+        .Right()
+        .Layer(1)
+        .Row(0)
+        .Position(0)
+        .BestSize(wxSize(w, min_h))
+        .MinSize(wxSize(FromDIP(300), min_h))
+        .FloatingSize(wxSize(w, FromDIP(560)))
+        .Show(show);
+    p->m_aui_mgr.Update();
+}
+
+void Plater::ensure_ai_assistant_pane()
+{
+    if (p->ollama_assistant)
+        return;
+
+    // Theme the caption bar to match the app's dark UI (the default AUI caption is a
+    // light gray that clashes) and swap in a dock art that draws a crisp themed close
+    // "X" instead of the default muddy gray button box.
+    {
+        auto*          art     = new ThemedDockArt();
+        const wxColour caption = SlicePilotUi::Theme::surface_alt();
+        art->SetMetric(wxAUI_DOCKART_GRADIENT_TYPE, wxAUI_GRADIENT_NONE);
+        art->SetColour(wxAUI_DOCKART_ACTIVE_CAPTION_COLOUR, caption);
+        art->SetColour(wxAUI_DOCKART_ACTIVE_CAPTION_GRADIENT_COLOUR, caption);
+        art->SetColour(wxAUI_DOCKART_INACTIVE_CAPTION_COLOUR, caption);
+        art->SetColour(wxAUI_DOCKART_INACTIVE_CAPTION_GRADIENT_COLOUR, caption);
+        art->SetColour(wxAUI_DOCKART_ACTIVE_CAPTION_TEXT_COLOUR, SlicePilotUi::Theme::text());
+        art->SetColour(wxAUI_DOCKART_INACTIVE_CAPTION_TEXT_COLOUR, SlicePilotUi::Theme::text_muted());
+        p->m_aui_mgr.SetArtProvider(art); // manager takes ownership of art
+    }
+
+    // Chrome-free panel; the AUI pane caption provides the title and close button.
+    // Right-only dock (Fusion-style). Not floatable — floating then redocking was
+    // producing a thin top strip that clipped the chat body.
+    p->ollama_assistant = new OllamaChatPanel(this, /*show_header=*/false);
+    p->m_aui_mgr.AddPane(p->ollama_assistant, wxAuiPaneInfo()
+                                                  .Name("ai_assistant")
+                                                  .Caption(AiLocale::text(_L("AI Assistant"), "AI 도우미"))
+                                                  .Right()
+                                                  .Layer(1)
+                                                  .Row(0)
+                                                  .Position(0)
+                                                  .CloseButton(true)
+                                                  .MaximizeButton(false)
+                                                  .PinButton(false)
+                                                  .Gripper(false)
+                                                  .PaneBorder(false)
+                                                  .TopDockable(false)
+                                                  .BottomDockable(false)
+                                                  .LeftDockable(false)
+                                                  .Floatable(false)
+                                                  .Movable(false)
+                                                  .BestSize(wxSize(FromDIP(340), FromDIP(420)))
+                                                  .MinSize(wxSize(FromDIP(300), FromDIP(420)))
+                                                  .Hide());
+    p->m_aui_mgr.Update();
+}
+
+void Plater::toggle_ai_assistant()
+{
+    ensure_ai_assistant_pane();
+    auto& pane = p->m_aui_mgr.GetPane("ai_assistant");
+    if (!pane.IsOk())
+        return;
+    const bool show = !pane.IsShown();
+    dock_ai_assistant_right(show);
+    if (show && p->ollama_assistant) {
+        p->ollama_assistant->Layout();
+        p->ollama_assistant->focus_input();
+    }
+}
+
+void Plater::ai_assistant_submit(const wxString& text)
+{
+    ensure_ai_assistant_pane();
+    auto& pane = p->m_aui_mgr.GetPane("ai_assistant");
+    if (!pane.IsOk())
+        return;
+    if (!pane.IsShown()) {
+        dock_ai_assistant_right(true);
+        if (p->ollama_assistant)
+            p->ollama_assistant->Layout();
+    }
+    if (p->ollama_assistant)
+        p->ollama_assistant->submit_text_and_send(text);
+}
+
+bool Plater::is_ai_assistant_shown() const
+{
+    if (!p->ollama_assistant)
+        return false;
+    auto& pane = p->m_aui_mgr.GetPane("ai_assistant");
+    return pane.IsOk() && pane.IsShown();
+}
 
 void Plater::reset_window_layout() { p->reset_window_layout(); }
 

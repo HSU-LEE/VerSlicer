@@ -442,6 +442,11 @@ public:
     void collapse_sidebar(bool collapse);
     Sidebar::DockingState get_sidebar_docking_state() const;
 
+    // AI assistant: Fusion-style right-docked panel (created lazily on first use).
+    void toggle_ai_assistant();
+    void ai_assistant_submit(const wxString& text);
+    bool is_ai_assistant_shown() const;
+
     void reset_window_layout();
 
     // Called after the Preferences dialog is closed and the program settings are saved.
@@ -924,6 +929,10 @@ public:
 private:
     struct priv;
     std::unique_ptr<priv> p;
+    // Lazily creates the right-docked AI assistant AUI pane on first use.
+    void ensure_ai_assistant_pane();
+    // Re-pin the assistant to the right edge with a usable height (avoids top-strip docking).
+    void dock_ai_assistant_right(bool show);
     std::string           m_3mf_path;
     // Set true during PopupMenu() tracking to suppress immediate error message boxes.
     // The error messages are collected to m_tracking_popup_menu_error_message instead and these error messages
