@@ -7903,6 +7903,10 @@ std::vector<std::pair<unsigned int, std::string>> GUI_App::get_selected_presets(
 // - Taking snapshot
 bool GUI_App::check_and_save_current_preset_changes(const wxString& caption, const wxString& header, bool remember_choice/* = true*/, bool dont_save_insted_of_discard/* = false*/)
 {
+    // AI automation: never prompt — discard pending edits and continue.
+    if (is_ai_automation_active())
+        return true;
+
     if (has_current_preset_changes()) {
         int act_buttons = ActionButtons::SAVE;
         if (dont_save_insted_of_discard)
@@ -7955,6 +7959,20 @@ void GUI_App::apply_keeped_preset_modifications()
 // Note: no_nullptr postponed_apply_of_keeped_changes indicates that thie function is called after ConfigWizard is closed
 bool GUI_App::check_and_keep_current_preset_changes(const wxString& caption, const wxString& header, int action_buttons, bool* postponed_apply_of_keeped_changes/* = nullptr*/)
 {
+    // AI automation: never prompt — discard pending edits across all tabs and
+    // continue so the job runs hands-free.
+    if (is_ai_automation_active()) {
+        if (has_current_preset_changes()) {
+            PrinterTechnology printer_technology = preset_bundle->printers.get_edited_preset().printer_technology();
+            for (const Tab* const tab : tabs_list) {
+                if (tab->supports_printer_technology(printer_technology) && tab->current_preset_is_dirty())
+                    tab->m_presets->discard_current_changes();
+            }
+            load_current_presets(false);
+        }
+        return true;
+    }
+
     if (has_current_preset_changes()) {
         bool is_called_from_configwizard = postponed_apply_of_keeped_changes != nullptr;
 

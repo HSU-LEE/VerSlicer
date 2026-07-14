@@ -28,11 +28,18 @@
 #include <boost/log/trivial.hpp>
 
 #include <atomic>
+#include <chrono>
 #include <thread>
 
 namespace Slic3r { namespace GUI {
 
 namespace {
+
+// If the wiki prefetch (sync HTTP, long timeouts on a worker thread) does not
+// resolve within this budget, proceed with the first LLM step anyway using
+// whatever context we already have. Guarantees a general request never stalls
+// at "관련 도움말을 찾는 중…".
+constexpr int kWikiPrefetchWatchdogMs = 8000;
 
 std::string build_assist_loop_system_prompt(bool korean)
 {
@@ -257,6 +264,8 @@ void OllamaAgentController::run_goal(const std::string& user_goal, OllamaExecuti
     m_pending_raw_text.clear();
     m_pending_executed_root = nlohmann::json::object();
     m_mutations_applied     = false;
+    m_wiki_prefetch_consumed = false;
+    ++m_run_epoch;
 
     const bool ko = wxGetApp().current_language_code().StartsWith("ko");
     refresh_print_intent_and_proposal(ko);
@@ -275,8 +284,12 @@ void OllamaAgentController::run_goal(const std::string& user_goal, OllamaExecuti
         if (m_callbacks.on_thinking)
             m_callbacks.on_thinking(ko ? wxString::FromUTF8("관련 도움말을 찾는 중…")
                                        : wxString("Looking up guidance…"));
-        const auto alive = m_alive;
-        std::thread([this, alive, user_goal, plan_hint, ko]() {
+        const auto     alive = m_alive;
+        const unsigned epoch = m_run_epoch;
+
+        // Fetch worker: sync HTTP with long timeouts, so it must stay off the
+        // main thread. Posts the result back when done.
+        std::thread([this, alive, epoch, user_goal, plan_hint, ko]() {
             nlohmann::json wiki = nlohmann::json::array();
             try {
                 wiki = OllamaAssistContextBuilder::fetch_wiki_evidence(user_goal, ko);
@@ -287,13 +300,24 @@ void OllamaAgentController::run_goal(const std::string& user_goal, OllamaExecuti
             }
             if (wxGetApp().is_closing())
                 return; // shutting down: never post to a dying main loop
-            wxGetApp().CallAfter([this, alive, wiki, user_goal, plan_hint, ko]() {
+            wxGetApp().CallAfter([this, alive, epoch, wiki, plan_hint, ko]() {
                 if (!alive->load() || wxGetApp().is_closing())
                     return;
-                m_prefetch.wiki = wiki;
-                m_messages.push_back({"user", OllamaAssistContextBuilder::build_initial_user_block(
-                                                  user_goal, plan_hint, m_prefetch, ko)});
-                begin_step();
+                begin_after_wiki_prefetch(epoch, wiki, plan_hint, ko);
+            });
+        }).detach();
+
+        // Watchdog: if the fetch stalls past the budget, start the loop anyway
+        // with an empty wiki. begin_after_wiki_prefetch() is one-shot, so a late
+        // fetch result is harmlessly ignored.
+        std::thread([this, alive, epoch, plan_hint, ko]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds(kWikiPrefetchWatchdogMs));
+            if (wxGetApp().is_closing())
+                return;
+            wxGetApp().CallAfter([this, alive, epoch, plan_hint, ko]() {
+                if (!alive->load() || wxGetApp().is_closing())
+                    return;
+                begin_after_wiki_prefetch(epoch, nlohmann::json::array(), plan_hint, ko);
             });
         }).detach();
         return;
@@ -302,6 +326,25 @@ void OllamaAgentController::run_goal(const std::string& user_goal, OllamaExecuti
     m_messages.push_back(
         {"user", OllamaAssistContextBuilder::build_initial_user_block(user_goal, plan_hint, m_prefetch, ko)});
 
+    begin_step();
+}
+
+void OllamaAgentController::begin_after_wiki_prefetch(unsigned epoch, const nlohmann::json& wiki,
+                                                      const nlohmann::json& plan_hint, bool ko)
+{
+    if (epoch != m_run_epoch)
+        return; // stale callback from a previous run_goal
+    if (m_wiki_prefetch_consumed)
+        return; // fetch worker and watchdog race; first one wins
+    m_wiki_prefetch_consumed = true;
+
+    if (m_cancelled || !m_running || !m_alive->load())
+        return;
+
+    if (wiki.is_array() && !wiki.empty())
+        m_prefetch.wiki = wiki;
+    m_messages.push_back(
+        {"user", OllamaAssistContextBuilder::build_initial_user_block(m_user_goal, plan_hint, m_prefetch, ko)});
     begin_step();
 }
 

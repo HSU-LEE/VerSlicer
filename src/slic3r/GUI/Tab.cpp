@@ -31,6 +31,7 @@
 #include "PresetComboBoxes.hpp"
 #include <wx/wupdlock.h>
 
+#include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "GUI_ObjectList.hpp"
 #include "slic3r/Utils/PresetUpdater.hpp"
@@ -6201,6 +6202,15 @@ bool Tab::select_preset(
 bool Tab::may_discard_current_dirty_preset(PresetCollection *presets /*= nullptr*/, const std::string &new_printer_name /*= ""*/, bool no_transfer, bool no_transfer_variant)
 {
     if (presets == nullptr) presets = m_presets;
+
+    // AI automation: the user delegated the job, so never block on the
+    // "discard / save / transfer" prompt — silently discard the dirty edits
+    // and let the preset switch proceed.
+    if (is_ai_automation_active()) {
+        if (presets->current_is_dirty())
+            presets->discard_current_changes();
+        return true;
+    }
 
     UnsavedChangesDialog dlg(m_type, presets, new_printer_name, no_transfer);
     if (dlg.ShowModal() == wxID_CANCEL)

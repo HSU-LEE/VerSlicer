@@ -413,8 +413,21 @@ static wxString substitution_message(const wxString& changes)
 		_L("Some values have been replaced. Please check them:") + "\n" + changes + "\n";
 }
 
+// --- AI automation dialog suppression -------------------------------------
+// Depth counter, main-thread only (all callers run on the wx main thread).
+static int s_ai_automation_depth = 0;
+
+void push_ai_automation_scope() { ++s_ai_automation_depth; }
+void pop_ai_automation_scope()  { if (s_ai_automation_depth > 0) --s_ai_automation_depth; }
+bool is_ai_automation_active()  { return s_ai_automation_depth > 0; }
+
 void show_substitutions_info(const PresetsConfigSubstitutions& presets_config_substitutions)
 {
+	// During AI automation the user has delegated the whole job; substituted
+	// legacy keys are applied silently instead of blocking on an info modal.
+	if (is_ai_automation_active())
+		return;
+
 	wxString changes;
 
 	auto preset_type_name = [](Preset::Type type) {
@@ -443,6 +456,9 @@ void show_substitutions_info(const PresetsConfigSubstitutions& presets_config_su
 
 void show_substitutions_info(const ConfigSubstitutions& config_substitutions, const std::string& filename)
 {
+	if (is_ai_automation_active())
+		return;
+
 	wxString changes = "\n";
 	add_config_substitutions(config_substitutions, changes);
 

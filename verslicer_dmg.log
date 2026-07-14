@@ -1,0 +1,33 @@
+=== dmg started 2026-07-14 10:51:28 ===
+Preparing portable app bundle...
+  source: /Users/hsu/VerSlicer/build/arm64/src/Release/verslicer.app
+  output: /Users/hsu/VerSlicer/build/arm64/dist/VerSlicer.app
+  materializing Resources from /Users/hsu/VerSlicer/resources
+Done: /Users/hsu/VerSlicer/build/arm64/dist/VerSlicer.app
+367M	/Users/hsu/VerSlicer/build/arm64/dist/VerSlicer.app
+Checking embedded library paths...
+  OK (no Homebrew/build-machine paths in Mach-O binaries)
+Preparing staging folder...
+Signing /Users/hsu/VerSlicer/build/arm64/dist/.dmg_staging_59655/VerSlicer.app (identity: -)...
+/Users/hsu/VerSlicer/build/arm64/dist/.dmg_staging_59655/VerSlicer.app: replacing existing signature
+/Users/hsu/VerSlicer/build/arm64/dist/.dmg_staging_59655/VerSlicer.app: valid on disk
+/Users/hsu/VerSlicer/build/arm64/dist/.dmg_staging_59655/VerSlicer.app: satisfies its Designated Requirement
+  codesign verify: OK
+Creating disk image...
+Notarization skipped (set APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD to enable).
+
+Done: /Users/hsu/VerSlicer/build/arm64/dist/VerSlicer-macOS-arm64-3.1.1.dmg
+-rw-r--r--@ 1 hsu  staff   153M Jul 14 10:52 /Users/hsu/VerSlicer/build/arm64/dist/VerSlicer-macOS-arm64-3.1.1.dmg
+
+NOTE: Ad-hoc signed — other Macs may block the app.
+  • Best fix: Apple Developer ID + notarization (set env vars above).
+  • One-time workaround on the other Mac:
+      xattr -dr com.apple.quarantine /Applications/VerSlicer.app
+    or Right-click the app → Open.
+
+Installer ready:
+  /Users/hsu/VerSlicer/build/arm64/dist/VerSlicer-macOS-arm64-3.1.1.dmg
+
+Copy this .dmg to another Mac, open it, drag VerSlicer to Applications.
+For AI chat, install Ollama separately: https://ollama.com/download
+DMG_EXIT=0

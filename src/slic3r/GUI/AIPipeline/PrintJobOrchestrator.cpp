@@ -2,6 +2,7 @@
 
 #include "PrintJobStepExecutors.hpp"
 
+#include "../GUI.hpp"
 #include "../GUI_App.hpp"
 #include "../AICoach/AIGuiOrchestrator.hpp"
 #include "../ModelSearch/ModelSearchService.hpp"
@@ -200,6 +201,11 @@ bool PrintJobOrchestrator::start(const std::string& user_utterance, wxWindow* pa
     job->auto_slice_and_send = true; // full "find and print" intent
     m_job                    = job;
     m_last_terminal          = PrintJobState::Idle;
+
+    // Suppress preset/substitution modals for the entire job so the user never
+    // has to click through a dialog after "~~ 뽑아줘". Balanced in finish_common().
+    push_ai_automation_scope();
+    m_automation_scope_active = true;
 
     // Phase 2 intent accumulator is plate/chat-scoped: reset at job start, then
     // merge the opening turn and snapshot the intent by value. start() is called
@@ -785,6 +791,12 @@ void PrintJobOrchestrator::finish_common()
     m_slice_sub.reset();
     clear_slicing_job();
     clear_import_owner();
+
+    // Release the dialog-suppression scope opened in start().
+    if (m_automation_scope_active) {
+        pop_ai_automation_scope();
+        m_automation_scope_active = false;
+    }
 
     if (m_search_begun) {
         AIGuiOrchestrator::instance().on_makerworld_search_end();

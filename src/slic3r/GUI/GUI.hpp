@@ -55,6 +55,24 @@ void warning_catcher(wxWindow* parent, const wxString& message);
 void show_substitutions_info(const PresetsConfigSubstitutions& presets_config_substitutions);
 void show_substitutions_info(const ConfigSubstitutions& config_substitutions, const std::string& filename);
 
+// --- AI automation dialog suppression -------------------------------------
+// While an AI-driven job (e.g. "~~ 뽑아줘") is running the user must not be
+// forced to click through modal prompts. Within an active scope:
+//   * config-substitution info popups are skipped (auto-OK), and
+//   * unsaved-preset-change prompts auto-resolve to "Discard".
+// The scope is re-entrant (depth-counted) and lives on the main thread only.
+void push_ai_automation_scope();
+void pop_ai_automation_scope();
+bool is_ai_automation_active();
+
+// RAII helper for synchronous automation blocks (e.g. a single action batch).
+struct AiAutomationScope {
+    AiAutomationScope()  { push_ai_automation_scope(); }
+    ~AiAutomationScope() { pop_ai_automation_scope(); }
+    AiAutomationScope(const AiAutomationScope&)            = delete;
+    AiAutomationScope& operator=(const AiAutomationScope&) = delete;
+};
+
 // Creates a wxCheckListBoxComboPopup inside the given wxComboCtrl, filled with the given text and items.
 // Items data must be separated by '|', and contain the item name to be shown followed by its initial value (0 for false, 1 for true).
 // For example "Item1|0|Item2|1|Item3|0", and so on.

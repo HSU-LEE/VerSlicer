@@ -19,6 +19,7 @@
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
 
+#include "slic3r/GUI/GUI.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 #include "slic3r/GUI/Plater.hpp"
 #include "slic3r/GUI/GLCanvas3D.hpp"
@@ -530,11 +531,17 @@ static std::string normalize_config_value(std::string v, const std::string& key)
     if (boost::iequals(v, "false") || boost::iequals(v, "no") || boost::iequals(v, "off"))
         return "0";
 
-    // For density, a bare number is usually a percent.
-    if (key.find("density") != std::string::npos) {
-        // "20" -> "20%"
-        bool all_digits = !v.empty() && std::all_of(v.begin(), v.end(), [](unsigned char c) { return std::isdigit(c); });
-        if (all_digits && v.find('%') == std::string::npos)
+    // For density, a bare number is usually a percent (integer or decimal).
+    if (key.find("density") != std::string::npos && v.find('%') == std::string::npos) {
+        int  dots   = 0;
+        bool numeric = !v.empty();
+        for (unsigned char c : v) {
+            if (c == '.')
+                ++dots;
+            else if (!std::isdigit(c))
+                numeric = false;
+        }
+        if (numeric && dots <= 1)
             v += "%";
     }
 
@@ -614,31 +621,36 @@ static SetConfigMutateResult mutate_set_config_on_config(DynamicPrintConfig& cfg
     DynamicPrintConfig        trial = cfg;
     ConfigSubstitutionContext ctxt{ForwardCompatibilitySubstitutionRule::Disable};
 
+    auto note_error = [&out](const std::string& msg) {
+        if (!out.errors.empty())
+            out.errors += "; ";
+        out.errors += msg;
+    };
+
+    // Resilient batch apply: a single bad key (blocked / unknown / unparsable)
+    // must NOT discard the other valid changes. We skip the offending key,
+    // record why, and commit everything that deserialized cleanly. This is what
+    // keeps a hands-free "인필 20%, 브림 켜줘" request working even when the LLM
+    // slips in one stray option.
     for (auto it = options.begin(); it != options.end(); ++it) {
         ++out.attempted;
         const std::string raw_key = it.key();
         const std::string key     = OllamaActionExecutor::normalize_config_key(raw_key);
 
         if (!OllamaSettingRegistry::is_allowed_key(key, preset)) {
-            if (!out.errors.empty())
-                out.errors += "; ";
-            out.errors += "blocked key for preset " + preset + ": " + raw_key;
-            return out;
+            note_error("blocked key for preset " + preset + ": " + raw_key);
+            continue;
         }
         if (!trial.has(key)) {
-            if (!out.errors.empty())
-                out.errors += "; ";
-            out.errors += "unknown option: " + raw_key;
-            return out;
+            note_error("unknown option: " + raw_key);
+            continue;
         }
 
         const std::string     val  = normalize_config_value(json_value_to_config_string(it.value()), key);
         DynamicPrintConfig    next = trial;
         if (!try_deserialize_config_key(next, key, val, ctxt)) {
-            if (!out.errors.empty())
-                out.errors += "; ";
-            out.errors += "failed: " + key;
-            return out;
+            note_error("failed: " + key);
+            continue;
         }
 
         if (skip_unchanged) {
@@ -661,8 +673,10 @@ static SetConfigMutateResult mutate_set_config_on_config(DynamicPrintConfig& cfg
         out.applied_kvs.push_back(key + "=" + stored);
     }
 
-    cfg    = std::move(trial);
-    out.ok = true;
+    cfg = std::move(trial);
+    // ok when we changed something, or when there was simply nothing to change
+    // (all no-ops). It's only a hard failure if every requested key errored out.
+    out.ok = out.changed > 0 || out.errors.empty();
     return out;
 }
 
@@ -1382,6 +1396,12 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
         return results;
     if (!root.contains("actions") || !root["actions"].is_array())
         return results;
+
+    // Applying AI actions may switch presets or reload configs that would
+    // otherwise raise "unsaved changes" / substitution modals. The user asked
+    // for these to resolve automatically (discard), so suppress them for the
+    // whole batch. Re-entrant: nests safely inside an orchestrator scope.
+    AiAutomationScope automation_scope;
 
     bool needs_batch_snapshot = false;
     for (const auto& action : root["actions"]) {

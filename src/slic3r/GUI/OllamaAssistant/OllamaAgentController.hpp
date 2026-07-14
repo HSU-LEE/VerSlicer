@@ -62,6 +62,12 @@ public:
 
 private:
     void begin_step();
+    /** Kick off the first LLM step once the (optional) wiki prefetch resolves.
+     *  One-shot: whichever of the fetch worker or the watchdog fires first wins,
+     *  guarded by m_wiki_prefetch_consumed so the loop can never double-start or
+     *  hang waiting on a stalled network fetch. */
+    void begin_after_wiki_prefetch(unsigned epoch, const nlohmann::json& wiki, const nlohmann::json& plan_hint,
+                                   bool ko);
     /** Merge the goal into the print-intent session and refresh the deterministic proposal. */
     void refresh_print_intent_and_proposal(bool korean);
     void on_llm_response(const std::string& text, const std::string& error);
@@ -95,6 +101,8 @@ private:
     std::string                    m_pending_raw_text;
     nlohmann::json                 m_pending_executed_root;
     bool                           m_mutations_applied{false};
+    bool                           m_wiki_prefetch_consumed{false}; // guards begin_after_wiki_prefetch (one-shot)
+    unsigned                       m_run_epoch{0}; // bumped per run_goal; rejects stale wiki callbacks
 
     void note_workflow_mutations(const OllamaWorkflowRun& workflow);
     OllamaPipelineOptions          pipeline_options() const;

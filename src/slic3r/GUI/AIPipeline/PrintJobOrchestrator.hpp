@@ -167,6 +167,7 @@ private:
     std::unique_ptr<wxTimer>                  m_watchdog;   // per-state timeout (import/slice)
     PrintJobState                             m_last_terminal{ PrintJobState::Idle };
     bool                                      m_search_begun{ false }; // matched on_makerworld_search_begin/end
+    bool                                      m_automation_scope_active{ false }; // matched push/pop_ai_automation_scope
     std::uint64_t                             m_next_job_id{ 1 };
 };
 
