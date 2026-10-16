@@ -3,13 +3,12 @@
 
 #include "OllamaActionExecutor.hpp"
 #include "OllamaUserFlow.hpp"
-#include "OllamaSettingSearch.hpp"
-
 #include "../BambuSmartPrint/BambuSmartPrintService.hpp"
 #include "../GUI_App.hpp"
 #include "../MainFrame.hpp"
 #include "../Plater.hpp"
 #include "../Selection.hpp"
+#include "../GLCanvas3D.hpp"
 
 #include "libslic3r/PresetBundle.hpp"
 
@@ -29,7 +28,8 @@ nlohmann::json selection_snapshot(Plater* plater)
         sel["empty"] = true;
         return sel;
     }
-    const Selection& selection = plater->get_selection();
+    GLCanvas3D* view3d = plater->get_view3D_canvas3D();
+    const Selection& selection = view3d ? view3d->get_selection() : plater->get_selection();
     nlohmann::json   ids       = nlohmann::json::array();
     std::unordered_set<int> seen;
     if (!selection.is_empty()) {
@@ -55,11 +55,31 @@ nlohmann::json objects_snapshot(Plater* plater)
     if (!plater)
         return arr;
     const Model& model = plater->model();
+    PartPlateList& plates = plater->get_partplate_list();
+    auto round1 = [](double v) { return std::round(v * 10.0) / 10.0; };
     for (size_t i = 0; i < model.objects.size(); ++i) {
-        arr.push_back(nlohmann::json::object({
+        ModelObject* mo = model.objects[i];
+        if (!mo)
+            continue;
+        nlohmann::json obj = nlohmann::json::object({
             {"id", i},
-            {"name", model.objects[i]->name},
-        }));
+            {"name", mo->name},
+        });
+        if (!mo->instances.empty()) {
+            const int inst = 0;
+            ModelInstance* mi = mo->instances[inst];
+            const Vec3d off = mi->get_offset();
+            const BoundingBoxf3 bb = mo->instance_bounding_box(static_cast<size_t>(inst));
+            const Vec3d size = bb.size();
+            const double z_deg = mi->get_rotation().z() * 180.0 / 3.14159265358979323846;
+            obj["position_mm"] = nlohmann::json::array({round1(off.x()), round1(off.y()), round1(off.z())});
+            obj["size_mm"] = nlohmann::json::array({round1(size.x()), round1(size.y()), round1(size.z())});
+            obj["rotation_z_deg"] = round1(z_deg);
+            const int plate = plates.find_instance_belongs(static_cast<int>(i), inst);
+            if (plate >= 0)
+                obj["plate"] = plate;
+        }
+        arr.push_back(std::move(obj));
     }
     return arr;
 }
@@ -159,14 +179,20 @@ std::string OllamaAgentStateService::snapshot_json()
     return snapshot().dump(2);
 }
 
+nlohmann::json OllamaAgentStateService::objects_json()
+{
+    return objects_snapshot(wxGetApp().plater());
+}
+
 nlohmann::json OllamaAgentStateService::config_digest(const std::string& user_goal_hint)
 {
     nlohmann::json out = nlohmann::json::object();
     if (!wxGetApp().preset_bundle)
         return out;
 
-    std::vector<std::string> keys = OllamaSettingSearch::candidate_keys_for_request(user_goal_hint, 2, 12);
-    if (keys.empty()) {
+    (void) user_goal_hint;
+    std::vector<std::string> keys;
+    {
         static const char* kDefaultKeys[] = {
             "layer_height", "sparse_infill_density", "enable_support", "brim_width",
             "retraction_length", "nozzle_temperature", "bed_temperature", "outer_wall_speed",

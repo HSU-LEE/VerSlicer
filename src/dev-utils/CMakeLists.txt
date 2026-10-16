@@ -39,7 +39,7 @@ if (ORCA_TOOLS)
         ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
     )
     target_link_libraries(makerworld_search_test libslic3r boost_headeronly)
-    target_compile_definitions(makerworld_search_test PRIVATE -DBOOST_ALL_NO_LIB)
+    target_compile_definitions(makerworld_search_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST)
 
     add_executable(model_search_ranker_test
         model_search_ranker_test.cpp
@@ -61,6 +61,7 @@ if (ORCA_TOOLS)
         ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionRegistry.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
     )
     target_include_directories(ollama_assistant_test PRIVATE
@@ -68,7 +69,7 @@ if (ORCA_TOOLS)
         ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
     )
     target_link_libraries(ollama_assistant_test libslic3r boost_headeronly)
-    target_compile_definitions(ollama_assistant_test PRIVATE -DBOOST_ALL_NO_LIB)
+    target_compile_definitions(ollama_assistant_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST)
 
     add_executable(ollama_pipeline_test
         ollama_pipeline_test.cpp
@@ -121,6 +122,7 @@ if (ORCA_TOOLS)
         bambu_wiki_search_test.cpp
         ../slic3r/GUI/OllamaAssistant/BambuLabWikiSearchCore.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionCritic.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
@@ -131,7 +133,7 @@ if (ORCA_TOOLS)
         ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
     )
     target_link_libraries(bambu_wiki_search_test libslic3r boost_headeronly)
-    target_compile_definitions(bambu_wiki_search_test PRIVATE -DBOOST_ALL_NO_LIB)
+    target_compile_definitions(bambu_wiki_search_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST)
 
     add_executable(ollama_benchmark_test
         ollama_benchmark_test.cpp
@@ -149,7 +151,7 @@ if (ORCA_TOOLS)
         ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
     )
     target_link_libraries(ollama_benchmark_test libslic3r boost_headeronly)
-    target_compile_definitions(ollama_benchmark_test PRIVATE -DBOOST_ALL_NO_LIB)
+    target_compile_definitions(ollama_benchmark_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST)
 
     add_test(NAME ollama_assistant_test COMMAND ollama_assistant_test)
     add_test(NAME ollama_pipeline_test COMMAND ollama_pipeline_test)

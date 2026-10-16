@@ -35,31 +35,8 @@ int main()
 {
     {
         PrintGoal g = PrintGoalParser::parse("야외에서 사용할 부품이라 튼튼하게");
-        expect_true(g.has_intent(PrintGoalIntent::Outdoor), "outdoor intent");
-        expect_true(g.has_intent(PrintGoalIntent::Strong), "outdoor implies strong");
-    }
-
-    {
-        PrintGoal g = PrintGoalParser::parse("오늘 안에 출력이 끝나야 해");
-        expect_true(g.has_intent(PrintGoalIntent::Fast), "fast intent");
-    }
-
-    {
-        PrintGoal g = PrintGoalParser::parse("베드에 안 붙어");
-        expect_true(g.has_intent(PrintGoalIntent::Adhesion), "adhesion intent");
-    }
-
-    {
-        PrintGoal g = PrintGoalParser::parse("오버행이 많아서 서포트 필요");
-        expect_true(g.has_intent(PrintGoalIntent::Overhang), "overhang intent");
-    }
-
-    {
-        PrintGoal a = PrintGoalParser::parse("튼튼하게");
-        PrintGoal b = PrintGoalParser::parse("빨리");
-        PrintGoal m = PrintGoalParser::merge(a, b);
-        expect_true(m.has_intent(PrintGoalIntent::Strong) && m.has_intent(PrintGoalIntent::Fast),
-                    "merged dual intent");
+        expect_true(g.user_text.find("튼튼") != std::string::npos, "parser keeps the user text");
+        expect_true(g.intents.empty(), "parser does not assign intents from keywords");
     }
 
     {
@@ -77,14 +54,32 @@ int main()
         expect_true(has_overhang, "overhang risk detected");
     }
 
+    auto goal_with = [](PrintGoalIntent intent, float strong = 0.f, float fast = 0.f) {
+        PrintGoal g;
+        g.intents.push_back(intent);
+        g.weight_strong = strong;
+        g.weight_fast = fast;
+        return g;
+    };
+
     {
-        PrintGoal g = PrintGoalParser::parse("튼튼 + 빨리");
+        PrintGoal a = goal_with(PrintGoalIntent::Strong, 0.8f, 0.f);
+        PrintGoal b = goal_with(PrintGoalIntent::Fast, 0.f, 0.8f);
+        PrintGoal m = PrintGoalParser::merge(a, b);
+        expect_true(m.has_intent(PrintGoalIntent::Strong) && m.has_intent(PrintGoalIntent::Fast),
+                    "merged dual intent");
+    }
+
+    {
+        PrintGoal g = goal_with(PrintGoalIntent::Strong, 0.8f, 0.f);
+        g.intents.push_back(PrintGoalIntent::Fast);
+        g.weight_fast = 0.8f;
         expect_true(!PrintPlanner::build_tradeoff_note(g).empty(), "tradeoff note for conflict");
     }
 
     {
         PlateContext ctx = minimal_plate_context();
-        PrintGoal      g = PrintGoalParser::parse("튼튼하게");
+        PrintGoal      g = goal_with(PrintGoalIntent::Strong, 0.85f, 0.f);
         PrintPlan      plan = PrintPlanner::plan_without_llm(ctx, g);
         expect_true(plan.proposed_config.opt_int("wall_loops") >= 3, "strong goal raises wall_loops");
         expect_true(plan.has_actions(), "strong goal produces actions");
@@ -92,7 +87,7 @@ int main()
 
     {
         PlateContext ctx = minimal_plate_context();
-        PrintGoal      g = PrintGoalParser::parse("빨리 출력");
+        PrintGoal      g = goal_with(PrintGoalIntent::Fast, 0.f, 0.85f);
         PrintPlan      plan = PrintPlanner::plan_without_llm(ctx, g);
         expect_true(plan.proposed_config.opt_float("layer_height") >= 0.24, "fast goal raises layer height");
     }
@@ -100,7 +95,7 @@ int main()
     {
         PlateContext ctx = minimal_plate_context();
         ctx.mesh.needs_brim = true;
-        PrintGoal g = PrintGoalParser::parse("베드에 잘 붙게");
+        PrintGoal g = goal_with(PrintGoalIntent::Adhesion);
         PrintPlan plan = PrintPlanner::plan_without_llm(ctx, g);
         expect_true(plan.proposed_config.opt_float("brim_width") >= 5.0, "adhesion goal adds brim");
     }
@@ -108,7 +103,7 @@ int main()
     {
         PlateContext ctx = minimal_plate_context();
         ctx.mesh.overhang_face_ratio = 0.2;
-        PrintGoal g = PrintGoalParser::parse("오버행");
+        PrintGoal g = goal_with(PrintGoalIntent::Overhang);
         PrintPlan plan = PrintPlanner::plan_without_llm(ctx, g);
         expect_true(plan.proposed_config.opt_bool("enable_support"), "overhang goal enables support");
     }

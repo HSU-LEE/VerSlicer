@@ -8761,7 +8761,7 @@ void GLCanvas3D::_render_canvas_toolbar()
             });
         }
     } else if (ImGui::IsItemHovered()) {
-        auto tooltip_str_wx = _L("Open Ollama chat");
+        auto tooltip_str_wx = _L("Open AI assistant");
         std::string tooltip_str = tooltip_str_wx.ToUTF8().data();
         float width = ImGui::CalcTextSize(tooltip_str.c_str()).x + imgui.scaled(2.0f);
         imgui.tooltip(tooltip_str, width);
@@ -8801,7 +8801,7 @@ void GLCanvas3D::_render_canvas_toolbar()
                                 if (wxGetApp().is_closing() || wxGetApp().mainframe == nullptr)
                                     return;
                                 if (wxGetApp().plater())
-                                    wxGetApp().plater()->ai_assistant_submit(wxString::FromUTF8(text));
+                                    wxGetApp().plater()->ai_assistant_prefill(wxString::FromUTF8(text));
                             });
                         });
                     }

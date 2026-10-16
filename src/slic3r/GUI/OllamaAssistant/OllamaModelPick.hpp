@@ -16,9 +16,7 @@ inline std::string pick_installed_ollama_model(const std::vector<std::string>& m
     if (want.empty())
         want = kOllamaDefaultModel;
     if (want == "qwen2.5")
-        want = "qwen2.5:3b";
-    if (want == "qwen2.5:7b")
-        want = "qwen2.5:3b";
+        want = kOllamaDefaultModel;
 
     auto exact = [&](const std::string& n) { return n == want; };
     auto prefix = [&](const std::string& n) { return n.rfind(want + ":", 0) == 0; };

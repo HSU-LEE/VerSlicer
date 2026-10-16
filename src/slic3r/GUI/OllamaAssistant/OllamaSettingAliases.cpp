@@ -25,7 +25,7 @@ const std::unordered_map<std::string, std::vector<const char*>>& ko_alias_table(
         {"outer_wall_speed", {"외벽 속도", "outer wall", "wall speed"}},
         {"sparse_infill_speed", {"채움 속도", "infill speed"}},
         {"seam_position", {"솔기", "seam"}},
-        {"ironing_type", {"아이어링", "ironing"}},
+        {"ironing_type", {"아이어링", "아이어닝", "다림질", "다리미", "ironing"}},
         {"elefant_foot_compensation", {"코끼리발", "elephant foot"}},
         {"support_top_z_distance", {"서포트 간격", "support gap"}},
         {"support_type", {"서포트 종류", "support type", "tree support"}},

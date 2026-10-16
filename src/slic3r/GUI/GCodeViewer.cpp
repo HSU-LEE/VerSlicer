@@ -996,11 +996,6 @@ void GCodeViewer::init(ConfigOptionMode mode, PresetBundle* preset_bundle)
 
     m_sequential_view.marker.init(filename);
 
-    // initializes point sizes
-    std::array<int, 2> point_sizes;
-    ::glGetIntegerv(GL_ALIASED_POINT_SIZE_RANGE, point_sizes.data());
-    m_detected_point_sizes = { static_cast<float>(point_sizes[0]), static_cast<float>(point_sizes[1]) };
-
     // BBS initialzed view_type items
     m_user_mode = mode;
     update_by_mode(m_user_mode);

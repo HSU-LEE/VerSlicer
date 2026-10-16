@@ -74,6 +74,7 @@ private:
     void append_thinking_line(const wxString& line);
     void append_thinking_text(const wxString& text);
     void clear_thinking_block();
+    void commit_thinking_block();
     wxString thinking_role_label() const;
     void set_busy(bool busy);
     void on_send(wxCommandEvent& event);
@@ -98,6 +99,10 @@ private:
     void update_system_welcome_in_chat();
     bool apply_mode() const { return m_apply_mode; }
     void refresh_mode_ui();
+    void update_send_button_chrome();
+    void cancel_inflight();
+    void toggle_voice();
+    void refresh_voice_button();
     // Re-apply the (possibly elided) input placeholder for the current width.
     void update_input_hint();
     wxString system_welcome_message() const;
@@ -130,6 +135,7 @@ private:
     TextInput*    m_input_field{nullptr};
     wxTextCtrl*   m_input_ctrl{nullptr};
     Button*       m_send_btn{nullptr};
+    Button*       m_voice_btn{nullptr};
     Button*       m_reset_btn{nullptr};
     ComboBox*     m_mode_combo{nullptr};
     wxStaticText* m_mode_label{nullptr};
@@ -145,6 +151,7 @@ private:
 
     // Streaming state for the in-flight request (guarded by m_request_gen).
     std::string   m_stream_buf;
+    wxString      m_last_thinking_line;
 
     // Full placeholder text for the input field (elided to fit on narrow widths).
     wxString      m_input_hint_full;

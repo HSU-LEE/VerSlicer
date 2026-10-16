@@ -445,6 +445,7 @@ public:
     // AI assistant: Fusion-style right-docked panel (created lazily on first use).
     void toggle_ai_assistant();
     void ai_assistant_submit(const wxString& text);
+    void ai_assistant_prefill(const wxString& text);
     bool is_ai_assistant_shown() const;
 
     void reset_window_layout();

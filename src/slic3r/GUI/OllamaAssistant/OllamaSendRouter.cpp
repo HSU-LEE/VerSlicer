@@ -1,9 +1,7 @@
 #include "OllamaSendRouter.hpp"
 
 #include "OllamaAssistRouter.hpp"
-#include "OllamaUserFlow.hpp"
 
-#include "../MakerWorld/MakerWorldIntent.hpp"
 #include "../MakerWorld/MakerWorldSearchService.hpp"
 
 namespace Slic3r { namespace GUI {
@@ -15,7 +13,9 @@ bool OllamaSendRouter::acquisition_gate_open(bool apply_mode, bool orchestrator_
 
 bool OllamaSendRouter::is_acquisition_request(const std::string& user_utf8, bool plate_has_model)
 {
-    return OllamaUserFlow::is_acquisition_print_request(user_utf8, plate_has_model);
+    (void) user_utf8;
+    (void) plate_has_model;
+    return false;
 }
 
 std::string OllamaSendRouter::acquisition_query(const std::string& user_utf8)
@@ -28,7 +28,8 @@ std::string OllamaSendRouter::acquisition_query(const std::string& user_utf8)
 
 bool OllamaSendRouter::should_bypass_to_makerworld(const std::string& user_utf8)
 {
-    return MakerWorldIntent::is_pure_makerworld_request(user_utf8);
+    (void) user_utf8;
+    return false;
 }
 
 bool OllamaSendRouter::should_use_assist_loop(const std::string& user_utf8, bool apply_mode,

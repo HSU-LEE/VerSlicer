@@ -11,44 +11,12 @@
 #include <boost/algorithm/string.hpp>
 #include <cmath>
 #include <cstdlib>
+#include <optional>
 #include <unordered_set>
 
 namespace Slic3r { namespace GUI {
 
 namespace {
-
-std::string lower_trim(std::string s)
-{
-    boost::algorithm::trim(s);
-    boost::algorithm::to_lower(s);
-    return s;
-}
-
-} // namespace
-
-std::string OllamaActionValidator::canonical_action_type(std::string type)
-{
-    const std::string t = lower_trim(std::move(type));
-    if (t == "split_mesh" || t == "split_objects" || t == "split")
-        return "split_object";
-    if (t == "add_palette" || t == "new_palette" || t == "new_plate" || t == "add_build_plate")
-        return "add_plate";
-    if (t == "arrange_by_object" || t == "arrange_by_objects" || t == "arrange-by-object"
-        || t == "arrange_byobject" || t == "print_by_object" || t == "by_object")
-        return "arrange_objects";
-    if (t == "resize")
-        return "scale";
-    return t;
-}
-
-namespace {
-
-static bool user_allows_delete(const std::string& user)
-{
-    return user.find("delete") != std::string::npos || user.find("remove") != std::string::npos
-        || user.find("erase") != std::string::npos || user.find("삭제") != std::string::npos
-        || user.find("지워") != std::string::npos || user.find("지우") != std::string::npos;
-}
 
 double clamp_double(double v, double lo, double hi)
 {
@@ -67,19 +35,6 @@ double normalize_degrees(double deg)
 bool contains_ci(const std::string& hay, const char* needle)
 {
     return boost::ifind_first(hay, needle);
-}
-
-bool user_wants_import(const std::string& user)
-{
-    return contains_ci(user, "import") || contains_ci(user, "add model") || contains_ci(user, "load") ||
-           contains_ci(user, "open file") || user.find("불러") != std::string::npos || user.find("가져") != std::string::npos ||
-           user.find("열어") != std::string::npos || user.find("추가") != std::string::npos;
-}
-
-bool user_wants_file_ops(const std::string& user)
-{
-    return contains_ci(user, "save") || contains_ci(user, "export") || contains_ci(user, "open") ||
-           user.find("저장") != std::string::npos || user.find("보내") != std::string::npos;
 }
 
 bool is_blocked_action_type(const std::string& type)
@@ -256,23 +211,80 @@ bool sanitize_transform(nlohmann::json& action, const std::string& type, OllamaA
         return true;
     }
     if (type == "rotate") {
+        auto read_deg = [](const nlohmann::json& j, const char* key) -> std::optional<double> {
+            if (!j.contains(key) || j[key].is_null())
+                return std::nullopt;
+            if (j[key].is_number())
+                return j[key].get<double>();
+            if (j[key].is_string()) {
+                try {
+                    size_t idx = 0;
+                    const double v = std::stod(j[key].get<std::string>(), &idx);
+                    if (idx == 0)
+                        return std::nullopt;
+                    return v;
+                } catch (...) {
+                    return std::nullopt;
+                }
+            }
+            return std::nullopt;
+        };
         for (const char* axis : {"x", "y", "z"}) {
-            if (action.contains(axis) && action[axis].is_number()) {
-                const double v = normalize_degrees(action[axis].get<double>());
-                action[axis] = v;
+            if (const auto v = read_deg(action, axis))
+                action[axis] = normalize_degrees(*v);
+        }
+        const double x = action.value("x", 0.0);
+        const double y = action.value("y", 0.0);
+        const double z = action.value("z", 0.0);
+        if (std::abs(x) < 0.01 && std::abs(y) < 0.01 && std::abs(z) < 0.01) {
+            for (const char* key : {"angle", "degrees", "yaw", "rotation"}) {
+                if (const auto v = read_deg(action, key)) {
+                    action["z"] = normalize_degrees(*v);
+                    break;
+                }
             }
         }
         return true;
     }
     if (type == "scale") {
+        auto read_num = [](const nlohmann::json& j, const char* key) -> std::optional<double> {
+            if (!j.contains(key) || j[key].is_null())
+                return std::nullopt;
+            if (j[key].is_number())
+                return j[key].get<double>();
+            if (j[key].is_string()) {
+                try {
+                    std::string s = j[key].get<std::string>();
+                    if (!s.empty() && s.back() == '%')
+                        s.pop_back();
+                    size_t idx = 0;
+                    const double v = std::stod(s, &idx);
+                    if (idx == 0)
+                        return std::nullopt;
+                    return v;
+                } catch (...) {
+                    return std::nullopt;
+                }
+            }
+            return std::nullopt;
+        };
+        if (!action.contains("factor")) {
+            if (const auto percent = read_num(action, "percent"))
+                action["factor"] = *percent / 100.0;
+            else if (const auto percent = read_num(action, "percentage"))
+                action["factor"] = *percent / 100.0;
+        }
         auto clamp_factor = [&](const char* key) {
-            if (!action.contains(key) || !action[key].is_number())
+            const auto parsed = read_num(action, key);
+            if (!parsed)
                 return;
-            double v = action[key].get<double>();
+            double v = *parsed;
             if (v <= 0.0) {
                 block_action(out, "scale factor must be positive");
                 v = 1.0;
             } else {
+                if (v > 20.0)
+                    v /= 100.0;
                 v = clamp_double(v, 0.05, 20.0);
             }
             action[key] = v;
@@ -302,14 +314,8 @@ bool sanitize_menu_item(const nlohmann::json& action, const std::string& user, O
         return false;
     }
 
-    const bool is_file_menu = boost::iequals(menu, "File") || boost::iequals(menu, "파일");
-    if (is_file_menu && !user_wants_file_ops(user)) {
-        if (contains_ci(item, "save") || contains_ci(item, "export") || contains_ci(item, "저장") ||
-            contains_ci(item, "보내")) {
-            block_action(out, "Blocked file save/export (not requested)");
-            return false;
-        }
-    }
+    (void) user;
+    (void) menu;
     return true;
 }
 
@@ -326,14 +332,6 @@ bool sanitize_one_action(nlohmann::json& action, const std::string& user, Ollama
         return false;
     }
 
-    if (type == "delete_selection" && !user_allows_delete(user)) {
-        block_action(out, "Blocked delete (user did not ask to delete)", /*quiet*/ true);
-        return false;
-    }
-    if (type == "add_model" && !user_wants_import(user)) {
-        block_action(out, "Blocked add_model (user did not ask to import)", /*quiet*/ true);
-        return false;
-    }
     if (type == "menu_item" && !sanitize_menu_item(action, user, out))
         return false;
     if (type == "set_config" && !sanitize_set_config(action, out))

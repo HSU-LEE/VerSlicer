@@ -158,14 +158,10 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaChatPanel.hpp
     GUI/OllamaAssistant/OllamaClient.cpp
     GUI/OllamaAssistant/OllamaClient.hpp
-    GUI/OllamaAssistant/OllamaDiagnosticPipeline.cpp
-    GUI/OllamaAssistant/OllamaDiagnosticPipeline.hpp
     GUI/OllamaAssistant/OllamaConfig.cpp
     GUI/OllamaAssistant/OllamaConfig.hpp
     GUI/OllamaAssistant/OllamaIntentContext.cpp
     GUI/OllamaAssistant/OllamaIntentContext.hpp
-    GUI/OllamaAssistant/OllamaPrintingTips.cpp
-    GUI/OllamaAssistant/OllamaPrintingTips.hpp
     GUI/OllamaAssistant/OllamaModelLoadAdvisor.cpp
     GUI/OllamaAssistant/OllamaModelLoadAdvisor.hpp
     GUI/OllamaAssistant/OllamaProcessingNotice.cpp
@@ -184,14 +180,10 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaSettingSearch.hpp
     GUI/OllamaAssistant/OllamaSettingAliases.cpp
     GUI/OllamaAssistant/OllamaSettingAliases.hpp
-    GUI/OllamaAssistant/OllamaRequestRouter.cpp
-    GUI/OllamaAssistant/OllamaRequestRouter.hpp
     GUI/OllamaAssistant/BambuLabWikiSearch.cpp
     GUI/OllamaAssistant/BambuLabWikiSearch.hpp
     GUI/OllamaAssistant/BambuLabWikiSearchCore.cpp
     GUI/OllamaAssistant/BambuLabWikiSearchCore.hpp
-    GUI/OllamaAssistant/OllamaActionCritic.cpp
-    GUI/OllamaAssistant/OllamaActionCritic.hpp
     GUI/OllamaAssistant/OllamaTelemetry.cpp
     GUI/OllamaAssistant/OllamaTelemetry.hpp
     GUI/OllamaAssistant/OllamaVoiceInput.cpp

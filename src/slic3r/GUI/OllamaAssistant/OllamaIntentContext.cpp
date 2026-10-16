@@ -98,27 +98,18 @@ nlohmann::json OllamaIntentContext::build_intent_signals_json()
 {
     nlohmann::json signals = nlohmann::json::object();
 
-    if (slice_suggests_support())
-        signals["support_recommended"] = true;
     const int islands = slice_unsupported_islands();
-    if (islands > 0) {
+    if (islands > 0)
         signals["unsupported_islands"] = islands;
-        signals["still_needs_support"] = true;
-    }
-    if (slice_suggests_support() && !print_support_enabled())
-        signals["support_recommended_after_slice"] = true;
+    signals["supports_enabled"] = print_support_enabled();
 
     const OllamaSelectionFootprint fp = current_selection_footprint();
-    signals["recommended_brim_width_mm"] = ollama_recommended_brim_width_mm(fp.x_mm, fp.y_mm);
-
     if (fp.valid) {
         signals["selection_footprint_mm"] = {
             {"x", fp.x_mm},
             {"y", fp.y_mm},
             {"z", fp.z_mm},
         };
-        if (ollama_selection_is_tall_narrow(fp.x_mm, fp.y_mm, fp.z_mm))
-            signals["lay_flat_recommended"] = true;
     }
 
     if (auto* bundle = wxGetApp().preset_bundle)
@@ -133,22 +124,6 @@ nlohmann::json OllamaIntentContext::build_engineering_hints_json()
     hints["minimal_change_max_keys"] = 2;
     hints["principle"] =
         "Infer the user's desired outcome and root cause before changing settings; prefer relative changes from current.";
-
-    nlohmann::json priority = nlohmann::json::object();
-    priority["adhesion"]  = nlohmann::json::array({"brim_width", "initial_layer_print_height"});
-    priority["strength"]  = nlohmann::json::array({"sparse_infill_density", "wall_loops"});
-    priority["overhang"]  = nlohmann::json::array({"enable_support"});
-    priority["speed"]     = nlohmann::json::array({"layer_height", "sparse_infill_density"});
-    priority["surface"]   = nlohmann::json::array({"layer_height", "top_shell_layers"});
-    priority["stringing"] = nlohmann::json::array({"retraction_length", "retraction_when_crossing_perimeters"});
-    hints["symptom_key_priority"] = priority;
-
-    hints["advanced_levers"] = nlohmann::json::array({
-        "ironing_type", "elefant_foot_compensation", "sparse_infill_pattern", "pressure_advance",
-        "minimum_layer_time", "bridge_fan_speed", "seam_position", "support_type", "overhang_speed",
-    });
-    hints["use_pro_tips"] =
-        "When obvious fixes fail or user asks for better quality, pick lesser-known levers from pro_tips in context — not only symptom_key_priority.";
 
     if (auto* bundle = wxGetApp().preset_bundle) {
         const DynamicPrintConfig& cfg = bundle->prints.get_edited_preset().config;
@@ -199,45 +174,12 @@ void OllamaIntentContext::consume_slice_feedback_if_ready()
     OllamaTelemetry::slice_feedback_evaluated(still, isl);
 }
 
-static double json_number_value(const nlohmann::json& v, double fallback = 0.0)
-{
-    if (v.is_number())
-        return v.get<double>();
-    if (v.is_string()) {
-        try {
-            return std::stod(v.get<std::string>());
-        } catch (...) {
-        }
-    }
-    return fallback;
-}
-
-static bool is_llm_placeholder_brim_width(const nlohmann::json& v)
-{
-    if (!v.is_number() && !v.is_string())
-        return false;
-    const double w = json_number_value(v, -1.0);
-    return w > 0.0 && w == 5.0;
-}
-
 void OllamaIntentContext::refine_set_config_options(nlohmann::json& options, const std::string& /*user_request*/)
 {
     if (!options.is_object())
         return;
 
     OllamaActionExecutor::normalize_set_config_options(options);
-
-    const bool has_brim_key = options.contains("brim_width") || options.contains("enable_brim");
-    if (has_brim_key) {
-        const double rec = recommended_brim_width_mm();
-        if (options.contains("brim_width") && is_llm_placeholder_brim_width(options["brim_width"]))
-            options["brim_width"] = rec;
-        else if (options.contains("enable_brim") && !options.contains("brim_width")) {
-            options["brim_width"] = rec;
-            if (!options.contains("brim_type"))
-                options["brim_type"] = "outer_only";
-        }
-    }
 }
 
 }} // namespace

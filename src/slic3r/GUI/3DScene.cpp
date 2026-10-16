@@ -596,6 +596,8 @@ void GLVolume::simple_render(GLShaderProgram* shader, ModelObjectPtrs& model_obj
             model_volume->mmu_segmentation_facets.get_facets(*model_volume, its_per_color);
             mmuseg_models.resize(its_per_color.size());
             for (int idx = 0; idx < its_per_color.size(); idx++) {
+                if (its_per_color[idx].vertices.empty() || its_per_color[idx].indices.empty())
+                    continue;
                 mmuseg_models[idx].init_from(its_per_color[idx]);
             }
 

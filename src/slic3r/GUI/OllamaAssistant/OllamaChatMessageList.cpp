@@ -476,6 +476,33 @@ void OllamaChatMessageList::set_pending_stream_text(const wxString& text)
     layout_transcript(true);
 }
 
+void OllamaChatMessageList::commit_pending()
+{
+    if (m_pending_timer)
+        m_pending_timer->Stop();
+    if (m_stream_row) {
+        destroy_row(m_stream_storage);
+        m_stream_row = nullptr;
+    }
+    for (Row& row : m_thinking_rows) {
+        row.id = m_next_id++;
+        m_rows.push_back(row);
+    }
+    m_thinking_rows.clear();
+    drop_oldest_if_needed();
+    if (!m_pending_row) {
+        layout_transcript(true);
+        return;
+    }
+    if (m_pending_storage.row_panel) {
+        m_sizer->Detach(m_pending_storage.row_panel);
+        m_pending_storage.row_panel->Destroy();
+    }
+    m_pending_storage = Row{};
+    m_pending_row     = nullptr;
+    layout_transcript(true);
+}
+
 void OllamaChatMessageList::clear_pending()
 {
     if (m_pending_timer)

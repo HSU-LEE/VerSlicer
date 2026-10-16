@@ -14834,6 +14834,23 @@ void Plater::ai_assistant_submit(const wxString& text)
         p->ollama_assistant->submit_text_and_send(text);
 }
 
+void Plater::ai_assistant_prefill(const wxString& text)
+{
+    ensure_ai_assistant_pane();
+    auto& pane = p->m_aui_mgr.GetPane("ai_assistant");
+    if (!pane.IsOk())
+        return;
+    if (!pane.IsShown()) {
+        dock_ai_assistant_right(true);
+        if (p->ollama_assistant)
+            p->ollama_assistant->Layout();
+    }
+    if (p->ollama_assistant) {
+        p->ollama_assistant->set_input_text(text);
+        p->ollama_assistant->focus_input();
+    }
+}
+
 bool Plater::is_ai_assistant_shown() const
 {
     if (!p->ollama_assistant)

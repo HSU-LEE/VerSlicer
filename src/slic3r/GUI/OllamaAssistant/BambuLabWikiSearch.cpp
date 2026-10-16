@@ -87,6 +87,26 @@ std::string http_get_sync(const std::string& url)
     return response;
 }
 
+bool query_has_hangul(const std::string& query)
+{
+    const auto* bytes = reinterpret_cast<const unsigned char*>(query.data());
+    for (size_t i = 0; i + 2 < query.size(); ++i) {
+        if (bytes[i] == 0xEA && bytes[i + 1] >= 0xB0 && bytes[i + 1] <= 0xBF)
+            return true;
+        if (bytes[i] == 0xEB || bytes[i] == 0xEC)
+            return true;
+        if (bytes[i] == 0xED && bytes[i + 1] <= 0x9E)
+            return true;
+    }
+    return false;
+}
+
+int& wiki_search_depth()
+{
+    static thread_local int depth = 0;
+    return depth;
+}
+
 } // namespace
 
 std::string BambuLabWikiSearch::wiki_locale(bool ko_ui) { return BambuLabWikiSearchCore::wiki_locale(ko_ui); }
@@ -108,9 +128,18 @@ std::vector<BambuWikiPageHit> BambuLabWikiSearch::search_pages(const std::string
     if (query.empty())
         return hits;
 
+    struct DepthGuard {
+        DepthGuard() { ++wiki_search_depth(); }
+        ~DepthGuard() { --wiki_search_depth(); }
+    } depth_guard;
+    (void) depth_guard;
+
+    const bool upgrade = wiki_search_depth() == 1 && locale == "en" && query_has_hangul(query);
+    const std::string use_locale = upgrade ? std::string("ko") : locale;
+
     const std::string gql =
         std::string("{ pages { search(query: \"") + escape_graphql_string(query) + "\", locale: \"" +
-        escape_graphql_string(locale) + "\") { results { id title path description } } } }";
+        escape_graphql_string(use_locale) + "\") { results { id title path description } } } }";
     const nlohmann::json body = {{"query", gql}};
 
     const std::string response = http_post_json_sync(std::string(kWikiHost) + "/graphql", body.dump());
@@ -131,7 +160,7 @@ std::vector<BambuWikiPageHit> BambuLabWikiSearch::search_pages(const std::string
             hit.description = r.value("description", "");
             if (hit.path.empty())
                 continue;
-            hit.url = std::string(kWikiHost) + "/" + locale + "/" + hit.path;
+            hit.url = std::string(kWikiHost) + "/" + use_locale + "/" + hit.path;
             hits.push_back(std::move(hit));
             if (hits.size() >= limit)
                 break;
@@ -141,7 +170,7 @@ std::vector<BambuWikiPageHit> BambuLabWikiSearch::search_pages(const std::string
                                    << hits.size() << " hits";
     }
 
-    if (hits.empty() && locale != "en")
+    if (hits.empty() && use_locale != "en")
         return search_pages(query, "en", limit);
     return hits;
 }

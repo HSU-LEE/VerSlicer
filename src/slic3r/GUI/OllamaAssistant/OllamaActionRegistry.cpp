@@ -10,6 +10,8 @@ namespace {
 
 const OllamaActionTypeSpec kActionTypes[] = {
     {"get_state", true, true, true, "Read current slicer state", "현재 슬라이서 상태 읽기"},
+    {"find_setting", true, true, true, "Find a slicer setting by name. Pass query.", "설정 이름 찾기. query를 넣으세요."},
+    {"wiki_search", true, true, true, "Search Bambu Lab wiki for a query", "도움말 검색"},
     {"list_objects", true, true, true, "List models on the plate", "플레이트 모델 목록"},
     {"select_object", true, true, true, "Select object by id or name", "객체 선택"},
     {"set_config", true, true, true, "Change print/filament/printer preset options", "프리셋 설정 변경"},
@@ -17,8 +19,8 @@ const OllamaActionTypeSpec kActionTypes[] = {
     {"rotate", true, true, true, "Rotate selection", "선택 모델 회전"},
     {"scale", true, false, false, "Scale selection", "선택 모델 크기 조절"},
     {"clone_selection", true, true, true, "Duplicate selection", "선택 복제"},
-    {"arrange", true, true, true, "Auto-arrange on build plate (by layer)", "플레이트 자동 배치 (층별)"},
-    {"arrange_objects", true, true, true, "Arrange by object (print-by-object layout)", "객체 단위 재배치 (물체 객체로)"},
+    {"arrange", true, true, true, "Auto-arrange on build plate (by layer)", "플레이트에 자동 배치"},
+    {"arrange_objects", true, true, true, "Arrange by object (print-by-object layout)", "객체 단위로 재배치"},
     {"split_object", true, true, true, "Split selected model into separate objects", "모델을 개별 객체로 분할"},
     {"split_mesh", true, true, true, "Split selected model into separate objects (alias)", "모델을 개별 객체로 분할"},
     {"delete_selection", true, false, false, "Delete selected models", "선택 삭제"},
@@ -33,7 +35,7 @@ const OllamaActionTypeSpec kActionTypes[] = {
     {"open_setup", true, false, true, "Open Smart Print setup wizard", "프린터 설정/연결"},
     {"send_print", true, false, true, "Send sliced job to printer", "프린터로 출력"},
     {"export_gcode", true, false, true, "Export G-code file", "G-code 내보내기"},
-    {"add_plate", true, true, true, "Add a new build plate (palette)", "빌드 플레이트(팔레트) 추가"},
+    {"add_plate", true, true, true, "Add a new build plate", "빌드 플레이트 추가"},
     {"delete_plate", true, false, false, "Delete current plate", "플레이트 삭제"},
     {"select_plate", true, false, false, "Select plate by index", "플레이트 선택"},
     {"save_project", true, false, false, "Save project", "프로젝트 저장"},
@@ -62,6 +64,24 @@ const std::vector<OllamaActionTypeSpec>& OllamaActionRegistry::all()
 bool OllamaActionRegistry::is_blocked_type(const std::string& type)
 {
     return kBlockedTypes.find(type) != kBlockedTypes.end();
+}
+
+std::string OllamaActionValidator::canonical_action_type(std::string type)
+{
+    boost::algorithm::trim(type);
+    boost::algorithm::to_lower(type);
+    if (type == "split_mesh" || type == "split_objects" || type == "split")
+        return "split_object";
+    if (type == "add_palette" || type == "new_palette" || type == "new_plate" || type == "add_build_plate")
+        return "add_plate";
+    if (type == "arrange_by_object" || type == "arrange_by_objects" || type == "arrange-by-object"
+        || type == "arrange_byobject" || type == "print_by_object" || type == "by_object")
+        return "arrange_objects";
+    if (type == "resize")
+        return "scale";
+    if (type == "search_setting" || type == "lookup_setting" || type == "find_settings")
+        return "find_setting";
+    return type;
 }
 
 bool OllamaActionRegistry::is_allowed_type(const std::string& type)

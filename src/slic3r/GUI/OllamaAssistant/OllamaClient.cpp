@@ -107,9 +107,7 @@ std::string normalize_model_tag(std::string model)
     if (model.empty())
         model = kOllamaDefaultModel;
     if (model == "qwen2.5")
-        model = "qwen2.5:3b";
-    if (model == "qwen2.5:7b")
-        model = "qwen2.5:3b";
+        model = kOllamaDefaultModel;
     return model;
 }
 

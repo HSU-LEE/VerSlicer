@@ -78,7 +78,7 @@ flowchart TD
 
 # Main features
 
-- **Natural-language control** — Presets, plate layout, mesh ops, slice, export, and send through Assist mode.
+- **Natural-language control** — Presets, plate layout, mesh ops, slice, export, and send through Apply mode.
 - **Question mode** — Explanations only; nothing on the plate changes.
 - **Find & print** — Empty plate + “print me a dragon” / “용 피규어 출력해줘” → MakerWorld search → pick dialog → import → mesh check → auto-config → slice → optional send.
 - **Voice (macOS)** — Mic input with garbled-transcript rejection.
@@ -111,7 +111,7 @@ Install [Ollama](https://ollama.com/), keep it running, then open VerSlicer → 
 
 ## 2. First session
 
-1. Set **Mode** to **Assist** to allow real changes.
+1. Set **Mode** to **Apply** to allow real changes.
 2. Confirm a model appears in the model dropdown.
 3. Try: *“Increase infill to 30%”* or *“Make this stronger.”*
 
@@ -120,7 +120,7 @@ Install [Ollama](https://ollama.com/), keep it running, then open VerSlicer → 
 | Mode | Behavior |
 | --- | --- |
 | **Question** | Advice only |
-| **Assist** | Applies validated actions on the slicer |
+| **Apply** | Applies validated actions on the slicer |
 
 ## 4. Find and print
 
@@ -216,13 +216,13 @@ Tune in `~/Library/Application Support/verslicer/verslicer.conf` under `"ollama"
 
 # Supported printers
 
-VerSlicer inherits **OrcaSlicer’s full printer compatibility** — Bambu Lab, Prusa, Creality, Voron, Klipper, OctoPrint, PrusaLink, and hundreds of profiles from the Orca ecosystem. AI actions operate on whichever printer and presets you have selected; no separate AI printer list.
+VerSlicer inherits **OrcaSlicer’s full printer profiles**. Guided setup and send-to-printer follow the Bambu Lab path; other profiles still slice locally. AI actions use whichever printer and presets you have selected.
 
 # Roadmap
 
 **Shipped (v3.1.x)**
 
-- [x] AI chat on the 3D view (Question + Assist)
+- [x] AI chat on the 3D view (Question + Apply)
 - [x] Voice input (macOS)
 - [x] Structured JSON action executor with validation
 - [x] Assist loop (multi-step agent)

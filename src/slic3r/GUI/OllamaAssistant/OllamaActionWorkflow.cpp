@@ -54,7 +54,7 @@ static bool ui_prefers_korean()
 
 static bool is_readonly_action(const std::string& type)
 {
-    return type == "get_state" || type == "list_objects";
+    return type == "get_state" || type == "list_objects" || type == "wiki_search" || type == "find_setting";
 }
 
 static bool is_workflow_only_action(const std::string& type)
@@ -345,6 +345,12 @@ static bool is_geometry_or_flow_only(const nlohmann::json& root)
     return true;
 }
 
+static bool is_dangerous_action(const std::string& type)
+{
+    return type == "delete_selection" || type == "delete_plate" || type == "save_project"
+        || type == "send_print" || type == "export_gcode";
+}
+
 static bool is_inline_chat_apply(const nlohmann::json& root)
 {
     if (root_has_set_config(root))
@@ -355,6 +361,8 @@ static bool is_inline_chat_apply(const nlohmann::json& root)
         if (!a.is_object())
             continue;
         const std::string type = a.value("type", "");
+        if (is_dangerous_action(type))
+            return false;
         if (!is_readonly_action(type) && !is_geometry_action(type) && !is_workflow_only_action(type))
             return false;
     }
@@ -431,7 +439,7 @@ OllamaWorkflowRun OllamaActionWorkflow::confirm_and_execute(const nlohmann::json
     AIGuiOrchestrator::instance().on_chat_apply_begin();
     try {
         BambuSmartPrintWorkflowDialog dlg(dlg_parent, content);
-        const int rc = SlicePilotUi::show_modal_with_auto_default(&dlg, wxID_OK);
+        const int rc = SlicePilotUi::show_modal_with_auto_default(&dlg, wxID_CANCEL);
         if (rc != wxID_OK) {
             run.cancelled = true;
             AIGuiOrchestrator::instance().on_chat_apply_end(false);

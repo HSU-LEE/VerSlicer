@@ -1,6 +1,8 @@
 #include "MakerWorldUrl.hpp"
 
+#ifndef OLLAMA_HEADLESS_TEST
 #include "../GUI_App.hpp"
+#endif
 
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
@@ -69,8 +71,12 @@ std::string absolute_makerworld_browser_url(const std::string& url_or_path)
     if (url_or_path.find("https://") == 0 || url_or_path.find("http://") == 0)
         return url_or_path;
 
+#ifdef OLLAMA_HEADLESS_TEST
+    const std::string host = "https://makerworld.com/";
+#else
     const std::string host = wxGetApp().get_model_http_url(
         wxGetApp().app_config ? wxGetApp().app_config->get_country_code() : "US");
+#endif
     if (!url_or_path.empty() && url_or_path.front() == '/')
         return host.substr(0, host.size() - 1) + url_or_path;
     return host + url_or_path;

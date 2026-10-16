@@ -205,12 +205,13 @@ Install
      Or in Terminal:
        xattr -dr com.apple.quarantine /Applications/${APP_NAME}.app
 
-AI assistant (Ollama) — required for chat/voice
-  VerSlicer uses Ollama running locally on your Mac.
-  1. Download and install Ollama: https://ollama.com/download
-  2. Open Terminal and run:  ollama pull qwen2.5:3b
-  3. Leave Ollama running, then use the chat button on the 3D toolbar.
-  4. In chat, set Mode to Assist to apply slicer changes (Question = advice only).
+AI assistant
+  Ollama and the qwen2.5:7b model are inside this app.
+  Open VerSlicer and use the chat button on the 3D toolbar.
+  The first time, the model is copied into
+  ~/Library/Application Support/VerSlicer/ollama/models
+  (no separate Ollama install and no download).
+  In chat, Mode "적용" applies slicer changes. "질문" is advice only.
 
 System requirements
   • macOS 11.3 or later

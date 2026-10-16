@@ -113,8 +113,9 @@ int main()
 
     {
         const nlohmann::json hint = OllamaAgentGoalPlanner::build_plan_hint("서포트 켜줘", true);
-        expect_true(hint.contains("hint") && hint.contains("candidate_keys"), "generic plan hint has keys");
-        expect_true(!OllamaAgentGoalPlanner::goal_expects_multi_step("서포트 켜줘"), "goal not multi-step");
+        expect_true(hint.contains("hint") && !hint.contains("candidate_keys"), "plan hint has no keyword keys");
+        expect_true(!OllamaAgentGoalPlanner::should_auto_finish_after_apply("서포트 켜줘", true, {}),
+                    "apply does not end the loop");
     }
 
     {

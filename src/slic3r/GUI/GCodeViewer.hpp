@@ -229,7 +229,6 @@ private:
 
     float m_legend_height;
     PrintEstimatedStatistics m_print_statistics;
-    std::array<float, 2> m_detected_point_sizes = { 0.0f, 0.0f };
     GCodeProcessorResult::SettingsIds m_settings_ids;
 
     std::vector<CustomGCode::Item> m_custom_gcode_per_print_z;

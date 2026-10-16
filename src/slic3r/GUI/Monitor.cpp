@@ -115,9 +115,9 @@ MonitorPanel::MonitorPanel(wxWindow* parent, wxWindowID id, const wxPoint& pos, 
     init_tabpanel();
 
     m_smart_print_summary = new BambuSmartPrintDeviceSummary(this);
+    m_smart_print_summary->Hide();
 
     m_main_sizer = new wxBoxSizer(wxVERTICAL);
-    m_main_sizer->Add(m_smart_print_summary, 0, wxEXPAND);
     m_main_sizer->Add(m_tabpanel, 1, wxEXPAND | wxLEFT, 0);
     SetSizerAndFit(m_main_sizer);
 

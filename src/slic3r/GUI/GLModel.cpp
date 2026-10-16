@@ -445,10 +445,9 @@ void GLModel::init_from(const indexed_triangle_set& its)
         return;
     }
 
-    if (its.vertices.empty() || its.indices.empty()){
-        assert(false);
+    // Painted-facet splits can yield an empty set for a color that has no triangles.
+    if (its.vertices.empty() || its.indices.empty())
         return;
-    }
 
     Geometry& data = m_render_data.geometry;
     data.format = { Geometry::EPrimitiveType::Triangles, Geometry::EVertexLayout::P3N3 };

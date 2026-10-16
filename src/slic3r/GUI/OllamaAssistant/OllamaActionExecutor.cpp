@@ -7,14 +7,15 @@
 #include "OllamaIntentContext.hpp"
 #include "OllamaMakerWorldActions.hpp"
 #include "OllamaSettingRegistry.hpp"
-#include "OllamaSettingSearch.hpp"
 #include "OllamaSystemPrompts.hpp"
-#include "OllamaPrintingTips.hpp"
 #include "OllamaResponseNormalizer.hpp"
 #include "OllamaUserFlow.hpp"
 #include "OllamaAgentStateService.hpp"
+#include "OllamaSettingCatalogBuilder.hpp"
+#include "OllamaSettingSearch.hpp"
 #include "BambuLabWikiSearch.hpp"
 #include "OllamaTelemetry.hpp"
+#include "AiLocale.hpp"
 
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
@@ -38,9 +39,12 @@
 #include "slic3r/Utils/UndoRedo.hpp"
 
 #include <boost/algorithm/string.hpp>
+#include <chrono>
 #include <filesystem>
+#include <future>
 #include <chrono>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_set>
@@ -76,6 +80,196 @@ std::optional<double> selection_instance_z_degrees(const Selection& sel)
     if (!vol)
         return std::nullopt;
     return normalize_rotation_degrees(vol->get_instance_rotation(Z) * 180.0 / kPi);
+}
+
+std::optional<double> json_number(const nlohmann::json& j, const char* key)
+{
+    if (!j.contains(key) || j[key].is_null())
+        return std::nullopt;
+    if (j[key].is_number())
+        return j[key].get<double>();
+    if (j[key].is_string()) {
+        try {
+            size_t idx = 0;
+            const double v = std::stod(j[key].get<std::string>(), &idx);
+            if (idx == 0)
+                return std::nullopt;
+            return v;
+        } catch (...) {
+            return std::nullopt;
+        }
+    }
+    return std::nullopt;
+}
+
+/** "45도 돌려줘" is a yaw added on the bed. Models send that as z, angle, degrees, yaw, or rotation. */
+Vec3d rotate_delta_degrees(const nlohmann::json& action)
+{
+    const double x = json_number(action, "x").value_or(0.0);
+    const double y = json_number(action, "y").value_or(0.0);
+    double       z = json_number(action, "z").value_or(0.0);
+    if (std::abs(x) < 0.01 && std::abs(y) < 0.01 && std::abs(z) < 0.01) {
+        for (const char* key : {"angle", "degrees", "yaw", "rotation"}) {
+            if (const auto v = json_number(action, key)) {
+                z = *v;
+                break;
+            }
+        }
+    }
+    Vec3d delta(x, y, z);
+    if (action.value("absolute", false)) {
+        // absolute is a bed angle, not another spin. Only Z is used that way.
+        delta.z() = z;
+    }
+    return delta;
+}
+
+bool write_instance_rotation_delta(Plater* plater, Selection& sel, const Vec3d& delta_deg)
+{
+    if (!plater)
+        return false;
+    Model& model = plater->model();
+    std::set<std::pair<int, int>> done;
+    bool wrote = false;
+    for (unsigned int vi : sel.get_volume_idxs()) {
+        const GLVolume* v = sel.get_volume(vi);
+        if (!v)
+            continue;
+        const int oi = v->object_idx();
+        const int ii = v->instance_idx();
+        if (oi < 0 || ii < 0 || oi >= static_cast<int>(model.objects.size()))
+            continue;
+        ModelObject* mo = model.objects[oi];
+        if (!mo || ii >= static_cast<int>(mo->instances.size()))
+            continue;
+        if (!done.insert({oi, ii}).second)
+            continue;
+        ModelInstance* mi = mo->instances[ii];
+        Vec3d rot = mi->get_rotation();
+        rot.x() += delta_deg.x() * kPi / 180.0;
+        rot.y() += delta_deg.y() * kPi / 180.0;
+        rot.z() += delta_deg.z() * kPi / 180.0;
+        mi->set_rotation(rot);
+        mo->invalidate_bounding_box();
+        wrote = true;
+    }
+    return wrote;
+}
+
+struct InstanceMeasure {
+    int   oi{-1};
+    int   ii{-1};
+    Vec3d offset{0, 0, 0};
+    Vec3d size{0, 0, 0};
+};
+
+std::optional<InstanceMeasure> measure_selected_instance(Plater* plater, const Selection& sel)
+{
+    if (!plater)
+        return std::nullopt;
+    const GLVolume* vol = sel.get_first_volume();
+    if (!vol)
+        return std::nullopt;
+    const int oi = vol->object_idx();
+    const int ii = vol->instance_idx();
+    if (oi < 0 || ii < 0)
+        return std::nullopt;
+    Model& model = plater->model();
+    if (oi >= static_cast<int>(model.objects.size()))
+        return std::nullopt;
+    ModelObject* mo = model.objects[oi];
+    if (!mo || ii >= static_cast<int>(mo->instances.size()))
+        return std::nullopt;
+    InstanceMeasure m;
+    m.oi     = oi;
+    m.ii     = ii;
+    m.offset = mo->instances[ii]->get_offset();
+    m.size   = mo->instance_bounding_box(static_cast<size_t>(ii)).size();
+    return m;
+}
+
+InstanceMeasure measure_instance(Plater* plater, int oi, int ii)
+{
+    InstanceMeasure m;
+    m.oi = oi;
+    m.ii = ii;
+    if (!plater || oi < 0 || ii < 0)
+        return m;
+    Model& model = plater->model();
+    if (oi >= static_cast<int>(model.objects.size()))
+        return m;
+    ModelObject* mo = model.objects[oi];
+    if (!mo || ii >= static_cast<int>(mo->instances.size()))
+        return m;
+    m.offset = mo->instances[ii]->get_offset();
+    m.size   = mo->instance_bounding_box(static_cast<size_t>(ii)).size();
+    return m;
+}
+
+bool write_instance_offset_delta(Plater* plater, Selection& sel, const Vec3d& delta_mm)
+{
+    if (!plater)
+        return false;
+    Model& model = plater->model();
+    std::set<std::pair<int, int>> done;
+    bool wrote = false;
+    for (unsigned int vi : sel.get_volume_idxs()) {
+        const GLVolume* v = sel.get_volume(vi);
+        if (!v)
+            continue;
+        const int oi = v->object_idx();
+        const int ii = v->instance_idx();
+        if (oi < 0 || ii < 0 || oi >= static_cast<int>(model.objects.size()))
+            continue;
+        ModelObject* mo = model.objects[oi];
+        if (!mo || ii >= static_cast<int>(mo->instances.size()))
+            continue;
+        if (!done.insert({oi, ii}).second)
+            continue;
+        ModelInstance* mi = mo->instances[ii];
+        mi->set_offset(mi->get_offset() + delta_mm);
+        mo->invalidate_bounding_box();
+        wrote = true;
+    }
+    return wrote;
+}
+
+bool write_instance_scale_factor(Plater* plater, Selection& sel, const Vec3d& factor)
+{
+    if (!plater)
+        return false;
+    Model& model = plater->model();
+    std::set<std::pair<int, int>> done;
+    bool wrote = false;
+    for (unsigned int vi : sel.get_volume_idxs()) {
+        const GLVolume* v = sel.get_volume(vi);
+        if (!v)
+            continue;
+        const int oi = v->object_idx();
+        const int ii = v->instance_idx();
+        if (oi < 0 || ii < 0 || oi >= static_cast<int>(model.objects.size()))
+            continue;
+        ModelObject* mo = model.objects[oi];
+        if (!mo || ii >= static_cast<int>(mo->instances.size()))
+            continue;
+        if (!done.insert({oi, ii}).second)
+            continue;
+        ModelInstance* mi = mo->instances[ii];
+        Vec3d scale = mi->get_scaling_factor();
+        scale.x() *= factor.x();
+        scale.y() *= factor.y();
+        scale.z() *= factor.z();
+        mi->set_scaling_factor(scale);
+        mo->invalidate_bounding_box();
+        wrote = true;
+    }
+    return wrote;
+}
+
+bool size_changed(const Vec3d& before, const Vec3d& after)
+{
+    return std::abs(after.x() - before.x()) > 0.2 || std::abs(after.y() - before.y()) > 0.2
+        || std::abs(after.z() - before.z()) > 0.2;
 }
 
 /** 3D prepare canvas — object transforms must not use preview canvas selection. */
@@ -779,72 +973,165 @@ OllamaActionResult apply_transform(const nlohmann::json& action, const char* typ
     sel.setup_cache();
 
     if (std::string(type_name) == "translate") {
-        const double x = action.value("x", 0.0);
-        const double y = action.value("y", 0.0);
-        const double z = action.value("z", 0.0);
-        sel.translate(Vec3d(x, y, z), tt);
-        plater->take_snapshot("AI Assistant: Move", UndoRedo::SnapshotType::GizmoAction);
+        const double x = json_number(action, "x").value_or(json_number(action, "dx").value_or(0.0));
+        const double y = json_number(action, "y").value_or(json_number(action, "dy").value_or(0.0));
+        const double z = json_number(action, "z").value_or(json_number(action, "dz").value_or(0.0));
+        const Vec3d delta(x, y, z);
+        if (delta.norm() < 0.05) {
+            result.success          = true;
+            result.effective_change = false;
+            result.message          = "Move distance is 0";
+            return result;
+        }
+        const auto before = measure_selected_instance(plater, sel);
+        sel.translate(delta, tt);
+        plater->take_snapshot(AiLocale::korean() ? std::string("AI 도우미: 이동") : std::string(_u8L("AI Assistant: Move")),
+                              UndoRedo::SnapshotType::GizmoAction);
         canvas->do_move("");
+        InstanceMeasure after = before ? measure_instance(plater, before->oi, before->ii) : InstanceMeasure{};
+        if (before && (after.offset - before->offset).norm() < 0.05) {
+            if (!write_instance_offset_delta(plater, sel, delta)) {
+                result.message = "Move did not change the model";
+                return result;
+            }
+            after = measure_instance(plater, before->oi, before->ii);
+        }
+        canvas->reload_scene(true, true);
+        canvas->request_extra_frame();
+        if (before && (after.offset - before->offset).norm() < 0.05) {
+            result.message = "Move did not change the model";
+            return result;
+        }
         result.success          = true;
         result.effective_change = true;
         result.message = (boost::format("Moved selection by (%1%, %2%, %3%) mm") % x % y % z).str();
+        if (before)
+            result.message += (boost::format(" position_mm is now (%1%, %2%, %3%)")
+                               % after.offset.x() % after.offset.y() % after.offset.z()).str();
     } else if (std::string(type_name) == "rotate") {
-        const double x_deg = action.value("x", 0.0);
-        const double y_deg = action.value("y", 0.0);
-        const double z_deg = action.value("z", 0.0);
-        const bool z_only  = std::abs(x_deg) < 0.01 && std::abs(y_deg) < 0.01 && std::abs(z_deg) > 0.01;
-
-        if (z_only) {
-            if (const auto current_z = selection_instance_z_degrees(sel)) {
-                const double target_z = normalize_rotation_degrees(z_deg);
-                if (rotation_degrees_equivalent(*current_z, target_z)) {
-                    result.success          = true;
-                    result.effective_change = false;
-                    result.message          = "Selection is already at the requested rotation";
-                    return result;
-                }
-                const double delta_deg = normalize_rotation_degrees(target_z - *current_z);
-                const double rz        = delta_deg * kPi / 180.0;
-                sel.rotate(Vec3d(0.0, 0.0, rz), tt);
-            } else {
-                const double rz = z_deg * kPi / 180.0;
-                sel.rotate(Vec3d(0.0, 0.0, rz), tt);
-            }
-        } else {
-            const double rx = x_deg * kPi / 180.0;
-            const double ry = y_deg * kPi / 180.0;
-            const double rz = z_deg * kPi / 180.0;
-            sel.rotate(Vec3d(rx, ry, rz), tt);
+        // Degrees are added to the current orientation. "45도 돌려줘" is +45° on the bed, not a no-op
+        // when the model sends angle/degrees/yaw instead of z.
+        Vec3d delta_deg = rotate_delta_degrees(action);
+        if (action.value("absolute", false)) {
+            if (const auto current_z = selection_instance_z_degrees(sel))
+                delta_deg.z() = normalize_rotation_degrees(delta_deg.z() - *current_z);
         }
-        plater->take_snapshot("AI Assistant: Rotate", UndoRedo::SnapshotType::GizmoAction);
+        if (std::abs(delta_deg.x()) < 0.01 && std::abs(delta_deg.y()) < 0.01 && std::abs(delta_deg.z()) < 0.01) {
+            result.success          = true;
+            result.effective_change = false;
+            result.message          = "Rotation angle is 0";
+            return result;
+        }
+
+        int          obj_idx = -1;
+        int          inst_idx = -1;
+        const GLVolume* first = sel.get_first_volume();
+        if (first) {
+            obj_idx  = first->object_idx();
+            inst_idx = first->instance_idx();
+        }
+        const auto model_z_deg = [&]() -> std::optional<double> {
+            if (obj_idx < 0 || inst_idx < 0)
+                return std::nullopt;
+            Model& model = plater->model();
+            if (obj_idx >= static_cast<int>(model.objects.size()))
+                return std::nullopt;
+            ModelObject* mo = model.objects[obj_idx];
+            if (!mo || inst_idx >= static_cast<int>(mo->instances.size()))
+                return std::nullopt;
+            return normalize_rotation_degrees(mo->instances[inst_idx]->get_rotation().z() * 180.0 / kPi);
+        };
+
+        const auto before_z = model_z_deg();
+        TransformationType rot_tt;
+        rot_tt.set_relative();
+        if (sel.is_single_full_instance() || sel.is_single_full_object())
+            rot_tt.set_independent();
+        rot_tt.set_instance();
+        sel.rotate(delta_deg * (kPi / 180.0), rot_tt);
+        plater->take_snapshot(AiLocale::korean() ? std::string("AI 도우미: 회전") : std::string(_u8L("AI Assistant: Rotate")),
+                              UndoRedo::SnapshotType::GizmoAction);
         canvas->do_rotate("");
+
+        const bool wanted_z = std::abs(delta_deg.z()) > 0.01;
+        const auto after_sel = model_z_deg();
+        if (wanted_z && before_z && after_sel && rotation_degrees_equivalent(*before_z, *after_sel)) {
+            if (!write_instance_rotation_delta(plater, sel, delta_deg)) {
+                result.message = "Rotation did not change the model";
+                return result;
+            }
+        }
+        canvas->reload_scene(true, true);
+        canvas->request_extra_frame();
+
+        const auto after_z = model_z_deg();
+        if (wanted_z && before_z && after_z && rotation_degrees_equivalent(*before_z, *after_z)) {
+            result.message = "Rotation did not change the model";
+            return result;
+        }
+
         result.success          = true;
         result.effective_change = true;
-        if (std::abs(z_deg) > 0.01 && std::abs(x_deg) < 0.01 && std::abs(y_deg) < 0.01)
-            result.message = (boost::format("Rotated selection to %1%° on the bed") % normalize_rotation_degrees(z_deg)).str();
+        if (std::abs(delta_deg.x()) < 0.01 && std::abs(delta_deg.y()) < 0.01)
+            result.message = (boost::format("Rotated selection by %1%° on the bed")
+                              % normalize_rotation_degrees(delta_deg.z())).str();
         else
-            result.message = "Rotated selection";
+            result.message = (boost::format("Rotated selection by (%1%, %2%, %3%)°")
+                              % delta_deg.x() % delta_deg.y() % delta_deg.z()).str();
+        if (const auto now = model_z_deg())
+            result.message += (boost::format(" rotation_z_deg is now %1%") % *now).str();
     } else if (std::string(type_name) == "scale") {
         const bool uniform = action.value("uniform", true);
-        double fx          = action.value("factor", action.value("x", 1.0));
-        double fy          = action.value("y", fx);
-        double fz          = action.value("z", fx);
+        double fx          = json_number(action, "factor").value_or(json_number(action, "x").value_or(1.0));
+        double fy          = json_number(action, "y").value_or(fx);
+        double fz          = json_number(action, "z").value_or(fx);
+        if (fx > 20.0)
+            fx /= 100.0;
+        if (fy > 20.0)
+            fy /= 100.0;
+        if (fz > 20.0)
+            fz /= 100.0;
         if (uniform)
             fy = fz = fx;
         if (fx <= 0.0 || fy <= 0.0 || fz <= 0.0) {
             result.message = "Scale factor must be positive";
             return result;
         }
+        if (std::abs(fx - 1.0) < 0.01 && std::abs(fy - 1.0) < 0.01 && std::abs(fz - 1.0) < 0.01) {
+            result.success          = true;
+            result.effective_change = false;
+            result.message          = "Scale factor is 1";
+            return result;
+        }
+        const auto before = measure_selected_instance(plater, sel);
         TransformationType st;
         st.set_world();
         st.set_relative();
         st.set_joint();
         sel.scale(Vec3d(fx, fy, fz), st);
-        plater->take_snapshot("AI Assistant: Scale", UndoRedo::SnapshotType::GizmoAction);
+        plater->take_snapshot(AiLocale::korean() ? std::string("AI 도우미: 크기") : std::string(_u8L("AI Assistant: Scale")),
+                              UndoRedo::SnapshotType::GizmoAction);
         canvas->do_scale("");
+        InstanceMeasure after = before ? measure_instance(plater, before->oi, before->ii) : InstanceMeasure{};
+        if (before && !size_changed(before->size, after.size)) {
+            if (!write_instance_scale_factor(plater, sel, Vec3d(fx, fy, fz))) {
+                result.message = "Scale did not change the model";
+                return result;
+            }
+            after = measure_instance(plater, before->oi, before->ii);
+        }
+        canvas->reload_scene(true, true);
+        canvas->request_extra_frame();
+        if (before && !size_changed(before->size, after.size)) {
+            result.message = "Scale did not change the model";
+            return result;
+        }
         result.success          = true;
         result.effective_change = true;
         result.message = (boost::format("Scaled selection (x%1%, x%2%, x%3%)") % fx % fy % fz).str();
+        if (before)
+            result.message += (boost::format(" size_mm is now (%1%, %2%, %3%)")
+                               % after.size.x() % after.size.y() % after.size.z()).str();
     } else {
         result.message = "Unknown transform type";
     }
@@ -987,6 +1274,41 @@ OllamaActionResult apply_split_object()
     return apply_plater_event(EVT_GLTOOLBAR_SPLIT_OBJECTS, "Split model into separate objects");
 }
 
+OllamaActionResult apply_find_setting(const nlohmann::json& action)
+{
+    OllamaActionResult result;
+    std::string query = action.value("query", "");
+    if (query.empty())
+        query = action.value("name", "");
+    boost::algorithm::trim(query);
+    if (query.empty()) {
+        result.message = "find_setting needs query";
+        return result;
+    }
+
+    const std::vector<OllamaSettingSearchHit> hits = OllamaSettingSearch::search(query, 2, 8);
+    std::vector<std::string> keys;
+    keys.reserve(hits.size());
+    for (const OllamaSettingSearchHit& hit : hits) {
+        if (OllamaSettingCatalogBuilder::is_restricted_key(hit.key))
+            continue;
+        keys.push_back(hit.key);
+    }
+
+    const bool ko = OllamaContextBuilder::ui_prefers_korean();
+    const DynamicPrintConfig* print_cfg = nullptr;
+    const DynamicPrintConfig* filament_cfg = nullptr;
+    if (wxGetApp().preset_bundle) {
+        print_cfg    = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
+        filament_cfg = &wxGetApp().preset_bundle->filaments.get_edited_preset().config;
+    }
+    nlohmann::json found = OllamaSettingSearch::lookup(keys, print_cfg, filament_cfg, ko);
+    result.success          = true;
+    result.effective_change = false;
+    result.message          = found.dump(2);
+    return result;
+}
+
 OllamaActionResult apply_get_state(const nlohmann::json& action)
 {
     (void) action;
@@ -1006,17 +1328,9 @@ OllamaActionResult apply_list_objects(const nlohmann::json& action)
         result.message = "Plater not available";
         return result;
     }
-    nlohmann::json arr = nlohmann::json::array();
-    const Model&   model = plater->model();
-    for (size_t i = 0; i < model.objects.size(); ++i) {
-        arr.push_back(nlohmann::json::object({
-            {"id", i},
-            {"name", model.objects[i]->name},
-        }));
-    }
     result.success          = true;
     result.effective_change = false;
-    result.message          = arr.dump(2);
+    result.message          = OllamaAgentStateService::objects_json().dump(2);
     return result;
 }
 
@@ -1028,7 +1342,8 @@ OllamaActionResult apply_select_object(const nlohmann::json& action)
         result.message = "Plater not available";
         return result;
     }
-    if (!select_objects_for_action(plater, action)) {
+    ensure_prepare_view_for_object_ops();
+    if (!select_objects_for_action(plater, action) && !ensure_selection_for_object_ops(plater, nullptr)) {
         result.message = "Could not select object — check object_id or object_name";
         return result;
     }
@@ -1366,11 +1681,8 @@ std::string OllamaActionExecutor::fit_context_json_to_limit(std::string json, si
 std::string OllamaActionExecutor::build_system_prompt(bool apply_mode)
 {
     const bool ko = OllamaContextBuilder::ui_prefers_korean();
-    if (apply_mode) {
-        std::string prompt = OllamaSystemPrompts::apply_system_prompt(ko);
-        prompt += OllamaUserFlow::flow_prompt_block(ko);
-        return prompt;
-    }
+    if (apply_mode)
+        return OllamaSystemPrompts::apply_system_prompt(ko);
     return OllamaSystemPrompts::question_system_prompt(ko);
 }
 
@@ -1413,7 +1725,8 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
     }
     if (needs_batch_snapshot) {
         if (Plater* plater = wxGetApp().plater())
-            plater->take_snapshot("AI Assistant", UndoRedo::SnapshotType::Action);
+            plater->take_snapshot(AiLocale::korean() ? std::string("AI 도우미") : std::string(_u8L("AI Assistant")),
+                                  UndoRedo::SnapshotType::Action);
     }
 
     bool config_effective_change = false;
@@ -1479,6 +1792,28 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
         OllamaActionResult result;
         if (type == "get_state")
             result = apply_get_state(action);
+        else if (type == "find_setting")
+            result = apply_find_setting(action);
+        else if (type == "wiki_search") {
+            const std::string query = action.value("query", "");
+            const bool        ko    = OllamaContextBuilder::ui_prefers_korean();
+            nlohmann::json    pages = nlohmann::json::array();
+            if (!query.empty()) {
+                // Wiki HTTP is several seconds. Run it off the UI thread and keep
+                // dispatching events so the window still paints and accepts input.
+                auto job = std::async(std::launch::async, [query, ko] {
+                    return BambuLabWikiSearch::build_wiki_context_from_queries({query}, ko, 2, 1400);
+                });
+                while (job.wait_for(std::chrono::milliseconds(40)) != std::future_status::ready) {
+                    if (wxTheApp && !wxGetApp().is_closing())
+                        wxTheApp->ProcessPendingEvents();
+                }
+                pages = job.get();
+            }
+            result.success          = !query.empty();
+            result.effective_change = false;
+            result.message          = nlohmann::json{{"query", query}, {"pages", std::move(pages)}}.dump();
+        }
         else if (type == "list_objects")
             result = apply_list_objects(action);
         else if (type == "select_object")
@@ -1536,12 +1871,11 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
         results.push_back(std::move(result));
     }
 
-    if (config_effective_change && !has_mesh_mutation) {
+    if (config_effective_change)
         invalidate_context_cache();
-        results.push_back(apply_slice(nlohmann::json::object({{"scope", "plate"}})));
-        OllamaIntentContext::mark_pending_slice_feedback();
-    } else if (had_slice_action && !has_mesh_mutation) {
+    if (had_slice_action && !has_mesh_mutation) {
         results.push_back(apply_slice(deferred_slice));
+        OllamaIntentContext::mark_pending_slice_feedback();
     }
 
     return results;
@@ -1665,13 +1999,7 @@ nlohmann::json OllamaActionExecutor::config_digest_for_set_config_actions(const 
         }
     }
 
-    if (keys.empty()) {
-        const std::vector<std::string> hinted =
-            OllamaSettingSearch::candidate_keys_for_request(user_goal_hint, 2, 12);
-        for (const std::string& key : hinted)
-            keys.insert(normalize_config_key_local(key));
-    }
-
+    (void) user_goal_hint;
     if (keys.empty()) {
         static const char* kDefaultKeys[] = {
             "layer_height", "sparse_infill_density", "enable_support", "brim_width",

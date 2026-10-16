@@ -2,28 +2,13 @@
 #include "OllamaUserFlow.hpp"
 #include "OllamaActionExecutor.hpp"
 #include "OllamaIntentContext.hpp"
-#include "OllamaRequestRouter.hpp"
 #include "OllamaSettingRegistry.hpp"
 #include "OllamaTelemetry.hpp"
 
-#include "../MakerWorld/MakerWorldIntent.hpp"
-#include "../MakerWorld/MakerWorldSearchService.hpp"
-
-#include <boost/algorithm/string.hpp>
-#include <regex>
 
 namespace Slic3r { namespace GUI {
 
 namespace {
-
-static std::string extract_first_url_from_text(const std::string& text)
-{
-    static const std::regex link_re(R"((https?://[^\s]+))", std::regex::icase);
-    std::smatch m;
-    if (std::regex_search(text, m, link_re))
-        return m[1].str();
-    return {};
-}
 
 static bool user_allows_delete(const std::string& user)
 {
@@ -54,28 +39,9 @@ static void normalize_set_config_shape(nlohmann::json& action)
         action.erase("options");
 }
 
-static void prune_geometry_for_setting_only_requests(nlohmann::json& root, const std::string& user_req)
+static void prune_geometry_for_setting_only_requests(nlohmann::json& /*root*/, const std::string& /*user_req*/)
 {
-    if (!OllamaResponseNormalizer::has_viable_set_config(root))
-        return;
-    if (OllamaRequestRouter::is_geometry_request(user_req))
-        return;
-    if (!root.contains("actions") || !root["actions"].is_array())
-        return;
-
-    nlohmann::json kept = nlohmann::json::array();
-    for (const auto& a : root["actions"]) {
-        if (!a.is_object()) {
-            kept.push_back(a);
-            continue;
-        }
-        const std::string type = a.value("type", "");
-        if (type == "rotate" || type == "translate" || type == "scale" || type == "arrange"
-            || type == "clone_selection")
-            continue;
-        kept.push_back(a);
-    }
-    root["actions"] = std::move(kept);
+    // Geometry tools stay. The model decides; sentences do not strip them.
 }
 
 static void prune_unsafe_actions(nlohmann::json& root, const std::string& user_req)
@@ -172,38 +138,7 @@ OllamaNormalizeResult OllamaResponseNormalizer::normalize(nlohmann::json& root, 
             normalize_set_config_shape(a);
     }
 
-    if (include_makerworld && MakerWorldIntent::is_pure_makerworld_request(user_req)) {
-        bool has_makerworld = false;
-        for (const auto& a : root["actions"]) {
-            if (a.is_object()) {
-                const std::string type = a.value("type", "");
-                if (type == "makerworld_search" || type == "import_makerworld")
-                    has_makerworld = true;
-            }
-        }
-        if (!has_makerworld) {
-            const std::string url = extract_first_url_from_text(user_req);
-            if (!url.empty())
-                root["actions"].push_back({{"type", "import_makerworld"}, {"url", url}});
-            else
-                root["actions"].push_back({
-                    {"type", "makerworld_search"},
-                    {"query", MakerWorldSearchService::normalize_search_query(user_req)},
-                });
-        }
-    }
-
-    if (include_makerworld && root["actions"].is_array()) {
-        const std::string norm_q = MakerWorldSearchService::normalize_search_query(user_req);
-        for (auto& a : root["actions"]) {
-            if (!a.is_object() || a.value("type", "") != "makerworld_search")
-                continue;
-            const std::string existing = a.value("query", "");
-            if (existing.empty() || MakerWorldIntent::is_pure_makerworld_request(user_req))
-                a["query"] = norm_q;
-        }
-    }
-
+    (void) include_makerworld;
     prune_unsafe_actions(root, user_req);
 
     for (auto& a : root["actions"]) {

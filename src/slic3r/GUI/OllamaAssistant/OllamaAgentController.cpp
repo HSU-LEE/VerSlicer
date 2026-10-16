@@ -7,17 +7,14 @@
 #include "OllamaAgentStateService.hpp"
 #include "OllamaAgentEventBus.hpp"
 #include "OllamaAssistContextBuilder.hpp"
-#include "OllamaChatPanel.hpp"
 #include "OllamaConfig.hpp"
 #include "OllamaExecutionPolicy.hpp"
-#include "OllamaSendRouter.hpp"
 #include "OllamaToolRegistry.hpp"
+#include "OllamaSettingSearch.hpp"
 #include "OllamaToolResult.hpp"
 #include "OllamaConfigProposalBuilder.hpp"
-#include "OllamaUserFlow.hpp"
 
 #include "../AICoach/AIGuiOrchestrator.hpp"
-#include "../AIPipeline/PrintJobOrchestrator.hpp"
 #include "../BambuSmartPrint/PrintPlannerGui.hpp"
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
@@ -28,45 +25,39 @@
 #include <boost/log/trivial.hpp>
 
 #include <atomic>
-#include <chrono>
-#include <thread>
 
 namespace Slic3r { namespace GUI {
 
 namespace {
 
-// If the wiki prefetch (sync HTTP, long timeouts on a worker thread) does not
-// resolve within this budget, proceed with the first LLM step anyway using
-// whatever context we already have. Guarantees a general request never stalls
-// at "관련 도움말을 찾는 중…".
-constexpr int kWikiPrefetchWatchdogMs = 8000;
+void emit_thinking_lines(const OllamaAgentCallbacks& callbacks, const std::string& block)
+{
+    if (!callbacks.on_thinking || block.empty())
+        return;
+    size_t start = 0;
+    while (start < block.size()) {
+        size_t end = block.find('\n', start);
+        if (end == std::string::npos)
+            end = block.size();
+        const std::string line = block.substr(start, end - start);
+        if (!line.empty())
+            callbacks.on_thinking(wxString::FromUTF8(line));
+        start = end + 1;
+    }
+}
 
 std::string build_assist_loop_system_prompt(bool korean)
 {
     std::string prompt = OllamaActionExecutor::build_system_prompt(true);
     prompt += korean
-        ? "\n\n## 에이전트 루프 (Cursor 방식)\n"
-          "- 가능하면 한 응답에 관련 actions를 묶어 실행하세요 (예: rotate + scale 동시).\n"
-          "- slicer_context가 이미 제공되면 get_state를 반복하지 마세요. 확인이 꼭 필요할 때만 호출.\n"
-          "- JSON에 \"done\":false 를 유지하고, 목표 달성 시에만 done:true 와 요약 message.\n"
-          "- **형상 요청**(크기·회전·구멍): scale/rotate/mesh_boolean 등만 — set_config·slice 금지(슬라이스 요청 시 제외).\n"
-          "- **인쇄 증상/품질**(현재 플레이트에 있는 출력물의 문제): set_config만 — 형상 도구 금지(이동·편집 요청 없으면).\n"
-          "- **새 물건 출력 요청**(\"용 피규어 출력해줘\"처럼 플레이트에 없는 물건 이름): makerworld_find_and_print (영어 query) — set_config·slice 금지.\n"
-          "- 50% 축소 → scale factor 0.5. 구멍 → mesh_boolean subtract_cylinder.\n"
-          "- 증상/품질 요청: slicer_context·wiki_evidence·settings_analysis·candidate_keys를 읽고 원인→최소 변경.\n"
-          "- 메쉬 요청: mesh_health 확인 후 repair_mesh/mesh_boolean/mirror_mesh/scale/split_mesh.\n"
-          "- 기능 설계(튼튼/가볍): mesh 작업 + set_config를 함께 계획할 수 있습니다.\n"
-        : "\n\n## Agent loop (Cursor-style)\n"
-          "- Batch related actions in one reply when safe (e.g. rotate + scale together).\n"
-          "- Do not repeat get_state when slicer_context is already provided — only when verification is needed.\n"
-          "- Keep \"done\":false until the goal is fully met; then done:true with summary message.\n"
-          "- **Model shape** (resize, rotate, hole): scale/rotate/mesh_boolean only — no set_config or slice unless user asked to slice.\n"
-          "- **Print symptoms/quality** (issues with the model already on the CURRENT plate): set_config only — no geometry tools unless user asked to move or edit the model.\n"
-          "- **Print a new named object** (e.g. \"print me a dragon figure\" and it is not on the plate): makerworld_find_and_print with an English query — never set_config/slice for this.\n"
-          "- 50% smaller → scale factor 0.5. Drill hole → mesh_boolean subtract_cylinder.\n"
-          "- For symptoms/quality: read slicer_context, wiki_evidence, settings_analysis, candidate_keys; infer cause → minimal fix.\n"
-          "- For mesh: check mesh_health, then repair_mesh / mesh_boolean / mirror_mesh / scale / split_mesh.\n"
-          "- Functional design (stronger/lighter): plan mesh ops and set_config together when needed.\n";
+        ? "\n\n## 루프\n"
+          "- 한 응답에 서로 의존하지 않는 actions만 묶으세요.\n"
+          "- 도구 결과를 보기 전에는 done:true 하지 마세요. 결과가 목표를 충족하면 그때 done:true.\n"
+          "- 같은 호출이 같은 결과로 반복되면 이유를 말하고 멈추세요.\n"
+        : "\n\n## Loop\n"
+          "- Batch only actions that do not depend on each other's results.\n"
+          "- Do not set done:true before you have seen tool results. Set it when those results meet the goal.\n"
+          "- If the same call returns the same result again, say why and stop.\n";
     prompt += OllamaToolRegistry::agent_tools_schema_block(korean);
     return prompt;
 }
@@ -112,73 +103,66 @@ bool root_is_done(const nlohmann::json& root)
     return root.value("done", false) || root.value("status", "") == "complete";
 }
 
-bool plate_has_model_now()
-{
-    if (Plater* plater = wxGetApp().plater()) {
-        try {
-            return !plater->model().objects.empty();
-        } catch (...) {
-        }
-    }
-    return false;
-}
-
-bool acquisition_pipeline_started(const std::vector<nlohmann::json>& step_tool_results)
-{
-    for (const auto& step : step_tool_results) {
-        if (!step.is_array())
-            continue;
-        for (const auto& r : step) {
-            if (!r.is_object() || !r.value("ok", false))
-                continue;
-            const std::string tool = r.value("tool", "");
-            if (tool == "makerworld_find_and_print" || tool == "makerworld_search" || tool == "import_makerworld"
-                || tool == "slice")
-                return true;
-        }
-    }
-    return false;
-}
-
-bool try_orchestrator_fallback_for_acquisition(const std::string& user_goal, bool korean, std::string& message_out)
-{
-    if (!OllamaUserFlow::is_acquisition_print_request(user_goal, plate_has_model_now()))
-        return false;
-    if (!AIPipeline::print_job_orchestrator_enabled())
-        return false;
-    OllamaChatPanel* panel = OllamaChatPanel::active_panel();
-    if (!panel)
-        return false;
-    const std::string query = OllamaSendRouter::acquisition_query(user_goal);
-    if (query.empty() || !panel->start_orchestrator_find_and_print(query))
-        return false;
-    message_out = korean ? "MakerWorld에서 모델을 찾아 출력을 준비할게요…"
-                         : "I'll find a model on MakerWorld and get the print ready…";
-    return true;
-}
-
 OllamaAgentController* g_active_agent = nullptr;
 bool                   g_agent_event_hook_installed = false;
 
-bool step_results_had_effective_change(const std::vector<nlohmann::json>& step_tool_results)
+std::string mutating_action_fingerprint(const nlohmann::json& root)
 {
-    for (const auto& step : step_tool_results) {
+    if (!root.contains("actions") || !root["actions"].is_array())
+        return {};
+    std::string out;
+    for (const auto& action : root["actions"]) {
+        if (!action.is_object())
+            continue;
+        const std::string type = action.value("type", "");
+        if (type.empty() || type == "get_state" || type == "list_objects" || type == "select_object"
+            || type == "wiki_search" || type == "find_setting")
+            continue;
+        out += type;
+        out += '\n';
+        out += action.dump();
+        out += '\n';
+    }
+    return out;
+}
+
+bool step_has_substantive_change(const std::vector<nlohmann::json>& steps)
+{
+    for (const auto& step : steps) {
         if (!step.is_array())
             continue;
         for (const auto& r : step) {
-            if (r.is_object() && r.value("ok", false) && r.value("changed", false))
-                return true;
+            if (!r.is_object() || !r.value("changed", false))
+                continue;
+            const std::string tool = r.value("tool", "");
+            if (tool == "get_state" || tool == "list_objects" || tool == "select_object" || tool == "wiki_search"
+                || tool == "find_setting" || tool == "verify_config" || tool == "ui_select_tab")
+                continue;
+            return true;
         }
     }
     return false;
+}
+
+bool tool_step_is_readonly(const nlohmann::json& step)
+{
+    if (!step.is_array() || step.empty())
+        return false;
+    for (const auto& r : step) {
+        if (!r.is_object())
+            return false;
+        const std::string tool = r.value("tool", "");
+        if (tool != "get_state" && tool != "list_objects" && tool != "select_object" && tool != "wiki_search"
+            && tool != "find_setting")
+            return false;
+    }
+    return true;
 }
 
 std::string pick_user_facing_message(const std::vector<nlohmann::json>& step_tool_results,
                                      const std::string& assistant_msg, bool korean)
 {
-    if (step_results_had_effective_change(step_tool_results) || !step_tool_results.empty())
-        return ollama_user_facing_summary(step_tool_results, assistant_msg, korean);
-    return assistant_msg;
+    return ollama_verified_user_message(step_tool_results, assistant_msg, korean);
 }
 
 void on_global_agent_event(const OllamaAgentEvent& evt)
@@ -263,88 +247,17 @@ void OllamaAgentController::run_goal(const std::string& user_goal, OllamaExecuti
     m_pending_assistant_msg.clear();
     m_pending_raw_text.clear();
     m_pending_executed_root = nlohmann::json::object();
-    m_mutations_applied     = false;
-    m_wiki_prefetch_consumed = false;
-    ++m_run_epoch;
+    m_mutations_applied = false;
+    m_readonly_stall_nudged = false;
+    m_applied_action_fingerprint.clear();
 
     const bool ko = wxGetApp().current_language_code().StartsWith("ko");
-    refresh_print_intent_and_proposal(ko);
-    // Local-only prefetch (settings analysis, mesh health) — no network.
-    m_prefetch    = OllamaAssistContextBuilder::prefetch_for_goal(user_goal, ko);
+    m_prefetch = OllamaAssistContextBuilder::prefetch_for_goal(user_goal, ko);
     m_messages.push_back({"system", build_assist_loop_system_prompt(ko)});
 
-    const nlohmann::json plan_hint = OllamaAgentGoalPlanner::build_plan_hint(user_goal, ko);
-
-    // Wiki evidence uses sync HTTP with 20s+ timeouts, so it must never run on
-    // the main thread. Approach: fetch it on a detached worker BEFORE the first
-    // LLM call and delay that call until the fetch completes — the UI stays
-    // responsive and the first LLM turn still sees the evidence. begin_step()
-    // re-checks cancellation, so a cancel during the fetch finishes cleanly.
-    if (OllamaAssistContextBuilder::wants_wiki_prefetch(user_goal)) {
-        if (m_callbacks.on_thinking)
-            m_callbacks.on_thinking(ko ? wxString::FromUTF8("관련 도움말을 찾는 중…")
-                                       : wxString("Looking up guidance…"));
-        const auto     alive = m_alive;
-        const unsigned epoch = m_run_epoch;
-
-        // Fetch worker: sync HTTP with long timeouts, so it must stay off the
-        // main thread. Posts the result back when done.
-        std::thread([this, alive, epoch, user_goal, plan_hint, ko]() {
-            nlohmann::json wiki = nlohmann::json::array();
-            try {
-                wiki = OllamaAssistContextBuilder::fetch_wiki_evidence(user_goal, ko);
-            } catch (const std::exception& ex) {
-                BOOST_LOG_TRIVIAL(warning) << "Ollama agent wiki prefetch failed: " << ex.what();
-            } catch (...) {
-                BOOST_LOG_TRIVIAL(warning) << "Ollama agent wiki prefetch failed: unknown error";
-            }
-            if (wxGetApp().is_closing())
-                return; // shutting down: never post to a dying main loop
-            wxGetApp().CallAfter([this, alive, epoch, wiki, plan_hint, ko]() {
-                if (!alive->load() || wxGetApp().is_closing())
-                    return;
-                begin_after_wiki_prefetch(epoch, wiki, plan_hint, ko);
-            });
-        }).detach();
-
-        // Watchdog: if the fetch stalls past the budget, start the loop anyway
-        // with an empty wiki. begin_after_wiki_prefetch() is one-shot, so a late
-        // fetch result is harmlessly ignored.
-        std::thread([this, alive, epoch, plan_hint, ko]() {
-            std::this_thread::sleep_for(std::chrono::milliseconds(kWikiPrefetchWatchdogMs));
-            if (wxGetApp().is_closing())
-                return;
-            wxGetApp().CallAfter([this, alive, epoch, plan_hint, ko]() {
-                if (!alive->load() || wxGetApp().is_closing())
-                    return;
-                begin_after_wiki_prefetch(epoch, nlohmann::json::array(), plan_hint, ko);
-            });
-        }).detach();
-        return;
-    }
-
     m_messages.push_back(
-        {"user", OllamaAssistContextBuilder::build_initial_user_block(user_goal, plan_hint, m_prefetch, ko)});
+        {"user", OllamaAssistContextBuilder::build_initial_user_block(user_goal, nlohmann::json::object(), m_prefetch, ko)});
 
-    begin_step();
-}
-
-void OllamaAgentController::begin_after_wiki_prefetch(unsigned epoch, const nlohmann::json& wiki,
-                                                      const nlohmann::json& plan_hint, bool ko)
-{
-    if (epoch != m_run_epoch)
-        return; // stale callback from a previous run_goal
-    if (m_wiki_prefetch_consumed)
-        return; // fetch worker and watchdog race; first one wins
-    m_wiki_prefetch_consumed = true;
-
-    if (m_cancelled || !m_running || !m_alive->load())
-        return;
-
-    if (wiki.is_array() && !wiki.empty())
-        m_prefetch.wiki = wiki;
-    m_messages.push_back(
-        {"user", OllamaAssistContextBuilder::build_initial_user_block(m_user_goal, plan_hint, m_prefetch, ko)});
     begin_step();
 }
 
@@ -388,7 +301,11 @@ void OllamaAgentController::begin_step()
     }
 
     ++m_step;
-    // Thinking lines are shown when actions are planned / applied — not generic "Working… (N)".
+    if (m_step == 1 && m_callbacks.on_thinking) {
+        const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+        m_callbacks.on_thinking(ko ? wxString::FromUTF8("어떻게 할지 생각 중입니다.")
+                                   : wxString("Thinking about how to do this."));
+    }
 
     trim_assist_messages(m_messages);
 
@@ -518,12 +435,23 @@ void OllamaAgentController::dispatch_llm_actions(const std::string& text)
         return;
     }
 
-    AIGuiOrchestrator::instance().on_chat_apply_begin();
-    if (m_callbacks.on_thinking) {
+    const std::string action_fp = mutating_action_fingerprint(root);
+    if (!action_fp.empty() && action_fp == m_applied_action_fingerprint) {
         const bool ko = wxGetApp().current_language_code().StartsWith("ko");
-        const std::string plan = ollama_thinking_planned_actions(root, ko);
-        if (!plan.empty())
-            m_callbacks.on_thinking(wxString::FromUTF8(plan));
+        OllamaAgentRunResult r;
+        r.completed         = true;
+        r.steps_taken       = m_step;
+        r.step_tool_results = m_step_tool_results;
+        r.final_message = ko ? "요청한 변경은 이미 플레이트에 적용되어 있습니다."
+                             : "That change is already applied on the plate.";
+        finish(std::move(r));
+        return;
+    }
+
+    AIGuiOrchestrator::instance().on_chat_apply_begin();
+    {
+        const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+        emit_thinking_lines(m_callbacks, ollama_thinking_planned_actions(root, ko));
     }
     const OllamaWorkflowRun workflow = OllamaActionWorkflow::execute_with_policy(root, m_parent, m_policy);
     note_workflow_mutations(workflow);
@@ -536,6 +464,11 @@ void OllamaAgentController::dispatch_llm_actions(const std::string& text)
             applied = true;
     }
     AIGuiOrchestrator::instance().on_chat_apply_end(applied, root, "ollama_assist_loop");
+    if (applied) {
+        const std::string fp = mutating_action_fingerprint(root);
+        if (!fp.empty())
+            m_applied_action_fingerprint = fp;
+    }
 
     schedule_post_apply_verification(root, assistant_msg, text, applied, std::move(workflow));
 }
@@ -578,11 +511,9 @@ void OllamaAgentController::handle_post_apply_verification(const nlohmann::json&
 
     const nlohmann::json& tool_results =
         m_step_tool_results.empty() ? nlohmann::json::array() : m_step_tool_results.back();
-    if (m_callbacks.on_thinking) {
+    {
         const bool ko = wxGetApp().current_language_code().StartsWith("ko");
-        const std::string summary = ollama_thinking_after_tools(tool_results, ko);
-        if (!summary.empty())
-            m_callbacks.on_thinking(wxString::FromUTF8(summary));
+        emit_thinking_lines(m_callbacks, ollama_thinking_after_tools(tool_results, ko));
     }
 
     if (OllamaAgentGoalPlanner::should_auto_finish_after_apply(m_user_goal, applied, m_step_tool_results)) {
@@ -705,40 +636,66 @@ void OllamaAgentController::proceed_after_tool_execution(const nlohmann::json& e
 {
     if (root_is_done(executed_root)) {
         const bool ko = wxGetApp().current_language_code().StartsWith("ko");
-        if (OllamaUserFlow::is_acquisition_print_request(m_user_goal, plate_has_model_now())
-            && !acquisition_pipeline_started(m_step_tool_results)) {
-            std::string fallback_msg;
-            if (try_orchestrator_fallback_for_acquisition(m_user_goal, ko, fallback_msg)) {
-                OllamaAgentRunResult r;
-                r.completed         = true;
-                r.steps_taken       = m_step;
-                r.step_tool_results = m_step_tool_results;
-                r.final_message     = fallback_msg;
-                finish(std::move(r));
-                return;
+        if (!step_has_substantive_change(m_step_tool_results)) {
+            if (!m_obvious_setting_applied) {
+                if (const auto change = OllamaSettingSearch::obvious_toggle(m_user_goal)) {
+                    m_obvious_setting_applied = true;
+                    nlohmann::json apply_root = {
+                        {"message", ""},
+                        {"done", true},
+                        {"actions", nlohmann::json::array({nlohmann::json{
+                             {"type", "set_config"},
+                             {"preset", change->preset},
+                             {"options", {{change->key, change->value}}},
+                         }})},
+                    };
+                    OllamaActionPipeline::process_actions(apply_root, pipeline_options());
+                    emit_thinking_lines(m_callbacks, ko ? change->label + " 값을 바꿉니다."
+                                                        : "Changing " + change->label + ".");
+                    OllamaWorkflowRun applied = OllamaActionWorkflow::execute_inline(apply_root, m_parent);
+                    note_workflow_mutations(applied);
+                    m_step_tool_results.push_back(ollama_tool_results_from_workflow(apply_root, applied));
+                    OllamaAgentRunResult applied_result;
+                    applied_result.completed         = true;
+                    applied_result.steps_taken       = m_step;
+                    applied_result.step_tool_results = m_step_tool_results;
+                    applied_result.final_message     = pick_user_facing_message(m_step_tool_results, "", ko);
+                    if (!step_has_substantive_change(m_step_tool_results)) {
+                        applied_result.final_message = ko ? change->label + "은(는) 이미 그 값입니다."
+                                                          : change->label + " is already set that way.";
+                    }
+                    finish(std::move(applied_result));
+                    return;
+                }
             }
-            if (m_step < m_max_steps) {
-                m_messages.push_back({"user",
-                    ko ? std::string("아직 MakerWorld에서 모델을 찾지 못했습니다. makerworld_find_and_print "
-                                     "action으로 영어 query를 넣어 실행하거나 done:true 없이 계속하세요.\n\nGoal:\n")
-                               + m_user_goal
-                         : std::string("The model has not been fetched yet. Run makerworld_find_and_print with an "
-                                       "English query, or continue without done:true.\n\nGoal:\n")
-                               + m_user_goal});
-                begin_step();
-                return;
+            if (!m_setting_search_nudged && m_step < m_max_steps) {
+                const std::vector<OllamaSettingSearchHit> hits = OllamaSettingSearch::search(m_user_goal, 2, 5);
+                if (!hits.empty() && hits.front().score >= 60) {
+                    m_setting_search_nudged = true;
+                    std::vector<std::string> keys;
+                    for (const OllamaSettingSearchHit& hit : hits)
+                        keys.push_back(hit.key);
+                    const DynamicPrintConfig* print_cfg = nullptr;
+                    const DynamicPrintConfig* filament_cfg = nullptr;
+                    if (wxGetApp().preset_bundle) {
+                        print_cfg    = &wxGetApp().preset_bundle->prints.get_edited_preset().config;
+                        filament_cfg = &wxGetApp().preset_bundle->filaments.get_edited_preset().config;
+                    }
+                    const nlohmann::json found = OllamaSettingSearch::lookup(keys, print_cfg, filament_cfg, ko);
+                    std::string nudge = ko
+                        ? "아직 설정이 바뀌지 않았습니다. 아래 후보의 key, preset, enum_values로 set_config를 호출하세요. "
+                          "켜려면 'no '로 시작하는 값이 아닌 값을 쓰세요. done:true는 바꾼 뒤에만.\n"
+                        : "No setting has changed yet. Call set_config with key, preset, and an enum_values entry from the matches. "
+                          "To turn a feature on, do not pick a value that starts with 'no '. Set done:true only after it changes.\n";
+                    nudge += found.dump(2);
+                    nudge += "\n\nGoal:\n";
+                    nudge += m_user_goal;
+                    m_messages.push_back({"user", std::move(nudge)});
+                    begin_step();
+                    return;
+                }
             }
-            OllamaAgentRunResult r;
-            r.blocked           = true;
-            r.steps_taken       = m_step;
-            r.step_tool_results = m_step_tool_results;
-            r.final_message     = ko ? "모델 검색·출력 파이프라인을 시작하지 못했습니다. "
-                                       "「화분 출력해줘」처럼 다시 시도해 주세요."
-                                     : "Could not start the find-and-print pipeline. Try again, e.g. \"print a vase\".";
-            finish(std::move(r));
-            return;
         }
-
         OllamaAgentRunResult r;
         r.completed         = true;
         r.steps_taken       = m_step;
@@ -754,16 +711,33 @@ void OllamaAgentController::proceed_after_tool_execution(const nlohmann::json& e
         return;
     }
 
-    const GeometryGoalNeeds geo_needs = OllamaAgentGoalPlanner::parse_geometry_needs(m_user_goal);
-    if (geo_needs.any() && OllamaAgentGoalPlanner::geometry_needs_met(geo_needs, m_step_tool_results)) {
+    if (m_step_tool_results.size() >= 2
+        && m_step_tool_results.back() == m_step_tool_results[m_step_tool_results.size() - 2]) {
+        const bool readonly = tool_step_is_readonly(m_step_tool_results.back());
+        if (readonly && !m_readonly_stall_nudged && m_step < m_max_steps) {
+            m_readonly_stall_nudged = true;
+            const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+            m_messages.push_back({"user", ko
+                ? "같은 조회 결과가 반복되었습니다. get_state, list_objects, select_object, wiki_search, find_setting 은 다시 호출하지 마세요. "
+                  "이미 상태를 알고 있습니다. 지금 set_config 또는 형상 도구로 목표를 적용하세요. "
+                  "적용할 수 없으면 done:true 와 이유만 반환하세요.\n\nGoal:\n" + m_user_goal
+                : "The same read result repeated. Do not call get_state, list_objects, select_object, wiki_search, or find_setting again. "
+                  "You already have the state. Apply the goal now with set_config or a geometry tool. "
+                  "If you cannot, return done:true and the reason only.\n\nGoal:\n" + m_user_goal});
+            begin_step();
+            return;
+        }
         const bool ko = wxGetApp().current_language_code().StartsWith("ko");
         OllamaAgentRunResult r;
-        r.completed         = true;
+        r.blocked           = true;
         r.steps_taken       = m_step;
         r.step_tool_results = m_step_tool_results;
-        r.final_message     = pick_user_facing_message(m_step_tool_results, assistant_msg, ko);
-        if (r.final_message.empty())
-            r.final_message = ko ? "요청한 모델 변경을 적용했습니다." : "Applied the requested model changes.";
+        if (m_mutations_applied)
+            r.final_message = ko ? "적용할 수 있는 변경은 반영했습니다. 같은 결과가 반복되어 여기서 멈춥니다."
+                                 : "Applied the changes that went through. Stopped because the same result repeated.";
+        else
+            r.final_message = ko ? "설정을 바꾸지 못했습니다. 상태만 반복 확인해서 멈췄습니다. 원하는 값을 더 구체적으로 말해 주세요."
+                                 : "No setting was changed. Stopped after the same state was read again. Say the value you want more specifically.";
         finish(std::move(r));
         return;
     }
@@ -786,11 +760,6 @@ void OllamaAgentController::proceed_after_tool_execution(const nlohmann::json& e
         feedback += std::string("\n\nAssistant note:\n") + assistant_msg;
     feedback += std::string("\n\nContinue toward goal (done:false until complete):\n") + m_user_goal;
     m_messages.push_back({"user", std::move(feedback)});
-
-    // Applied actions may have changed the baseline config; re-derive the proposal so the
-    // next step's context reflects the updated geometry/config state.
-    const bool ko = wxGetApp().current_language_code().StartsWith("ko");
-    refresh_print_intent_and_proposal(ko);
 
     begin_step();
 }

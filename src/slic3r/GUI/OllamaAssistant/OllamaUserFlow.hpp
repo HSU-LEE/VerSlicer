@@ -24,7 +24,6 @@ class OllamaUserFlow
 {
 public:
     static nlohmann::json build_flow_context_json();
-    static std::string    flow_prompt_block(bool korean);
 
     /** Coach / overlay buttons → same action pipeline as Ollama chat. */
     static OllamaFlowDispatchResult dispatch_coach_action(const std::string& action_id, Plater* plater);

@@ -28,19 +28,18 @@ std::string ollama_mode_string_from_policy(OllamaExecutionPolicy policy)
 
 bool ollama_action_is_readonly(const std::string& type)
 {
-    return type == "get_state" || type == "list_objects";
+    return type == "get_state" || type == "list_objects" || type == "wiki_search" || type == "find_setting";
 }
 
 bool ollama_action_requires_confirmation(const std::string& type, OllamaExecutionPolicy policy)
 {
     if (ollama_action_is_readonly(type))
         return false;
-    if (type == "delete_selection" || type == "save_project" || type == "send_print")
+    if (type == "delete_selection" || type == "delete_plate" || type == "save_project"
+        || type == "send_print" || type == "export_gcode" || type == "set_config")
         return true;
-    if (type == "set_config")
-        return policy != OllamaExecutionPolicy::AutoSafe;
     if (policy == OllamaExecutionPolicy::ConfirmAlways)
-        return type == "export_gcode" || type == "import_makerworld";
+        return type == "import_makerworld";
     return false;
 }
 

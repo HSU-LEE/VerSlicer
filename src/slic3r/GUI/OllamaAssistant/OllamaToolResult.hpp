@@ -29,6 +29,13 @@ std::string ollama_format_agent_step_summary(const std::vector<nlohmann::json>& 
 std::string ollama_user_facing_summary(const std::vector<nlohmann::json>& step_tool_results,
                                        const std::string& llm_message, bool korean);
 
+/**
+ * What the user should read after a turn.
+ * Confirmed tool changes win. A model sentence is used only when no mutating tool ran.
+ */
+std::string ollama_verified_user_message(const std::vector<nlohmann::json>& step_tool_results,
+                                         const std::string& assistant_msg, bool korean);
+
 /** Plain-language intro shown in the thinking panel when a turn starts. */
 std::string ollama_thinking_goal_intro(const std::string& user_goal, bool korean);
 

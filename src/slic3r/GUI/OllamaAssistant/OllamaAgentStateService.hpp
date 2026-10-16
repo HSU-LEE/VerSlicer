@@ -24,6 +24,8 @@ class OllamaAgentStateService
 public:
     static nlohmann::json snapshot();
     static std::string    snapshot_json();
+    /** Objects with size, bed position, and Z rotation. Same records as snapshot()["objects"]. */
+    static nlohmann::json objects_json();
 
     /** Compact print-setting values for agent context (goal-aware key pick). */
     static nlohmann::json config_digest(const std::string& user_goal_hint = {});

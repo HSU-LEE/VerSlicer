@@ -52,7 +52,9 @@ public:
     /** Replace the streamed preview text inside the pending bubble. */
     void set_pending_stream_text(const wxString& text);
     bool has_pending() const { return m_pending_row != nullptr; }
-    /** Remove the pending bubble (final reply arrived / request ended). */
+    /** Keep activity lines in the transcript and drop the animated caption. */
+    void commit_pending();
+    /** Remove the pending bubble and its activity lines. */
     void clear_pending();
 
 private:

@@ -533,23 +533,31 @@ void ImGuiWrapper::new_frame()
 
     ImGuiIO& io = ImGui::GetIO();
 
+    // Drop modifiers whose key-up was lost (focus change, mouse-enter). Do this
+    // before NewFrame(): that call snapshots io.KeyMods from these bools, and
+    // EndFrame aborts in debug if KeyMods is edited afterwards.
+    // On macOS, wx reports Command as ControlDown() while wxGetKeyState(WXK_CONTROL)
+    // is only the physical Control key.
+#ifdef __WXOSX__
+    const bool ctrl_down = wxGetKeyState(WXK_CONTROL) || wxGetKeyState(WXK_RAW_CONTROL) || wxGetKeyState(WXK_COMMAND);
+#else
+    const bool ctrl_down = wxGetKeyState(WXK_CONTROL);
+#endif
+    if (!ctrl_down)
+        io.KeyCtrl = false;
+    if (!wxGetKeyState(WXK_SHIFT))
+        io.KeyShift = false;
+    if (!wxGetKeyState(WXK_ALT))
+        io.KeyAlt = false;
+#ifdef __WXOSX__
+    if (!wxGetKeyState(WXK_COMMAND))
+        io.KeySuper = false;
+#endif
+
     ImGui::NewFrame();
     m_new_frame_open = true;
 
-    // BBL: we should render the new frame first, than reset keys' status
-    // BBL: copy & paste form prusa github repo (https://github.com/prusa3d/PrusaSlicer/blob/master/src/slic3r/GUI/ImGuiWrapper.cpp#L375C5-L402C6)
-    // synchronize key states
     // when the application loses the focus it may happen that the key up event is not processed
-
-    // synchronize modifier keys
-    constexpr std::array<std::pair<ImGuiKeyModFlags_, wxKeyCode>, 3> imgui_mod_keys{
-        std::make_pair(ImGuiKeyModFlags_Ctrl, WXK_CONTROL),
-        std::make_pair(ImGuiKeyModFlags_Shift, WXK_SHIFT),
-        std::make_pair(ImGuiKeyModFlags_Alt, WXK_ALT) };
-    for (const std::pair<ImGuiKeyModFlags_, wxKeyCode>& key : imgui_mod_keys) {
-        if ((io.KeyMods & key.first) != 0 && !wxGetKeyState(key.second))
-            io.KeyMods &= ~key.first;
-    }
 
     // Not sure if it is neccessary
     // values from 33 to 126 are reserved for the standard ASCII characters

@@ -54,12 +54,12 @@ int main()
     }
 
     {
-        expect_true(OllamaRequestRouter::classify("90도 돌려줘") == OllamaRequestRoute::Fast, "rotate -> fast");
-        expect_true(OllamaRequestRouter::classify("arrange the plate") == OllamaRequestRoute::Fast, "arrange -> fast");
-        expect_true(OllamaRequestRouter::classify("서포트 켜줘") == OllamaRequestRoute::Standard, "support -> standard");
-        expect_true(OllamaRequestRouter::classify("고쳐줘") == OllamaRequestRoute::Deep, "vague -> deep");
-        expect_true(OllamaRequestRouter::classify("베드에 안 붙어") != OllamaRequestRoute::Fast,
-                    "adhesion query not fast-route");
+        expect_true(OllamaRequestRouter::classify("") == OllamaRequestRoute::Fast, "empty -> fast");
+        expect_true(OllamaRequestRouter::classify("90도 돌려줘") == OllamaRequestRoute::Standard, "one path");
+        expect_true(OllamaRequestRouter::classify("arrange the plate") == OllamaRequestRoute::Standard, "one path");
+        expect_true(OllamaRequestRouter::classify("서포트 켜줘") == OllamaRequestRoute::Standard, "one path");
+        expect_true(OllamaRequestRouter::classify("고쳐줘") == OllamaRequestRoute::Standard, "one path");
+        expect_true(!OllamaRequestRouter::is_geometry_request("rotate 90"), "no geometry keyword route");
     }
 
     {

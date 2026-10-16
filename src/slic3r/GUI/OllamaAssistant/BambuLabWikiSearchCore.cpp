@@ -1,11 +1,8 @@
 #include "BambuLabWikiSearchCore.hpp"
 
-#include "OllamaSettingSearch.hpp"
-
 #include <boost/algorithm/string.hpp>
 
 #include <regex>
-#include <sstream>
 
 namespace Slic3r { namespace GUI {
 namespace BambuLabWikiSearchCore {
@@ -14,37 +11,9 @@ std::string wiki_locale(bool ko_ui) { return ko_ui ? "ko" : "en"; }
 
 std::string normalize_search_query(const std::string& user_request, bool ko_ui)
 {
+    (void) ko_ui;
     std::string q = user_request;
     boost::trim(q);
-    if (q.empty())
-        return q;
-
-    const auto keys = OllamaSettingSearch::candidate_keys_for_request(q, 2, 5);
-    if (!keys.empty()) {
-        std::ostringstream oss;
-        for (size_t i = 0; i < keys.size(); ++i) {
-            if (i)
-                oss << ' ';
-            oss << keys[i];
-        }
-        return oss.str();
-    }
-
-    if (ko_ui) {
-        static const std::pair<const char*, const char*> ko_to_en[] = {
-            {"서포트", "support overhang"},
-            {"브림", "brim adhesion"},
-            {"채움", "infill density"},
-            {"리트랙션", "retraction stringing"},
-            {"온도", "nozzle temperature"},
-            {"베드", "bed adhesion"},
-            {"강도", "print strength infill wall"},
-        };
-        for (const auto& kv : ko_to_en) {
-            if (user_request.find(kv.first) != std::string::npos)
-                return kv.second;
-        }
-    }
     return q;
 }
 

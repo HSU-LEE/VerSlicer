@@ -108,8 +108,15 @@ std::string friendly_tool_line(const std::string& tool, const std::string& msg, 
     }
     if (tool == "scale" || msg.find("Scaled") != std::string::npos)
         return korean ? "모델 크기를 조정했습니다." : "Resized the model.";
-    if (tool == "rotate" || msg.find("Rotat") != std::string::npos)
+    if (tool == "rotate" || msg.find("Rotat") != std::string::npos) {
+        const auto deg = msg.find("by ");
+        const auto end = msg.find("°");
+        if (deg != std::string::npos && end != std::string::npos && end > deg + 3) {
+            const std::string n = msg.substr(deg + 3, end - (deg + 3));
+            return korean ? ("모델을 " + n + "도 돌렸습니다.") : ("Rotated the model " + n + " degrees.");
+        }
         return korean ? "모델을 회전했습니다." : "Rotated the model.";
+    }
     if (tool == "translate" || msg.find("Translat") != std::string::npos)
         return korean ? "모델 위치를 옮겼습니다." : "Moved the model.";
     if (tool == "arrange" || msg.find("rrang") != std::string::npos)
@@ -145,6 +152,7 @@ std::string ollama_format_agent_step_summary(const std::vector<nlohmann::json>& 
         lines.push_back(line);
     };
 
+    bool settings_changed = false;
     for (const auto& step : step_results) {
         if (!step.is_array() || step.empty())
             continue;
@@ -155,11 +163,16 @@ std::string ollama_format_agent_step_summary(const std::vector<nlohmann::json>& 
             const std::string msg  = r.value("message", "");
             if (tool == "get_state" || tool == "list_objects" || tool == "select_object")
                 continue;
+            if (tool == "set_config")
+                settings_changed = true;
             const std::string line = strip_leading_list_numbering(
                 friendly_tool_line(tool, msg, korean));
             add_once(line);
         }
     }
+    if (settings_changed)
+        add_once(korean ? "설정이 마음에 들지 않으면 “방금 설정 되돌려 줘”라고 하세요."
+                        : "If those settings are wrong, say “undo the last settings change”.");
 
     std::string out;
     for (size_t i = 0; i < lines.size(); ++i) {
@@ -173,12 +186,64 @@ std::string ollama_format_agent_step_summary(const std::vector<nlohmann::json>& 
 std::string ollama_user_facing_summary(const std::vector<nlohmann::json>& step_tool_results,
                                        const std::string& llm_message, bool korean)
 {
-    const std::string executed = ollama_format_agent_step_summary(step_tool_results, korean);
-    if (!executed.empty())
-        return executed;
-    if (!step_tool_results.empty())
-        return {};
-    return llm_message;
+    return ollama_verified_user_message(step_tool_results, llm_message, korean);
+}
+
+std::string ollama_verified_user_message(const std::vector<nlohmann::json>& step_tool_results,
+                                         const std::string& assistant_msg, bool korean)
+{
+    std::vector<std::string> changed_lines;
+    std::vector<std::string> failed_lines;
+    bool saw_tool = false;
+    bool saw_mutating = false;
+    auto add_once = [](std::vector<std::string>& lines, const std::string& line) {
+        if (line.empty())
+            return;
+        for (const auto& existing : lines)
+            if (existing == line)
+                return;
+        lines.push_back(line);
+    };
+    for (const auto& step : step_tool_results) {
+        if (!step.is_array())
+            continue;
+        for (const auto& r : step) {
+            if (!r.is_object())
+                continue;
+            saw_tool = true;
+            const std::string tool = r.value("tool", "");
+            const bool readonly = tool == "get_state" || tool == "list_objects" || tool == "select_object"
+                                  || tool == "wiki_search" || tool == "find_setting" || tool == "verify_config";
+            if (!readonly)
+                saw_mutating = true;
+            if (!r.value("ok", true)) {
+                add_once(failed_lines, korean ? "요청한 변경이 적용되지 않았습니다."
+                                              : "The requested change did not apply.");
+                continue;
+            }
+            if (!r.value("changed", false) || readonly)
+                continue;
+            add_once(changed_lines, friendly_tool_line(tool, r.value("message", ""), korean));
+        }
+    }
+    if (!changed_lines.empty()) {
+        std::string out;
+        for (const auto& line : changed_lines) {
+            if (!out.empty())
+                out += "\n";
+            out += line;
+        }
+        return out;
+    }
+    if (!failed_lines.empty())
+        return failed_lines.front();
+    if (saw_mutating)
+        return korean ? "적용된 변경이 없습니다." : "Nothing was applied.";
+    if (saw_tool && !assistant_msg.empty())
+        return assistant_msg;
+    if (!saw_tool)
+        return assistant_msg;
+    return korean ? "적용된 변경이 없습니다." : "Nothing was applied.";
 }
 
 std::string ollama_format_agent_completion_report(const std::vector<nlohmann::json>& step_results, bool korean)
@@ -255,13 +320,98 @@ std::string describe_action_type(const std::string& type, const nlohmann::json& 
     return type;
 }
 
+std::string setting_activity_phrase(const nlohmann::json& action, bool korean)
+{
+    if (!action.contains("options") || !action["options"].is_object() || action["options"].empty())
+        return korean ? "인쇄 설정을 바꿉니다." : "Updating print settings.";
+
+    auto name_of = [korean](const std::string& key) -> std::string {
+        if (key == "layer_height") return korean ? "레이어 높이" : "layer height";
+        if (key == "sparse_infill_density") return korean ? "내부 채움" : "infill";
+        if (key == "enable_support") return korean ? "서포트" : "supports";
+        if (key == "brim_width" || key == "brim_type") return korean ? "브림" : "brim";
+        if (key == "wall_loops") return korean ? "외벽 수" : "wall loops";
+        if (key == "nozzle_temperature") return korean ? "노즐 온도" : "nozzle temperature";
+        if (key == "bed_temperature") return korean ? "베드 온도" : "bed temperature";
+        if (key == "outer_wall_speed") return korean ? "외벽 속도" : "outer wall speed";
+        if (key == "retraction_length") return korean ? "리트랙션" : "retraction";
+        return {};
+    };
+
+    std::string joined;
+    int         count = 0;
+    for (auto it = action["options"].begin(); it != action["options"].end() && count < 3; ++it, ++count) {
+        std::string name = name_of(it.key());
+        if (name.empty())
+            name = it.key();
+        if (it.value().is_number())
+            name += korean ? " " + it.value().dump() : " to " + it.value().dump();
+        else if (it.value().is_string())
+            name += korean ? " " + it.value().get<std::string>() : " to " + it.value().get<std::string>();
+        else if (it.value().is_boolean())
+            name += it.value().get<bool>() ? (korean ? " 켜기" : " on") : (korean ? " 끄기" : " off");
+        if (!joined.empty())
+            joined += ", ";
+        joined += name;
+    }
+    return korean ? joined + "을(를) 바꿉니다." : "Changing " + joined + ".";
+}
+
+std::string activity_line_for_action(const nlohmann::json& action, bool korean)
+{
+    const std::string type = action.value("type", "");
+    if (type.empty())
+        return {};
+    if (type == "get_state")
+        return korean ? "슬라이서 상태를 살펴봅니다." : "Looking at the slicer state.";
+    if (type == "list_objects")
+        return korean ? "플레이트에 있는 모델을 확인합니다." : "Checking the models on the plate.";
+    if (type == "select_object")
+        return korean ? "작업할 모델을 선택합니다." : "Selecting the model to work on.";
+    if (type == "rotate") {
+        const double z = action.value("z", action.value("angle", 0.0));
+        if (std::abs(z) > 0.01)
+            return korean ? (boost::format("모델을 %1%도 돌립니다.") % z).str()
+                          : (boost::format("Rotating the model %1% degrees.") % z).str();
+        return korean ? "모델을 돌립니다." : "Rotating the model.";
+    }
+    if (type == "scale")
+        return korean ? "모델 크기를 바꿉니다." : "Resizing the model.";
+    if (type == "translate")
+        return korean ? "모델 위치를 옮깁니다." : "Moving the model.";
+    if (type == "find_setting") {
+        const std::string query = action.value("query", action.value("name", ""));
+        if (query.empty())
+            return korean ? "설정 이름을 찾습니다." : "Looking up the setting name.";
+        return korean ? "설정에서 \"" + query + "\"을(를) 찾습니다."
+                      : "Looking up the setting \"" + query + "\".";
+    }
+    if (type == "wiki_search") {
+        const std::string query = action.value("query", "");
+        if (query.empty())
+            return korean ? "도움말을 검색합니다." : "Searching the help pages.";
+        return korean ? "도움말에서 \"" + query + "\"을(를) 찾습니다."
+                      : "Searching help for \"" + query + "\".";
+    }
+    if (type == "set_config")
+        return setting_activity_phrase(action, korean);
+    const std::string desc = describe_action_type(type, action, korean);
+    if (desc.empty())
+        return {};
+    return korean ? desc + "을(를) 실행합니다." : "Running: " + desc + ".";
+}
+
 } // namespace
 
 std::string ollama_thinking_goal_intro(const std::string& user_goal, bool korean)
 {
-    (void) user_goal;
-    return korean ? "요청을 확인했습니다. 필요한 변경을 찾아 적용하겠습니다."
-                  : "Understood — I'll find and apply the needed changes.";
+    std::string goal = user_goal;
+    boost::algorithm::trim(goal);
+    if (goal.size() > 80)
+        goal = goal.substr(0, 80) + "…";
+    if (goal.empty())
+        return korean ? "요청을 읽었습니다." : "Read the request.";
+    return korean ? "요청: " + goal : "Request: " + goal;
 }
 
 std::string ollama_thinking_planned_actions(const nlohmann::json& root, bool korean)
@@ -269,36 +419,18 @@ std::string ollama_thinking_planned_actions(const nlohmann::json& root, bool kor
     if (!root.contains("actions") || !root["actions"].is_array() || root["actions"].empty())
         return {};
 
-    std::vector<std::string> parts;
+    std::string out;
     for (const auto& a : root["actions"]) {
         if (!a.is_object())
             continue;
-        const std::string type = a.value("type", "");
-        if (type.empty() || type == "get_state" || type == "list_objects" || type == "select_object")
+        const std::string line = activity_line_for_action(a, korean);
+        if (line.empty())
             continue;
-        const std::string desc = describe_action_type(type, a, korean);
-        if (desc.empty())
-            continue;
-        bool dup = false;
-        for (const auto& p : parts)
-            if (p == desc) {
-                dup = true;
-                break;
-            }
-        if (!dup)
-            parts.push_back(desc);
+        if (!out.empty())
+            out += '\n';
+        out += line;
     }
-    if (parts.empty())
-        return {};
-
-    std::string joined;
-    for (size_t i = 0; i < parts.size(); ++i) {
-        if (i)
-            joined += korean ? " → " : " → ";
-        joined += parts[i];
-    }
-    return korean ? (boost::format("적용합니다: %1%") % joined).str()
-                  : (boost::format("Applying: %1%") % joined).str();
+    return out;
 }
 
 std::string ollama_thinking_step_wait(int step, bool korean)
@@ -313,38 +445,33 @@ std::string ollama_thinking_after_tools(const nlohmann::json& tool_results, bool
     if (!tool_results.is_array() || tool_results.empty())
         return {};
 
-    std::vector<std::string> lines;
+    std::string out;
+    auto        add = [&](const std::string& line) {
+        if (line.empty())
+            return;
+        if (!out.empty())
+            out += '\n';
+        out += line;
+    };
+
     for (const auto& r : tool_results) {
         if (!r.is_object())
             continue;
-        if (!r.value("ok", false)) {
-            return korean ? "적용 중 문제가 있어 다른 방법을 시도합니다."
-                          : "Something failed — trying another approach.";
-        }
-        if (!r.value("changed", false))
+        const std::string tool = r.value("tool", "");
+        if (tool == "get_state" || tool == "list_objects" || tool == "select_object" || tool == "wiki_search"
+            || tool == "find_setting")
             continue;
-        const std::string line =
-            friendly_tool_line(r.value("tool", ""), r.value("message", ""), korean);
-        if (!line.empty()) {
-            bool dup = false;
-            for (const auto& existing : lines)
-                if (existing == line) {
-                    dup = true;
-                    break;
-                }
-            if (!dup)
-                lines.push_back(line);
+        if (!r.value("ok", false)) {
+            add(korean ? "이 단계는 적용되지 않았습니다. 다른 방법을 시도합니다."
+                       : "That step did not apply. Trying another way.");
+            continue;
         }
-    }
-
-    if (lines.empty())
-        return korean ? "상태를 확인했습니다." : "Checked the current state.";
-
-    std::string out;
-    for (size_t i = 0; i < lines.size(); ++i) {
-        if (i)
-            out += korean ? " " : " ";
-        out += lines[i];
+        if (!r.value("changed", false)) {
+            if (tool == "set_config")
+                add(korean ? "그 설정은 이미 같은 값이었습니다." : "That setting was already at the requested value.");
+            continue;
+        }
+        add(friendly_tool_line(tool, r.value("message", ""), korean));
     }
     return out;
 }

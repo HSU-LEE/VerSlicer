@@ -30,16 +30,15 @@ int main()
     }
 
     {
-        expect_true(BambuLabWikiSearchCore::normalize_search_query("실이 많이 나와", true).find("stringing") != std::string::npos,
-                    "ko stringing query");
-        expect_true(BambuLabWikiSearchCore::normalize_search_query("베드에 안 붙", true).find("adhesion") != std::string::npos,
-                    "ko adhesion query");
+        expect_true(BambuLabWikiSearchCore::normalize_search_query("실이 많이 나와", true).find("실이") != std::string::npos,
+                    "query kept as written");
+        expect_true(BambuLabWikiSearchCore::normalize_search_query("  bed adhesion  ", true) == "bed adhesion",
+                    "query trimmed");
     }
 
     {
-        expect_true(OllamaRequestRouter::benefits_from_wiki("고쳐줘"), "wiki for vague");
-        expect_true(OllamaRequestRouter::benefits_from_wiki("stringing bad"), "wiki for symptom");
-        expect_true(!OllamaRequestRouter::benefits_from_wiki("rotate 90"), "no wiki for rotate");
+        expect_true(!OllamaRequestRouter::benefits_from_wiki("고쳐줘"), "wiki is a tool, not a prefetch");
+        expect_true(!OllamaRequestRouter::benefits_from_wiki("rotate 90"), "wiki is a tool, not a prefetch");
     }
 
     {
@@ -48,8 +47,8 @@ int main()
             {{"title", "Stringing"}, {"excerpt", "Increase retraction length and lower nozzle temperature."}},
         });
         const OllamaCriticResult critic = OllamaActionCritic::review(root, "lots of stringing", wiki);
-        expect_true(critic.verdict == OllamaCriticVerdict::Revise, "critic revise on empty actions");
-        expect_true(!critic.suggested_keys.empty(), "critic suggests keys");
+        expect_true(critic.verdict == OllamaCriticVerdict::Approve, "empty actions are not a keyword revise");
+        expect_true(critic.suggested_keys.empty(), "critic does not invent keys");
     }
 
     if (getenv("OLLAMA_WIKI_E2E") && std::string(getenv("OLLAMA_WIKI_E2E")) == "1") {
