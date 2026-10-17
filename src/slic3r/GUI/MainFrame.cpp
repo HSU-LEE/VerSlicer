@@ -14,6 +14,8 @@
 #include <wx/filename.h>
 #include <wx/debug.h>
 #include <wx/utils.h>
+#include <wx/clipbrd.h>
+#include <wx/textctrl.h>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem.hpp>
@@ -34,6 +36,7 @@
 #include "AIModelCreate/AIModelCreateDialog.hpp"
 
 #include "Tab.hpp"
+#include "Widgets/TextInput.hpp"
 #include "ProgressStatusBar.hpp"
 #include "3DScene.hpp"
 #include "ParamsDialog.hpp"
@@ -2675,6 +2678,56 @@ static void add_common_view_menu_items(wxMenu* view_menu, MainFrame* mainFrame, 
         "", nullptr, [can_change_view]() { return can_change_view(); }, mainFrame);
 }
 
+namespace {
+
+// The Edit menu owns Cmd/Ctrl+V. A disabled Paste item still swallows the
+// shortcut on macOS, so text fields never see it. Route clipboard keys to the
+// focused editor instead of the 3D selection.
+wxTextCtrl* focused_text_ctrl()
+{
+    for (wxWindow* window = wxWindow::FindFocus(); window; window = window->GetParent()) {
+        if (auto* text = dynamic_cast<wxTextCtrl*>(window))
+            return text;
+        if (auto* input = dynamic_cast<::TextInput*>(window))
+            return input->GetTextCtrl();
+    }
+    return nullptr;
+}
+
+void copy_text_selection(wxTextCtrl* text)
+{
+    if (!text)
+        return;
+    const wxString selected = text->GetStringSelection();
+    if (selected.empty() || !wxTheClipboard->Open())
+        return;
+    wxTheClipboard->SetData(new wxTextDataObject(selected));
+    wxTheClipboard->Close();
+}
+
+void cut_text_selection(wxTextCtrl* text)
+{
+    if (!text)
+        return;
+    long from = 0, to = 0;
+    text->GetSelection(&from, &to);
+    copy_text_selection(text);
+    if (from != to)
+        text->Remove(from, to);
+}
+
+void paste_text(wxTextCtrl* text)
+{
+    if (!text || !wxTheClipboard->Open())
+        return;
+    wxTextDataObject data;
+    if (wxTheClipboard->GetData(data))
+        text->WriteText(data.GetText());
+    wxTheClipboard->Close();
+}
+
+} // namespace
+
 void MainFrame::init_menubar_as_editor()
 {
 #ifdef __APPLE__
@@ -2854,16 +2907,22 @@ void MainFrame::init_menubar_as_editor()
         editMenu->AppendSeparator();
         // BBS Cut TODO
         append_menu_item(editMenu, wxID_ANY, _L("Cut") + "\t" + ctrl + "X",
-            _L("Cut selection to clipboard"), [this](wxCommandEvent&) {m_plater->cut_selection_to_clipboard(); },
-            "menu_cut", nullptr, [this]() {return m_plater->can_copy_to_clipboard(); }, this);
+            _L("Cut selection to clipboard"), [this](wxCommandEvent&) {
+                if (wxTextCtrl* text = focused_text_ctrl()) { cut_text_selection(text); return; }
+                m_plater->cut_selection_to_clipboard(); },
+            "menu_cut", nullptr, [this]() { return focused_text_ctrl() || m_plater->can_copy_to_clipboard(); }, this);
         // BBS Copy
         append_menu_item(editMenu, wxID_ANY, _L("Copy") + "\t" + ctrl + "C",
-            _L("Copy selection to clipboard"), [this](wxCommandEvent&) { m_plater->copy_selection_to_clipboard(); },
-            "menu_copy", nullptr, [this](){return m_plater->can_copy_to_clipboard(); }, this);
+            _L("Copy selection to clipboard"), [this](wxCommandEvent&) {
+                if (wxTextCtrl* text = focused_text_ctrl()) { copy_text_selection(text); return; }
+                m_plater->copy_selection_to_clipboard(); },
+            "menu_copy", nullptr, [this](){ return focused_text_ctrl() || m_plater->can_copy_to_clipboard(); }, this);
         // BBS Paste
         append_menu_item(editMenu, wxID_ANY, _L("Paste") + "\t" + ctrl + "V",
-            _L("Paste clipboard"), [this](wxCommandEvent&) { m_plater->paste_from_clipboard(); },
-            "menu_paste", nullptr, [this](){return m_plater->can_paste_from_clipboard(); }, this);
+            _L("Paste clipboard"), [this](wxCommandEvent&) {
+                if (wxTextCtrl* text = focused_text_ctrl()) { paste_text(text); return; }
+                m_plater->paste_from_clipboard(); },
+            "menu_paste", nullptr, [this](){ return focused_text_ctrl() || m_plater->can_paste_from_clipboard(); }, this);
         // BBS Delete selected
         append_menu_item(editMenu, wxID_ANY, _L("Delete selected") + "\t" + _L("Del"),
             _L("Deletes the current selection"),[this](wxCommandEvent&) { m_plater->remove_selected(); },
@@ -2915,6 +2974,7 @@ void MainFrame::init_menubar_as_editor()
         // BBS Cut TODO
         append_menu_item(editMenu, wxID_ANY, _L("Cut") + sep + ctrl_t + "X",
             _L("Cut selection to clipboard"), [this, handle_key_event](wxCommandEvent&) {
+                if (wxTextCtrl* text = focused_text_ctrl()) { cut_text_selection(text); return; }
                 wxKeyEvent e;
                 e.SetEventType(wxEVT_KEY_DOWN);
                 e.SetControlDown(true);
@@ -2923,10 +2983,11 @@ void MainFrame::init_menubar_as_editor()
                     return;
                 }
                 m_plater->cut_selection_to_clipboard(); },
-            "", nullptr, [this]() {return m_plater->can_copy_to_clipboard(); }, this);
+            "", nullptr, [this]() { return focused_text_ctrl() || m_plater->can_copy_to_clipboard(); }, this);
         // BBS Copy
         append_menu_item(editMenu, wxID_ANY, _L("Copy") + sep + ctrl_t + "C",
             _L("Copy selection to clipboard"), [this, handle_key_event](wxCommandEvent&) {
+                if (wxTextCtrl* text = focused_text_ctrl()) { copy_text_selection(text); return; }
                 wxKeyEvent e;
                 e.SetEventType(wxEVT_KEY_DOWN);
                 e.SetControlDown(true);
@@ -2935,10 +2996,11 @@ void MainFrame::init_menubar_as_editor()
                     return;
                 }
                 m_plater->copy_selection_to_clipboard(); },
-            "", nullptr, [this](){return m_plater->can_copy_to_clipboard(); }, this);
+            "", nullptr, [this](){ return focused_text_ctrl() || m_plater->can_copy_to_clipboard(); }, this);
         // BBS Paste
         append_menu_item(editMenu, wxID_ANY, _L("Paste") + sep + ctrl_t + "V",
             _L("Paste clipboard"), [this, handle_key_event](wxCommandEvent&) {
+                if (wxTextCtrl* text = focused_text_ctrl()) { paste_text(text); return; }
                 wxKeyEvent e;
                 e.SetEventType(wxEVT_KEY_DOWN);
                 e.SetControlDown(true);
@@ -2947,7 +3009,7 @@ void MainFrame::init_menubar_as_editor()
                     return;
                 }
                 m_plater->paste_from_clipboard(); },
-            "", nullptr, [this](){return m_plater->can_paste_from_clipboard(); }, this);
+            "", nullptr, [this](){ return focused_text_ctrl() || m_plater->can_paste_from_clipboard(); }, this);
 #if 0
         // BBS Delete selected
         append_menu_item(editMenu, wxID_ANY, _L("Delete selected") + "\t" + _L("Backspace"),
@@ -2995,6 +3057,7 @@ void MainFrame::init_menubar_as_editor()
         // BBS Select All
         append_menu_item(editMenu, wxID_ANY, _L("Select all") + sep + ctrl_t + "A",
             _L("Selects all objects"), [this, handle_key_event](wxCommandEvent&) {
+                if (wxTextCtrl* text = focused_text_ctrl()) { text->SelectAll(); return; }
                 wxKeyEvent e;
                 e.SetEventType(wxEVT_KEY_DOWN);
                 e.SetControlDown(true);
@@ -3003,7 +3066,7 @@ void MainFrame::init_menubar_as_editor()
                     return;
                 }
                 m_plater->select_all(); },
-            "", nullptr, [this](){return can_select(); }, this);
+            "", nullptr, [this](){ return focused_text_ctrl() || can_select(); }, this);
         // BBS Deslect All
         append_menu_item(editMenu, wxID_ANY, _L("Deselect all") + sep + _L("Esc"),
             _L("Deselects all objects"), [this, handle_key_event](wxCommandEvent&) {

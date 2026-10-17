@@ -14,6 +14,7 @@ class TextInput : public wxNavigationEnabled<StaticBox>
     StateColor     text_color;
     wxTextCtrl * text_ctrl;
 
+    bool      m_allow_context_menu{false};
     wxString  static_tips;
     wxSize    static_tips_size;
     wxBitmap  static_tips_icon;
@@ -65,6 +66,9 @@ public:
     wxTextCtrl *GetTextCtrl() { return text_ctrl; }
 
     wxTextCtrl const *GetTextCtrl() const { return text_ctrl; }
+
+    // Right-click is swallowed by default. Chat (and other editors) opt in.
+    void AllowContextMenu(bool allow) { m_allow_context_menu = allow; }
 
 protected:
     virtual void OnEdit() {}

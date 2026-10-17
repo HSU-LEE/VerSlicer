@@ -7645,13 +7645,15 @@ void Plater::priv::reset(bool apply_presets_change)
 
     m_worker.cancel_all();
 
+    // Stop the background slicer before reinit(). reinit() rebuilds plates and
+    // reads the full preset config; a running perimeter job still owns those
+    // layer surfaces and will crash if they disappear underneath it.
+    this->background_process.reset();
+
     //BBS: clear the partplate list's object before object cleared
     partplate_list.reinit();
     partplate_list.update_slice_context_to_current_plate(background_process);
     preview->update_gcode_result(partplate_list.get_current_slice_result());
-
-    // Stop and reset the Print content.
-    this->background_process.reset();
     model.clear_objects();
     assemble_view->get_canvas3d()->reset_explosion_ratio();
     update();

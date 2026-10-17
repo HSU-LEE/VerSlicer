@@ -42,7 +42,9 @@
 #include "../Widgets/ProgressBar.hpp"
 #include "../Widgets/TextInput.hpp"
 
+#include <wx/clipbrd.h>
 #include <wx/control.h>
+#include <wx/menu.h>
 #include <wx/dcclient.h>
 #include <wx/sizer.h>
 #include <wx/textctrl.h>
@@ -563,6 +565,27 @@ static wxString streaming_preview_text(const std::string& buf)
     return wxString::FromUTF8(utf8_complete_prefix(out));
 }
 
+// The model often replies with a fenced action JSON. Show the sentence, not the blob.
+static std::string chat_visible_reply(const std::string& raw)
+{
+    if (raw.find("```") == std::string::npos && raw.find("\"message\"") == std::string::npos
+        && (raw.empty() || raw.front() != '{'))
+        return raw;
+    try {
+        const nlohmann::json root = OllamaActionExecutor::extract_action_json(raw);
+        if (root.contains("message") && root["message"].is_string()) {
+            const std::string msg = root["message"].get<std::string>();
+            if (!msg.empty() && msg != raw && msg.find("```") == std::string::npos)
+                return msg;
+        }
+    } catch (...) {
+    }
+    const wxString preview = streaming_preview_text(raw);
+    if (!preview.empty())
+        return std::string(preview.utf8_string());
+    return raw;
+}
+
 // Most recently created panel; the agent loop routes makerworld_find_and_print
 // through it so the orchestrator always runs with real chat/busy callbacks.
 OllamaChatPanel* g_active_chat_panel = nullptr;
@@ -758,6 +781,7 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
                                   wxDefaultPosition, wxSize(-1, compose_h), wxTE_PROCESS_ENTER);
     m_input_field->SetCornerRadius(FromDIP(6));
     m_input_field->SetMinSize(wxSize(-1, compose_h));
+    m_input_field->AllowContextMenu(true);
     m_input_ctrl = m_input_field->GetTextCtrl();
     m_input_ctrl->SetHint(wxEmptyString);
     wxGetApp().UpdateDarkUI(m_input_field);
@@ -807,6 +831,82 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     m_send_btn->Bind(wxEVT_BUTTON, &OllamaChatPanel::on_send, this);
     m_voice_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { toggle_voice(); });
     m_input_ctrl->Bind(wxEVT_TEXT_ENTER, &OllamaChatPanel::on_send, this);
+    // TextInput swallows the right-click menu, and on macOS Cmd+V is taken by the
+    // app before this field sees it. Handle clipboard keys and a small edit menu here.
+    auto copy_selection = [this]() {
+        if (!m_input_ctrl)
+            return;
+        const wxString selected = m_input_ctrl->GetStringSelection();
+        if (selected.empty() || !wxTheClipboard->Open())
+            return;
+        wxTheClipboard->SetData(new wxTextDataObject(selected));
+        wxTheClipboard->Close();
+    };
+    auto paste_clipboard = [this]() {
+        if (!m_input_ctrl || !wxTheClipboard->Open())
+            return;
+        wxTextDataObject data;
+        if (wxTheClipboard->GetData(data))
+            m_input_ctrl->WriteText(data.GetText());
+        wxTheClipboard->Close();
+    };
+    m_input_ctrl->Bind(wxEVT_CHAR_HOOK, [this, copy_selection, paste_clipboard](wxKeyEvent& e) {
+        const bool command = e.CmdDown() && !e.AltDown() && !e.ShiftDown();
+        if (command && m_input_ctrl) {
+            const int key  = e.GetUnicodeKey();
+            const int code = e.GetKeyCode();
+            const auto matches = [&](int letter) {
+                return key == letter || key == (letter + 32) || code == letter || code == (letter + 32);
+            };
+            if (matches('V')) {
+                paste_clipboard();
+                return;
+            }
+            if (matches('C')) {
+                copy_selection();
+                return;
+            }
+            if (matches('X')) {
+                long from = 0, to = 0;
+                m_input_ctrl->GetSelection(&from, &to);
+                copy_selection();
+                if (from != to)
+                    m_input_ctrl->Remove(from, to);
+                return;
+            }
+            if (matches('A')) {
+                m_input_ctrl->SelectAll();
+                return;
+            }
+        }
+        e.Skip();
+    });
+    m_input_ctrl->Bind(wxEVT_RIGHT_DOWN, [this](wxMouseEvent&) {
+        if (!m_input_ctrl)
+            return;
+        wxMenu menu;
+        menu.Append(wxID_CUT);
+        menu.Append(wxID_COPY);
+        menu.Append(wxID_PASTE);
+        menu.AppendSeparator();
+        menu.Append(wxID_SELECTALL);
+        const bool has_selection = !m_input_ctrl->GetStringSelection().IsEmpty();
+        menu.Enable(wxID_CUT, has_selection);
+        menu.Enable(wxID_COPY, has_selection);
+        m_input_ctrl->PopupMenu(&menu);
+    });
+    m_input_ctrl->Bind(wxEVT_MENU, [this, copy_selection](wxCommandEvent&) {
+        if (!m_input_ctrl)
+            return;
+        long from = 0, to = 0;
+        m_input_ctrl->GetSelection(&from, &to);
+        copy_selection();
+        if (from != to)
+            m_input_ctrl->Remove(from, to);
+    }, wxID_CUT);
+    m_input_ctrl->Bind(wxEVT_MENU, [copy_selection](wxCommandEvent&) { copy_selection(); }, wxID_COPY);
+    m_input_ctrl->Bind(wxEVT_MENU, [paste_clipboard](wxCommandEvent&) { paste_clipboard(); }, wxID_PASTE);
+    m_input_ctrl->Bind(wxEVT_MENU, [this](wxCommandEvent&) { if (m_input_ctrl) m_input_ctrl->SelectAll(); }, wxID_SELECTALL);
     if (m_collapse_btn)
         m_collapse_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { set_collapsed(!m_collapsed); });
 
@@ -1820,8 +1920,9 @@ void OllamaChatPanel::on_assist_loop_finished(const OllamaAgentRunResult& result
 
     const bool ko = AiLocale::korean();
     wxString   display;
-    if (!result.final_message.empty())
-        display = wxString::FromUTF8(result.final_message);
+    const std::string visible = chat_visible_reply(result.final_message);
+    if (!visible.empty())
+        display = wxString::FromUTF8(visible);
     else if (display.empty() && result.cancelled)
         display = ko ? wxString::FromUTF8("작업이 취소되었습니다.") : _L("Cancelled.");
     else if (display.empty() && result.blocked)

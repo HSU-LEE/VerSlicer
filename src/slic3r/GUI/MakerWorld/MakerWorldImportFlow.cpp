@@ -29,6 +29,21 @@
 namespace Slic3r { namespace GUI {
 
 namespace {
+std::atomic<bool> g_model_chooser_open{false};
+}
+
+bool MakerWorldImportFlow::try_begin_model_chooser()
+{
+    bool expected = false;
+    return g_model_chooser_open.compare_exchange_strong(expected, true);
+}
+
+void MakerWorldImportFlow::end_model_chooser()
+{
+    g_model_chooser_open.store(false);
+}
+
+namespace {
 
 struct PendingImportUi
 {
@@ -307,12 +322,19 @@ void MakerWorldImportFlow::run_search_from_query(wxWindow* parent, const std::st
             _L("Question mode: you can search and pick a model. Switch to Apply mode to import into the plate."));
     }
 
+    if (!try_begin_model_chooser()) {
+        chat_notify(callbacks, _L("A model chooser is already open."));
+        finish_flow(callbacks);
+        return;
+    }
+
     AIGuiOrchestrator::instance().on_makerworld_search_begin();
     MakerWorldSearchService::prefetch_staffpick_pool();
     set_flow_busy(callbacks, true, _L("Searching MakerWorld…"));
 
     if (!wxGetApp().app_config) {
         chat_notify(callbacks, _L("Application configuration is not ready. Restart the slicer and try again."));
+        end_model_chooser();
         finish_flow(callbacks);
         return;
     }
@@ -334,6 +356,7 @@ void MakerWorldImportFlow::run_search_from_query(wxWindow* parent, const std::st
                 if (!page.empty())
                     wxLaunchDefaultBrowser(wxString::FromUTF8(page));
             }
+            end_model_chooser();
             finish_flow(callbacks);
             return;
         }
@@ -347,12 +370,15 @@ void MakerWorldImportFlow::run_search_from_query(wxWindow* parent, const std::st
                 static_cast<int>(result.candidates.size()), source_note));
 
         if (!p) {
+            end_model_chooser();
             finish_flow(callbacks);
             return;
         }
 
         MakerWorldPickDialog dlg(p, result.candidates);
-        if (dlg.ShowModal() != wxID_OK || !dlg.has_selection()) {
+        const int pick = dlg.ShowModal();
+        end_model_chooser();
+        if (pick != wxID_OK || !dlg.has_selection()) {
             chat_notify(callbacks, _L("Search cancelled."));
             finish_flow(callbacks);
             return;
@@ -426,12 +452,19 @@ void MakerWorldImportFlow::run_search_and_offer_print(wxWindow* parent, const st
         return;
     }
 
+    if (!try_begin_model_chooser()) {
+        chat_notify(callbacks, _L("A model chooser is already open."));
+        finish_flow(callbacks);
+        return;
+    }
+
     AIGuiOrchestrator::instance().on_makerworld_search_begin();
     MakerWorldSearchService::prefetch_staffpick_pool();
     set_flow_busy(callbacks, true, _L("Searching MakerWorld…"));
 
     if (!wxGetApp().app_config) {
         chat_notify(callbacks, _L("Application configuration is not ready. Restart the slicer and try again."));
+        end_model_chooser();
         finish_flow(callbacks);
         return;
     }
@@ -450,6 +483,7 @@ void MakerWorldImportFlow::run_search_and_offer_print(wxWindow* parent, const st
                 chat_notify(callbacks, wxString::FromUTF8(result.error));
             else
                 chat_notify(callbacks, _L("No models found on MakerWorld."));
+            end_model_chooser();
             finish_flow(callbacks);
             return;
         }
@@ -472,12 +506,15 @@ void MakerWorldImportFlow::run_search_and_offer_print(wxWindow* parent, const st
                                  : _L("MakerWorld results:\n") + chat_lines);
 
         if (!p) {
+            end_model_chooser();
             finish_flow(callbacks);
             return;
         }
 
         MakerWorldPrintOfferDialog dlg(p, top);
-        if (dlg.ShowModal() != wxID_OK || !dlg.has_selection()) {
+        const int offer = dlg.ShowModal();
+        end_model_chooser();
+        if (offer != wxID_OK || !dlg.has_selection()) {
             chat_notify(callbacks, _L("Print cancelled."));
             finish_flow(callbacks);
             return;

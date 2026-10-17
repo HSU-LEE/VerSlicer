@@ -2,6 +2,7 @@
 
 #include <boost/log/trivial.hpp>
 #include "OllamaActionExecutor.hpp"
+#include "OllamaToolGateway.hpp"
 #include "OllamaConfig.hpp"
 #include "OllamaIntentContext.hpp"
 #include "OllamaModelPick.hpp"
@@ -144,6 +145,47 @@ std::string extract_chat_content(const nlohmann::json& j)
     }
 
     return {};
+}
+
+nlohmann::json parse_tool_arguments(const nlohmann::json& arguments)
+{
+    if (arguments.is_object())
+        return arguments;
+    if (arguments.is_string()) {
+        try {
+            nlohmann::json parsed = nlohmann::json::parse(arguments.get<std::string>());
+            if (parsed.is_object())
+                return parsed;
+        } catch (...) {
+        }
+    }
+    return nlohmann::json::object();
+}
+
+/** Native Ollama tool_calls become the same action JSON the agent already executes. */
+std::string content_from_tool_calls(const nlohmann::json& message, const std::string& prose)
+{
+    if (!message.contains("tool_calls") || !message["tool_calls"].is_array() || message["tool_calls"].empty())
+        return {};
+    nlohmann::json actions = nlohmann::json::array();
+    std::string errors;
+    for (const auto& call : message["tool_calls"]) {
+        const nlohmann::json& fn = call.contains("function") && call["function"].is_object() ? call["function"] : call;
+        const std::string name = fn.value("name", "");
+        const nlohmann::json args = parse_tool_arguments(fn.contains("arguments") ? fn["arguments"] : nlohmann::json::object());
+        const OllamaNormalizedTool normalized = OllamaToolGateway::normalize(name, args);
+        if (!normalized.ok) {
+            if (!errors.empty())
+                errors += " ";
+            errors += normalized.error;
+            continue;
+        }
+        actions.push_back(normalized.action);
+    }
+    nlohmann::json root = {{"message", prose.empty() ? errors : prose}, {"done", false}, {"actions", std::move(actions)}};
+    if (!errors.empty() && prose.empty())
+        root["message"] = errors;
+    return root.dump();
 }
 
 std::string summarize_empty_reply(const nlohmann::json& j, const std::string& raw)
@@ -311,7 +353,8 @@ std::vector<std::string> list_models_sync_impl(const std::string& base_url, std:
 ChatAttemptResult run_chat_http(const std::string& url, const std::string& model,
                                 const std::vector<OllamaMessage>& messages,
                                 const std::shared_ptr<std::atomic<bool>>& cancel_flag, int retry_tier,
-                                OllamaRequestKind kind, OllamaClient::StreamCallback stream_cb = nullptr)
+                                OllamaRequestKind kind, OllamaClient::StreamCallback stream_cb = nullptr,
+                                const std::string& tools_json = {})
 {
     ChatAttemptResult out;
     out.retry_tier = retry_tier;
@@ -327,6 +370,14 @@ ChatAttemptResult run_chat_http(const std::string& url, const std::string& model
     body["messages"] = nlohmann::json::array();
     for (const OllamaMessage& msg : messages)
         body["messages"].push_back({{"role", msg.role}, {"content", msg.content}});
+    if (!tools_json.empty()) {
+        try {
+            const nlohmann::json tools = nlohmann::json::parse(tools_json);
+            if (tools.is_array() && !tools.empty())
+                body["tools"] = tools;
+        } catch (...) {
+        }
+    }
 
     const std::string post_body = body.dump();
 
@@ -442,6 +493,11 @@ ChatAttemptResult run_chat_http(const std::string& url, const std::string& model
         out.content        = extract_chat_content(j);
         out.http_status    = http_status;
         out.resolved_model = model;
+        if (j.contains("message") && j["message"].is_object()) {
+            const std::string from_tools = content_from_tool_calls(j["message"], out.content);
+            if (!from_tools.empty())
+                out.content = from_tools;
+        }
         if (!is_effectively_empty(out.content))
             return out;
 
@@ -477,7 +533,7 @@ void OllamaClient::cancel_active_requests(OllamaCancelDomain domain)
 }
 
 void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessage>& messages, ChatCallback callback,
-                        OllamaRequestKind kind, StreamCallback stream_cb)
+                        OllamaRequestKind kind, StreamCallback stream_cb, std::string tools_json)
 {
     if (!callback)
         return;
@@ -501,6 +557,7 @@ void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessag
         std::string                        url;
         std::string                        model;
         std::vector<OllamaMessage>         messages;
+        std::string                        tools_json;
         std::shared_ptr<std::atomic<bool>> cancel_flag;
         OllamaRequestKind                  kind;
     };
@@ -512,6 +569,7 @@ void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessag
     job->url         = m_base_url + "/api/chat";
     job->model       = normalize_model_tag(model);
     job->messages    = messages;
+    job->tools_json  = std::move(tools_json);
     job->cancel_flag = std::make_shared<std::atomic<bool>>(false);
     job->kind        = kind;
     {
@@ -536,7 +594,12 @@ void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessag
                 model = pick_installed_ollama_model(installed, model);
 
             result = run_chat_http(job->url, model, job->messages, job->cancel_flag, retry_tier, job->kind,
-                                   job->stream_cb);
+                                   job->stream_cb, job->tools_json);
+            if (result.content.empty() && !job->tools_json.empty()
+                && (result.http_status == 400 || result.error.find("tool") != std::string::npos)) {
+                result = run_chat_http(job->url, model, job->messages, job->cancel_flag, retry_tier, job->kind,
+                                       job->stream_cb);
+            }
 
             if (result.content.empty() && result.error.find("HTTP 404") != std::string::npos && !installed.empty()) {
                 model  = pick_installed_ollama_model(installed, model);

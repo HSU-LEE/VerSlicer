@@ -11017,10 +11017,15 @@ static std::map<t_custom_gcode_key, t_config_option_keys> s_CustomGcodeSpecificP
                                      "curr_physical_extruder_id", "timelapse_pos_x", "timelapse_pos_y", "has_timelapse_safe_pos"}},
     {"wrapping_detection_gcode",    {"layer_num", "layer_z", "max_layer_z", "most_used_physical_extruder_id", "curr_physical_extruder_id"}},
     {"change_filament_gcode",       {"layer_num", "layer_z", "max_layer_z", "next_extruder", "previous_extruder", "fan_speed",
-                               "first_flush_volume", "flush_length_1", "flush_length_2", "flush_length_3", "flush_length_4",
+                               "first_flush_volume", "flush_length", "flush_length_1", "flush_length_2", "flush_length_3", "flush_length_4",
+                               "flush_temperatures", "flush_volumetric_speeds", "filament_cooling_before_tower",
                                "new_filament_e_feedrate", "new_filament_temp", "new_retract_length",
                                "new_retract_length_toolchange", "old_filament_e_feedrate", "old_filament_temp", "old_retract_length",
                                "old_retract_length_toolchange", "relative_e_axis", "second_flush_volume", "toolchange_count", "toolchange_z",
+                               "current_hotend", "next_hotend", "outer_wall_volumetric_speed",
+                               "wipe_avoid_perimeter", "wipe_avoid_pos_x", "is_prime_tower_interface",
+                               "filament_tower_interface_purge_volume", "filament_tower_interface_print_temp",
+                               "temperature", "first_layer_temperature", "nozzle_temperature", "nozzle_temperature_initial_layer",
                                "travel_point_1_x", "travel_point_1_y", "travel_point_2_x", "travel_point_2_y", "travel_point_3_x",
                                "travel_point_3_y", "x_after_toolchange", "y_after_toolchange", "z_after_toolchange"}},
     {"change_extrusion_role_gcode", {"layer_num", "layer_z", "extrusion_role", "last_extrusion_role"}},
@@ -11092,6 +11097,19 @@ CustomGcodeSpecificConfigDef::CustomGcodeSpecificConfigDef()
     new_def("flush_length_2", coFloat, "Flush Length 2", "The second flush length.");
     new_def("flush_length_3", coFloat, "Flush Length 3", "The third flush length.");
     new_def("flush_length_4", coFloat, "Flush Length 4", "The fourth flush length.");
+    new_def("flush_length", coFloat, "Flush length", "Total length of filament to purge during this toolchange.");
+    new_def("flush_temperatures", coInts, "Flush temperatures", "Per-filament nozzle temperature used while purging.");
+    new_def("flush_volumetric_speeds", coFloats, "Flush volumetric speeds", "Per-filament volumetric speed used while purging.");
+    new_def("filament_cooling_before_tower", coFloats, "Cooling before tower", "Per-filament cooling distance before the prime tower.");
+    new_def("current_hotend", coInt, "Current hotend", "Zero-based hotend index that is unloading.");
+    new_def("next_hotend", coInt, "Next hotend", "Zero-based hotend index that is loading.");
+    new_def("toolchange_z", coFloat, "Toolchange Z", "Z height at which the filament change runs.");
+    new_def("outer_wall_volumetric_speed", coFloat, "Outer wall volumetric speed", "Outer-wall volumetric speed of the filament being loaded.");
+    new_def("wipe_avoid_perimeter", coBool, "Wipe avoid perimeter", "True when the travel after a toolchange should avoid perimeters.");
+    new_def("wipe_avoid_pos_x", coFloat, "Wipe avoid position X", "X coordinate used when routing the post-toolchange travel around the model.");
+    new_def("is_prime_tower_interface", coBool, "Prime tower interface", "True when this toolchange is printing the prime-tower interface.");
+    new_def("filament_tower_interface_purge_volume", coFloat, "Tower interface purge volume", "Extra purge volume used for the prime-tower interface.");
+    new_def("filament_tower_interface_print_temp", coInt, "Tower interface print temperature", "Nozzle temperature used while printing the prime-tower interface.");
 
 // change_extrusion_role_gcode
     std::string extrusion_role_types = "Possible Values:\n[\"Perimeter\", \"ExternalPerimeter\", "

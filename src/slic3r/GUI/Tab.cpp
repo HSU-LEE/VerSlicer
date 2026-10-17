@@ -1259,6 +1259,12 @@ void Tab::load_config(const DynamicPrintConfig& config)
 // Reload current $self->{config} (aka $self->{presets}->edited_preset->config) into the UI fields.
 void Tab::reload_config()
 {
+    // Reload every built page, not only the one on screen. Otherwise a setting
+    // written into the preset stays invisible until that page is opened again.
+    for (const PageShp& page : m_pages) {
+        if (page)
+            page->reload_config();
+    }
     if (m_active_page)
         m_active_page->reload_config();
     if (m_type == Preset::TYPE_PRINT && m_config != nullptr)

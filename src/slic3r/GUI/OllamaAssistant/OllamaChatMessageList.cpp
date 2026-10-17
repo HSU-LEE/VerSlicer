@@ -10,6 +10,10 @@
 #include <wx/stattext.h>
 #include <wx/timer.h>
 
+#ifdef __WXOSX__
+#include <wx/osx/window.h>
+#endif
+
 #include <algorithm>
 
 namespace Slic3r { namespace GUI {
@@ -40,16 +44,25 @@ int bubble_border_px(wxWindow* ref)
 
 wxSize measure_wrapped_label(wxStaticText* label, int wrap_px, wxWindow* ref)
 {
+    // Wrap() does nothing when the width is unchanged, so a label whose text just
+    // changed stays on one line. Toggle the width so the new text is wrapped.
+    // Do not use GetBestSize() here: on macOS that is NSTextField sizeToFit of the
+    // current frame, which locks in a stretched height and becomes a blank tail.
+    label->Wrap(wrap_px + 1);
     label->Wrap(wrap_px);
-    const wxSize best = label->GetBestSize();
-    wxClientDC     dc(label);
+    wxClientDC dc(label);
     dc.SetFont(label->GetFont());
-    const wxSize dc_sz = dc.GetMultiLineTextExtent(label->GetLabel());
-    // Extra vertical slack: on macOS GetBestSize often under-reports wrapped Hangul
-    // height by a few pixels, which clips the last line of system welcome bubbles.
+    const wxString wrapped = label->GetLabel();
+    wxSize dc_sz = dc.GetMultiLineTextExtent(wrapped);
+    if (dc_sz.GetHeight() <= 0)
+        dc_sz.SetHeight(dc.GetCharHeight());
+    // GetMultiLineTextExtent under-reports wrapped Hangul, and the native field
+    // then draws past the bubble into the input row. Size from line count as well.
+    const int line_count = std::max(1, 1 + static_cast<int>(std::count(wrapped.begin(), wrapped.end(), '\n')));
+    const int from_lines = line_count * (dc.GetCharHeight() + ref->FromDIP(3));
     const int slack = ref->FromDIP(6);
-    const int w     = std::min(std::max(best.GetWidth(), dc_sz.GetWidth()) + ref->FromDIP(2), wrap_px);
-    const int h     = std::max(best.GetHeight(), dc_sz.GetHeight()) + slack;
+    const int w     = std::min(std::max(dc_sz.GetWidth() + ref->FromDIP(2), ref->FromDIP(8)), wrap_px);
+    const int h     = std::max(dc_sz.GetHeight() + slack, from_lines);
     return wxSize(w, h);
 }
 
@@ -62,9 +75,22 @@ OllamaChatMessageList::OllamaChatMessageList(wxWindow* parent)
     SetScrollRate(0, FromDIP(10));
     m_sizer = new wxBoxSizer(wxVERTICAL);
     auto* outer = new wxBoxSizer(wxVERTICAL);
-    outer->Add(m_sizer, 1, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(kListPadDp));
+    // Slack sits above the bubbles, so a short transcript rests on the input
+    // instead of leaving a dead zone under the newest line. The spacer's min
+    // height is 0, so it does not add scrollable blank once the list is taller
+    // than the viewport.
+    outer->Add(0, 0, 1);
+    outer->Add(m_sizer, 0, wxEXPAND | wxLEFT | wxRIGHT, FromDIP(kListPadDp));
     outer->AddSpacer(FromDIP(kListPadDp));
     SetSizer(outer);
+    // HandleOnSize would replace the virtual size with max(client, sizer min)
+    // and, together with scrolling to that height, parks the view in the padding.
+    SetAutoLayout(false);
+#ifdef __WXOSX__
+    // Without this, scrolled bubbles paint over the input row underneath.
+    MacClipsToBounds(true);
+    MacSetClipChildren();
+#endif
 
     Bind(wxEVT_SIZE, &OllamaChatMessageList::on_size, this);
 
@@ -219,15 +245,16 @@ void OllamaChatMessageList::rewrap_row(Row& row)
     const int    label_w = std::min(text_sz.GetWidth(), wrap);
     const int    label_h = text_sz.GetHeight();
     row.label->SetMinSize(wxSize(label_w, label_h));
-    row.label->SetMaxSize(wxSize(wrap, -1));
+    row.label->SetMaxSize(wxSize(wrap, label_h));
     const int pad_x  = FromDIP(kBubblePadXDp);
     const int pad_y  = FromDIP(bubble_pad_y_dp(row.kind));
     const int border = bubble_border_px(this);
     const int bubble_w = std::min(label_w + 2 * pad_x + 2 * border, max_bubble_width());
     const int bubble_h = label_h + 2 * pad_y + 2 * border;
     row.bubble->SetMinSize(wxSize(bubble_w, bubble_h));
-    row.bubble->SetMaxSize(wxSize(max_bubble_width(), -1));
+    row.bubble->SetMaxSize(wxSize(max_bubble_width(), bubble_h));
     row.row_panel->SetMinSize(wxSize(-1, bubble_h));
+    row.row_panel->SetMaxSize(wxSize(-1, bubble_h));
     row.bubble->Layout();
     row.row_panel->Layout();
 }
@@ -279,7 +306,14 @@ void OllamaChatMessageList::rewrap_all()
 
 void OllamaChatMessageList::layout_transcript(bool scroll_to_end)
 {
-    FitInside();
+    const int client_w = std::max(GetClientSize().GetWidth(), FromDIP(120));
+    const int client_h = std::max(GetClientSize().GetHeight(), 1);
+    const wxSize min = GetSizer() ? GetSizer()->CalcMin() : wxSize(client_w, client_h);
+    // At least one viewport tall so the top spacer can pin short threads to the
+    // input. Taller threads use their real height, with no extra page of blank.
+    const int virt_h = std::max(min.y, client_h);
+    const int virt_w = std::max(min.x, client_w);
+    SetVirtualSize(virt_w, virt_h);
     Layout();
     maybe_rewrap_for_scrollbar();
     if (scroll_to_end)
@@ -298,19 +332,13 @@ void OllamaChatMessageList::on_size(wxSizeEvent& evt)
 
 void OllamaChatMessageList::scroll_to_bottom()
 {
-    FitInside();
-    Layout();
-    maybe_rewrap_for_scrollbar();
-    const int unit_y = std::max(1, FromDIP(10));
-    const int virt_y = GetVirtualSize().GetHeight();
-    Scroll(0, virt_y / unit_y + 1);
-    CallAfter([this]() {
-        FitInside();
-        Layout();
-        maybe_rewrap_for_scrollbar();
-        const int unit = std::max(1, FromDIP(10));
-        Scroll(0, GetVirtualSize().GetHeight() / unit + 1);
-    });
+    const int unit = std::max(1, FromDIP(10));
+    const int overflow = GetVirtualSize().GetHeight() - GetClientSize().GetHeight();
+    if (overflow <= 0) {
+        Scroll(0, 0);
+        return;
+    }
+    Scroll(0, (overflow + unit - 1) / unit);
 }
 
 void OllamaChatMessageList::drop_oldest_if_needed()

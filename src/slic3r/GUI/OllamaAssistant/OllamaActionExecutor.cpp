@@ -587,16 +587,38 @@ static void expand_support_options(nlohmann::json& options)
         return;
     }
 
-    if (options.contains("support_type") && options["support_type"].is_string())
-        options["support_type"] = normalize_support_type_value(options["support_type"].get<std::string>());
+    auto is_hybrid_request = [](std::string v) {
+        boost::algorithm::to_lower(v);
+        return v.find("hybrid") != std::string::npos || v.find("하이브리드") != std::string::npos;
+    };
+
+    if (options.contains("support_type") && options["support_type"].is_string()) {
+        const std::string raw = options["support_type"].get<std::string>();
+        if (is_hybrid_request(raw)) {
+            // Tree Hybrid is a support style, not a support_type enum value.
+            options["enable_support"] = true;
+            options["support_type"]   = kAssistantDefaultSupportType;
+            options["support_style"]  = "tree_hybrid";
+        } else {
+            options["support_type"] = normalize_support_type_value(raw);
+        }
+    }
+    if (options.contains("support_style") && options["support_style"].is_string()
+        && is_hybrid_request(options["support_style"].get<std::string>())) {
+        options["enable_support"] = true;
+        options["support_style"]  = "tree_hybrid";
+        if (!options.contains("support_type"))
+            options["support_type"] = kAssistantDefaultSupportType;
+    }
 
     if (!options.contains("enable_support"))
         return;
     if (!json_truthy(options["enable_support"]))
         return;
 
-    // Bambu/Orca: tree(auto) generates tree supports from geometry.
-    options["support_type"] = kAssistantDefaultSupportType;
+    // Turning support on without a type uses tree(auto). Do not overwrite a type already chosen.
+    if (!options.contains("support_type"))
+        options["support_type"] = kAssistantDefaultSupportType;
 }
 
 static void strip_disallowed_config_keys(nlohmann::json& options)
@@ -908,6 +930,7 @@ OllamaActionResult apply_set_config(const nlohmann::json& action)
 
     if (Tab* tab = wxGetApp().get_tab(ptype)) {
         tab->update_dirty();
+        tab->update_changed_ui();
         tab->reload_config();
     }
     if (auto* plater = wxGetApp().plater()) {
@@ -917,25 +940,36 @@ OllamaActionResult apply_set_config(const nlohmann::json& action)
             wxGetApp().mainframe->update_side_preset_ui();
     }
 
+    std::string applied_summary;
+    bool        stuck = true;
+    for (const std::string& kv : mut.applied_kvs) {
+        const auto eq = kv.find('=');
+        if (eq == std::string::npos)
+            continue;
+        const std::string key  = kv.substr(0, eq);
+        const std::string want = kv.substr(eq + 1);
+        std::string       got  = want;
+        try {
+            got = cfg->opt_serialize(key);
+        } catch (...) {
+            stuck = false;
+        }
+        if (got != want)
+            stuck = false;
+        if (!applied_summary.empty())
+            applied_summary += ", ";
+        applied_summary += key + "=" + got;
+    }
+    if (!stuck) {
+        result.message = "Setting did not stick: " + applied_summary;
+        OllamaTelemetry::set_config_applied(preset, mut.attempted, 0, false);
+        return result;
+    }
+
     result.success          = true;
     result.effective_change = true;
     OllamaTelemetry::set_config_applied(preset, mut.attempted, mut.changed, false);
-
-    if (mut.changed == 1 && mut.applied_kvs.size() == 1) {
-        const std::string& kv = mut.applied_kvs.front();
-        if (kv.find("brim_width") != std::string::npos && kv.find("=0") == std::string::npos)
-            result.message = "Brim enabled";
-        else if (kv.find("brim_width=0") != std::string::npos)
-            result.message = "Brim disabled";
-        else if (kv.find("enable_support") != std::string::npos)
-            result.message = "Supports enabled";
-        else if (kv.find("sparse_infill_density") != std::string::npos)
-            result.message = "Infill updated";
-        else
-            result.message = "Print setting updated";
-    } else {
-        result.message = (boost::format("Updated %1% print setting(s)") % mut.changed).str();
-    }
+    result.message = "Applied " + applied_summary;
     return result;
 }
 

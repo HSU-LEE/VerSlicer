@@ -8,6 +8,7 @@
 #include "../ModelSearch/CandidateRanker.hpp"
 #include "../ModelSearch/ModelSearchService.hpp"
 
+#include "../MakerWorld/MakerWorldImportFlow.hpp"
 #include "../MakerWorld/MakerWorldPrintOfferDialog.hpp"
 #include "../MakerWorld/MakerWorldTypes.hpp"
 
@@ -83,9 +84,14 @@ int PrintJobStepExecutors::show_print_offer_dialog(wxWindow* parent, const std::
     for (size_t i = 0; i < limit; ++i)
         top.push_back(to_makerworld_candidate(candidates[i]));
 
+    if (!MakerWorldImportFlow::try_begin_model_chooser())
+        return -1;
+
     wxWindow* p = parent ? parent : wxGetApp().GetTopWindow();
     MakerWorldPrintOfferDialog dlg(p, top);
-    if (dlg.ShowModal() != wxID_OK || !dlg.has_selection())
+    const int offer = dlg.ShowModal();
+    MakerWorldImportFlow::end_model_chooser();
+    if (offer != wxID_OK || !dlg.has_selection())
         return -1;
 
     const int idx = dlg.selected_index();

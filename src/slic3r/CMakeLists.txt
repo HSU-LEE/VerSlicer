@@ -140,6 +140,10 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaExecutionPolicy.hpp
     GUI/OllamaAssistant/OllamaToolRegistry.cpp
     GUI/OllamaAssistant/OllamaToolRegistry.hpp
+    GUI/OllamaAssistant/OllamaToolGateway.cpp
+    GUI/OllamaAssistant/OllamaToolGateway.hpp
+    GUI/OllamaAssistant/OllamaMcpServer.cpp
+    GUI/OllamaAssistant/OllamaMcpServer.hpp
     GUI/OllamaAssistant/OllamaToolResult.cpp
     GUI/OllamaAssistant/OllamaToolResult.hpp
     GUI/OllamaAssistant/OllamaChatDialog.cpp

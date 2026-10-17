@@ -1340,28 +1340,53 @@ static inline std::vector<std::vector<ExPolygons>> segmentation_top_and_bottom_l
     };
     auto layer_color_stat = [&layers = std::as_const(layers), &print_object](const size_t layer_idx, const size_t color_idx) -> LayerColorStat {
         LayerColorStat out;
+        if (layer_idx >= layers.size() || layers[layer_idx] == nullptr)
+            return out;
         const Layer &layer = *layers[layer_idx];
-        for (const LayerRegion *region : layer.regions())
-            if (const PrintRegionConfig &config = region->region().config();
+        const float  layer_height = std::max(float(layer.height), 0.05f);
+        // Painting runs before regions are split by extruder, so a painted filament
+        // often has no wall_filament match. A zero outer-wall width also makes
+        // Flow::rounded_rectangle_extrusion_spacing throw and abort the slice.
+        const auto accumulate = [&](const bool match_color) {
+            for (const LayerRegion *region : layer.regions()) {
+                const PrintRegionConfig &config = region->region().config();
                 // color_idx == 0 means "don't know" extruder aka the underlying extruder.
-                // As this region may split existing regions, we collect statistics over all regions for color_idx == 0.
-                color_idx == 0 || config.wall_filament == int(color_idx)) {
-                //BBS: the extrusion line width is outer wall rather than inner wall
-                const double nozzle_diameter = print_object.print()->config().nozzle_diameter.get_at(0);
+                if (match_color && color_idx != 0 && config.wall_filament != int(color_idx))
+                    continue;
+                const int filament_id = config.wall_filament.value > 0 ? config.wall_filament.value : 1;
+                const double nozzle_diameter = std::max(print_object.print()->config().nozzle_diameter.get_at(size_t(filament_id - 1)), 0.1);
                 double outer_wall_line_width = config.get_abs_value("outer_wall_line_width", nozzle_diameter);
-                out.extrusion_width     = std::max<float>(out.extrusion_width, outer_wall_line_width);
+                if (outer_wall_line_width <= 0.)
+                    outer_wall_line_width = print_object.config().get_abs_value("line_width", nozzle_diameter);
+                if (outer_wall_line_width <= 0.)
+                    outer_wall_line_width = Flow::auto_extrusion_width(frExternalPerimeter, float(nozzle_diameter));
+                const float min_width = layer_height * float(1. - 0.25 * PI) + 0.05f;
+                if (outer_wall_line_width < min_width)
+                    outer_wall_line_width = std::max<double>(min_width, nozzle_diameter);
+                out.extrusion_width     = std::max<float>(out.extrusion_width, float(outer_wall_line_width));
                 out.top_shell_layers    = std::max<int>(out.top_shell_layers, config.top_shell_layers);
                 out.bottom_shell_layers = std::max<int>(out.bottom_shell_layers, config.bottom_shell_layers);
                 out.small_region_threshold = config.gap_infill_speed.value > 0 ?
                                              // Gap fill enabled. Enable a single line of 1/2 extrusion width.
-                                             0.5f * outer_wall_line_width :
+                                             0.5f * float(outer_wall_line_width) :
                                              // Gap fill disabled. Enable two lines slightly overlapping.
-                                             outer_wall_line_width + 0.7f * Flow::rounded_rectangle_extrusion_spacing(outer_wall_line_width, float(layer.height));
+                                             float(outer_wall_line_width) + 0.7f * Flow::rounded_rectangle_extrusion_spacing(float(outer_wall_line_width), layer_height);
                 out.small_region_threshold = scaled<float>(out.small_region_threshold * 0.5f);
-                out.extrusion_spacing = Flow::rounded_rectangle_extrusion_spacing(float(outer_wall_line_width), float(layer.height));
+                out.extrusion_spacing = Flow::rounded_rectangle_extrusion_spacing(float(outer_wall_line_width), layer_height);
                 ++ out.num_regions;
             }
-        assert(out.num_regions > 0);
+        };
+        accumulate(true);
+        if (out.num_regions == 0)
+            accumulate(false);
+        if (out.num_regions == 0) {
+            const double nozzle_diameter = std::max(print_object.print()->config().nozzle_diameter.get_at(0), 0.1);
+            const double width = Flow::auto_extrusion_width(frExternalPerimeter, float(nozzle_diameter));
+            out.extrusion_width = float(width);
+            out.extrusion_spacing = Flow::rounded_rectangle_extrusion_spacing(float(width), layer_height);
+            out.small_region_threshold = scaled<float>(0.5f * float(width) * 0.5f);
+            out.num_regions = 1;
+        }
         out.extrusion_width = scaled<float>(out.extrusion_width);
         out.extrusion_spacing = scaled<float>(out.extrusion_spacing);
         return out;
@@ -1375,7 +1400,13 @@ static inline std::vector<std::vector<ExPolygons>> segmentation_top_and_bottom_l
         for (size_t layer_idx = range.begin(); layer_idx < range.end(); ++ layer_idx) {
             for (size_t color_idx = 0; color_idx < num_facets_states; ++color_idx) {
                 throw_on_cancel_callback();
+                const bool has_top    = !top_raw[color_idx].empty() && !top_raw[color_idx][layer_idx].empty();
+                const bool has_bottom = !bottom_raw[color_idx].empty() && !bottom_raw[color_idx][layer_idx].empty();
+                if (!has_top && !has_bottom)
+                    continue;
                 LayerColorStat stat = layer_color_stat(layer_idx, color_idx);
+                if (stat.num_regions <= 0 || stat.extrusion_width <= 0.f)
+                    continue;
                 if (std::vector<Polygons> &top = top_raw[color_idx]; ! top.empty() && ! top[layer_idx].empty())
                     if (ExPolygons top_ex = union_ex(top[layer_idx]); ! top_ex.empty()) {
                         // Clean up thin projections. They are not printable anyways.

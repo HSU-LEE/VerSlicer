@@ -11,6 +11,7 @@
 #include "OllamaExecutionPolicy.hpp"
 #include "OllamaToolRegistry.hpp"
 #include "OllamaSettingSearch.hpp"
+#include "OllamaToolGateway.hpp"
 #include "OllamaToolResult.hpp"
 #include "OllamaConfigProposalBuilder.hpp"
 
@@ -318,7 +319,8 @@ void OllamaAgentController::begin_step()
                               return;
                           on_llm_response(text, error);
                       });
-                  });
+                  },
+                  OllamaRequestKind::Chat, nullptr, OllamaToolGateway::ollama_tools().dump());
 }
 
 void OllamaAgentController::note_workflow_mutations(const OllamaWorkflowRun& workflow)

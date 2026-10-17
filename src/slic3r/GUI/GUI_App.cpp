@@ -5,6 +5,7 @@
 #include "OllamaAssistant/OllamaVoiceInput.hpp"
 #include "OllamaAssistant/OllamaClient.hpp"
 #include "OllamaAssistant/OllamaServerManager.hpp"
+#include "OllamaAssistant/OllamaMcpServer.hpp"
 #include "GUI_Init.hpp"
 #include "GUI_ObjectList.hpp"
 #include "slic3r/GUI/UserManager.hpp"
@@ -755,6 +756,8 @@ void GUI_App::post_init()
     if (! this->initialized())
         throw Slic3r::RuntimeError("Calling post_init() while not yet initialized");
 
+    OllamaMcpServer::start();
+
     m_open_method = "double_click";
     bool switch_to_3d = false;
 
@@ -1066,6 +1069,7 @@ void GUI_App::cleanup_ollama_assistant()
         ollama_voice_input.reset();
     }
 
+    OllamaMcpServer::stop();
     OllamaServerManager::shutdown_if_started();
 
     OllamaChatDialog* dlg = ollama_chat_dialog;

@@ -52,6 +52,10 @@ public:
 
     /** Plater calls when import_model_id finishes (success or failure). */
     static void notify_plater_import_done(bool ok, const std::string& detail = {});
+
+    /** Only one model-chooser dialog may be on screen. */
+    static bool try_begin_model_chooser();
+    static void end_model_chooser();
 };
 
 }} // namespace

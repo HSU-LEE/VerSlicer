@@ -127,8 +127,15 @@ std::string friendly_tool_line(const std::string& tool, const std::string& msg, 
         return korean ? "모델을 개별 객체로 분할했습니다." : "Split the model into separate objects.";
     if (tool == "add_plate" || msg.find("Added plate") != std::string::npos)
         return korean ? "새 빌드 플레이트를 추가했습니다." : "Added a new build plate.";
-    if (tool == "set_config" || msg.find("print setting") != std::string::npos)
+    if (tool == "set_config" || msg.find("print setting") != std::string::npos) {
+        if (msg.rfind("Applied ", 0) == 0) {
+            const std::string values = msg.substr(8);
+            return korean ? ("설정을 반영했습니다: " + values) : ("Applied " + values);
+        }
+        if (msg.find("did not stick") != std::string::npos)
+            return korean ? "설정이 반영되지 않았습니다." : "The setting did not stay applied.";
         return korean ? "인쇄 설정을 조정했습니다." : "Updated print settings.";
+    }
     if (tool == "get_state" || tool == "list_objects")
         return korean ? "모델 상태를 확인했습니다." : "Checked model state.";
     if (tool == "slice" || msg.find("licing") != std::string::npos)

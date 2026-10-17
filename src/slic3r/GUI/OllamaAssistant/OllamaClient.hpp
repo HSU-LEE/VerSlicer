@@ -43,7 +43,8 @@ public:
     using ModelsCallback = std::function<void(const std::vector<std::string>& models, const std::string& error)>;
 
     void chat(const std::string& model, const std::vector<OllamaMessage>& messages, ChatCallback callback,
-              OllamaRequestKind kind = OllamaRequestKind::Chat, StreamCallback stream = nullptr);
+              OllamaRequestKind kind = OllamaRequestKind::Chat, StreamCallback stream = nullptr,
+              std::string tools_json = {});
     void list_models(ModelsCallback callback);
 
     static void cancel_active_requests(OllamaCancelDomain domain = OllamaCancelDomain::All);
