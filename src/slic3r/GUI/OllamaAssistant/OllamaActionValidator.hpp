@@ -18,7 +18,7 @@ struct OllamaActionSanitizeResult
 class OllamaActionValidator
 {
 public:
-    static constexpr size_t kMaxActionsPerTurn = 12;
+    static constexpr size_t kMaxActionsPerTurn = 32;
 
     /** Map common LLM type aliases to canonical action ids (no user-intent rules). */
     static std::string canonical_action_type(std::string type);

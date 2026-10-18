@@ -2520,6 +2520,7 @@ void GUI_App::init_app_config()
         m_last_config_version = app_config->orig_version();//parse_semver_from_ini(app_config->config_path());
     }
     else {
+        app_config->set_defaults();
 #ifdef _WIN32
         // update associate files from registry information
         if (is_associate_files(L"3mf")) {

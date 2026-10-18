@@ -564,7 +564,7 @@ void MaterialSyncItem::doRender(wxDC &dc)
 
     ////border
 #if __APPLE__
-    dc.SetPen(wxColour(0xAC, 0xAC, 0xAC));
+    dc.SetPen(wxPen(wxGetApp().dark_mode() ? wxColour(107, 107, 107) : wxColour(0xAC, 0xAC, 0xAC), 1));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
     dc.DrawRoundedRectangle(1, 1, MATERIAL_ITEM_SIZE.x - 1, MATERIAL_ITEM_SIZE.y - 1, 5);
 
@@ -1420,7 +1420,7 @@ bool AmsMapingPopup::ProcessLeftDown(wxMouseEvent &event)
 void AmsMapingPopup::paintEvent(wxPaintEvent &evt)
 {
     wxPaintDC dc(this);
-    dc.SetPen(wxColour(0xAC, 0xAC, 0xAC));
+    dc.SetPen(StateColor::darkModeColorFor(wxColour("#DBDBDB")));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
     dc.DrawRoundedRectangle(0, 0, GetSize().x, GetSize().y, 0);
 }
@@ -1757,7 +1757,7 @@ AmsMapingTipPopup::AmsMapingTipPopup(wxWindow *parent)
 void AmsMapingTipPopup::paintEvent(wxPaintEvent &evt)
 {
     wxPaintDC dc(this);
-    dc.SetPen(wxColour(0xAC, 0xAC, 0xAC));
+    dc.SetPen(StateColor::darkModeColorFor(wxColour("#DBDBDB")));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
     dc.DrawRoundedRectangle(0, 0, GetSize().x, GetSize().y, 0);
 }
@@ -1894,7 +1894,7 @@ void AmsHumidityTipPopup::doRender(wxDC& dc)
     dc.DrawBitmap(close_img.bmp(), GetSize().x - close_img.GetBmpWidth() - FromDIP(38), FromDIP(24));
 
     //background
-    dc.SetPen(wxColour(0xAC, 0xAC, 0xAC));
+    dc.SetPen(StateColor::darkModeColorFor(wxColour("#DBDBDB")));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
     dc.DrawRoundedRectangle(0, 0, GetSize().x, GetSize().y, 0);
 }
@@ -1992,7 +1992,7 @@ AmsTutorialPopup::AmsTutorialPopup(wxWindow* parent)
 void AmsTutorialPopup::paintEvent(wxPaintEvent& evt)
 {
     wxPaintDC dc(this);
-    dc.SetPen(wxColour(0xAC, 0xAC, 0xAC));
+    dc.SetPen(StateColor::darkModeColorFor(wxColour("#DBDBDB")));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
     dc.DrawRoundedRectangle(0, 0, GetSize().x, GetSize().y, 0);
 }
@@ -2076,7 +2076,7 @@ void AmsIntroducePopup::set_mode(bool enable_ams)
 void AmsIntroducePopup::paintEvent(wxPaintEvent& evt)
 {
     wxPaintDC dc(this);
-    dc.SetPen(wxColour(0xAC, 0xAC, 0xAC));
+    dc.SetPen(StateColor::darkModeColorFor(wxColour("#DBDBDB")));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
     dc.DrawRoundedRectangle(0, 0, GetSize().x, GetSize().y, 0);
 }
@@ -2283,7 +2283,7 @@ AmsRMGroup* AmsReplaceMaterialDialog::create_backup_group(wxString gname, std::m
 void AmsReplaceMaterialDialog::paintEvent(wxPaintEvent& evt)
 {
     wxPaintDC dc(this);
-    dc.SetPen(wxColour(0xAC, 0xAC, 0xAC));
+    dc.SetPen(StateColor::darkModeColorFor(wxColour("#DBDBDB")));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
     dc.DrawRoundedRectangle(0, 0, GetSize().x, GetSize().y, 0);
 }

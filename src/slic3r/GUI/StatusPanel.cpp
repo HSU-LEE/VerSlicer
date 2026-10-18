@@ -1446,33 +1446,30 @@ wxBoxSizer *StatusBasePanel::create_monitoring_page()
     bSizer_monitoring_title->Add(FromDIP(13), 0, 0, 0);
     bSizer_monitoring_title->AddStretchSpacer();
 
-    m_staticText_timelapse = new wxStaticText(m_panel_monitoring_title, wxID_ANY, _L("Timelapse"), wxDefaultPosition, wxDefaultSize, 0);
-    m_staticText_timelapse->Wrap(-1);
+    m_staticText_timelapse = new wxStaticText(m_panel_monitoring_title, wxID_ANY, _L("Timelapse"), wxDefaultPosition, wxDefaultSize,
+                                             wxST_ELLIPSIZE_END | wxALIGN_RIGHT);
+    m_staticText_timelapse->SetMinSize(wxSize(FromDIP(48), -1));
+    m_staticText_timelapse->SetForegroundColour(PAGE_TITLE_FONT_COL());
     m_staticText_timelapse->Hide();
-    bSizer_monitoring_title->Add(m_staticText_timelapse, 0, wxALIGN_CENTER_VERTICAL | wxALL, FromDIP(5));
+    bSizer_monitoring_title->Add(m_staticText_timelapse, 1, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, FromDIP(8));
 
-    m_mqtt_source = new wxStaticText(m_panel_monitoring_title, wxID_ANY, "MqttSource", wxDefaultPosition, wxDefaultSize, 0);
-    m_mqtt_source->Wrap(-1);
+    m_mqtt_source = new wxStaticText(m_panel_monitoring_title, wxID_ANY, "MqttSource", wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
+    m_mqtt_source->SetMinSize(wxSize(FromDIP(36), -1));
+    m_mqtt_source->SetForegroundColour(PAGE_TITLE_FONT_COL());
     m_mqtt_source->Hide();
-    bSizer_monitoring_title->Add(m_mqtt_source, 0, wxALIGN_CENTER_VERTICAL | wxALL, FromDIP(5));
+    bSizer_monitoring_title->Add(m_mqtt_source, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(6));
 
     m_bmToggleBtn_timelapse = new SwitchButton(m_panel_monitoring_title);
     m_bmToggleBtn_timelapse->SetMinSize(SWITCH_BUTTON_SIZE);
     m_bmToggleBtn_timelapse->Hide();
-    bSizer_monitoring_title->Add(m_bmToggleBtn_timelapse, 0, wxALIGN_CENTER_VERTICAL | wxALL, FromDIP(5));
+    bSizer_monitoring_title->Add(m_bmToggleBtn_timelapse, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(8));
 
 #if !BBL_RELEASE_TO_PUBLIC
-    m_staticText_timelapse->Show();
-    m_bmToggleBtn_timelapse->Show();
-    m_bmToggleBtn_timelapse->Bind(wxEVT_TOGGLEBUTTON, [this](wxCommandEvent &e) {
-        NetworkAgent* agent = wxGetApp().getAgent();
-        if (!agent)
-            return;
-        if (e.IsChecked())
-            agent->start_subscribe("tunnel");
-        else
-            agent->stop_subscribe("tunnel");
-    });
+    // MQTT source and the tunnel switch are developer controls. Keep them off the
+    // camera title so the bar only shows Camera and the camera actions.
+    m_staticText_timelapse->Hide();
+    m_mqtt_source->Hide();
+    m_bmToggleBtn_timelapse->Hide();
 #endif
 
     //m_bitmap_camera_img = new wxStaticBitmap(m_panel_monitoring_title, wxID_ANY, m_bitmap_camera , wxDefaultPosition, wxSize(FromDIP(32), FromDIP(18)), 0);
@@ -2778,20 +2775,13 @@ void StatusPanel::update(MachineObject *obj)
     //m_project_task_panel->Thaw();
 
 #if !BBL_RELEASE_TO_PUBLIC
-    auto delay1 = std::chrono::duration_cast<std::chrono::milliseconds>(obj->last_utc_time - std::chrono::system_clock::now()).count();
-    auto delay2 = std::chrono::duration_cast<std::chrono::milliseconds>(obj->last_push_time - std::chrono::system_clock::now()).count();
-    auto delay  = wxString::Format(" %ld/%ld", delay1, delay2);
-    m_staticText_timelapse->SetLabel((obj->is_lan_mode_printer() ? "Local Mqtt" : obj->is_tunnel_mqtt ? "Tunnel Mqtt" : "Cloud Mqtt") + delay);
-    m_bmToggleBtn_timelapse->Enable(!obj->is_lan_mode_printer());
-    m_bmToggleBtn_timelapse->SetValue(obj->is_tunnel_mqtt);
-#endif
-
-#if !BBL_RELEASE_TO_PUBLIC
-    if (obj->HasRecentCloudMessage() && obj->HasRecentLanMessage()) m_mqtt_source->SetLabel("Cloud+Lan");
-    else if (obj->HasRecentCloudMessage()) m_mqtt_source->SetLabel("Cloud");
-    else if (obj->HasRecentLanMessage()) m_mqtt_source->SetLabel("Lan");
-    else m_mqtt_source->SetLabel("None");
-    m_mqtt_source->Show();
+    if (m_staticText_timelapse->IsShown() || m_mqtt_source->IsShown() || m_bmToggleBtn_timelapse->IsShown()) {
+        m_staticText_timelapse->Hide();
+        m_mqtt_source->Hide();
+        m_bmToggleBtn_timelapse->Hide();
+        if (m_panel_monitoring_title)
+            m_panel_monitoring_title->Layout();
+    }
 #endif
 
     //m_machine_ctrl_panel->Freeze();

@@ -5143,6 +5143,9 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     m_aui_mgr.AddPane(sidebar, wxAuiPaneInfo()
                                    .Name("sidebar")
                                    .Left()
+                                   .CaptionVisible(false)
+                                   .PaneBorder(false)
+                                   .Gripper(false)
                                    .CloseButton(false)
                                    .TopDockable(false)
                                    .BottomDockable(false)
@@ -5183,6 +5186,11 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
 
             sidebar_layout.is_collapsed = !sidebar.IsShown();
         }
+
+        // A saved layout can restore the empty caption bar above the Printer title.
+        sidebar.CaptionVisible(false);
+        sidebar.PaneBorder(false);
+        sidebar.Gripper(false);
 
         // Keep tracking the current sidebar size, by storing it using `best_size`, which will be stored
         // in the config and re-applied when the app is opened again.

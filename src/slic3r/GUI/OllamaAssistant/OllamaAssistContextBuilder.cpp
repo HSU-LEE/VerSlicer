@@ -81,7 +81,7 @@ std::string OllamaAssistContextBuilder::build_initial_user_block(const std::stri
               "Batch independent changes in one reply. Set done:true when the goal is met.\n\n";
 
     std::string body = block.dump(2);
-    body             = OllamaActionExecutor::fit_context_json_to_limit(std::move(body), 12000);
+    body             = OllamaActionExecutor::fit_context_json_to_limit(std::move(body), 48000);
     return header + body;
 }
 

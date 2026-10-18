@@ -147,10 +147,7 @@ MediaPlayCtrl::MediaPlayCtrl(wxWindow *parent, wxMediaCtrl2 *media_ctrl, const w
     m_label_stat = new Label(this, "");
     m_label_stat->SetForegroundColour(wxColour("#323A3C"));
     m_media_ctrl->Bind(EVT_MEDIA_CTRL_STAT, [this](auto & e) {
-#if !BBL_RELEASE_TO_PUBLIC
-        wxSize size = m_media_ctrl->GetVideoSize();
-        m_label_stat->SetLabel(e.GetString() + wxString::Format(" VS:%ix%i", size.x, size.y));
-#endif
+        m_label_stat->SetLabel(wxEmptyString);
         wxString str = e.GetString();
         m_stat.clear();
         for (auto k : {"FPS:", "BPS:", "T:", "B:"}) {

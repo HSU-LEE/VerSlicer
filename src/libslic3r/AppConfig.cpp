@@ -164,7 +164,7 @@ void AppConfig::set_defaults()
 #endif
 
         if (get("single_instance").empty())
-            set_bool("single_instance", false);
+            set_bool("single_instance", true);
 
 #ifdef SUPPORT_REMEMBER_OUTPUT_PATH
         if (get("remember_output_path").empty())
@@ -450,6 +450,21 @@ void AppConfig::set_defaults()
         set("privacy_version", "00.00.00.00");
     }
 
+    if (get("language").empty())
+        set("language", "en");
+
+    if (get("region").empty())
+        set("region", "Asia-Pacific");
+
+    if (get("bambu_smart_print_enabled").empty())
+        set_bool("bambu_smart_print_enabled", false);
+
+    if (get("slicepilot_simple_layout").empty())
+        set_bool("slicepilot_simple_layout", false);
+
+    if (get("ai_coach_enabled").empty())
+        set_bool("ai_coach_enabled", true);
+
     if (get("rotate_view").empty()) {
         set("rotate_view", "none/mouse left");
     }
@@ -542,7 +557,7 @@ void AppConfig::set_defaults()
     }
 
     if (get("enable_step_mesh_setting").empty()) {
-        set_bool("enable_step_mesh_setting", true);
+        set_bool("enable_step_mesh_setting", false);
     }
     if (get("linear_defletion", "angle_defletion").empty()) {
         set("linear_defletion", "0.003");

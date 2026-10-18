@@ -10,6 +10,11 @@ namespace {
 
 nlohmann::json obj_schema(nlohmann::json properties, nlohmann::json required = nlohmann::json::array())
 {
+    // nlohmann::json{} is null. ChatGPT rejects a null properties object.
+    if (!properties.is_object())
+        properties = nlohmann::json::object();
+    if (!required.is_array())
+        required = nlohmann::json::array();
     return nlohmann::json{
         {"type", "object"},
         {"properties", std::move(properties)},

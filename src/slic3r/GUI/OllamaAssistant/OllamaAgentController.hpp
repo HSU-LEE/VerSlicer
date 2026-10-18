@@ -43,7 +43,7 @@ struct OllamaAgentCallbacks
 class OllamaAgentController
 {
 public:
-    static constexpr int kDefaultMaxSteps = 8;
+    static constexpr int kDefaultMaxSteps = 40;
 
     OllamaAgentController(OllamaClient& client, std::string model);
     ~OllamaAgentController();

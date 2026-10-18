@@ -53,11 +53,13 @@ std::string build_assist_loop_system_prompt(bool korean)
     prompt += korean
         ? "\n\n## 루프\n"
           "- 한 응답에 서로 의존하지 않는 actions만 묶으세요.\n"
-          "- 도구 결과를 보기 전에는 done:true 하지 마세요. 결과가 목표를 충족하면 그때 done:true.\n"
+          "- 도구 결과를 보기 전에는 done:true 하지 마세요. 요청이 적당히 충족되면 바로 done:true.\n"
+          "- 이미 적용한 뒤 관련 설정을 더 찾거나 상태를 다시 읽지 마세요.\n"
           "- 같은 호출이 같은 결과로 반복되면 이유를 말하고 멈추세요.\n"
         : "\n\n## Loop\n"
           "- Batch only actions that do not depend on each other's results.\n"
-          "- Do not set done:true before you have seen tool results. Set it when those results meet the goal.\n"
+          "- Do not set done:true before you have seen tool results. Set it as soon as the request is reasonably satisfied.\n"
+          "- After a change lands, do not look up more related settings or read state again.\n"
           "- If the same call returns the same result again, say why and stop.\n";
     prompt += OllamaToolRegistry::agent_tools_schema_block(korean);
     return prompt;
@@ -65,7 +67,7 @@ std::string build_assist_loop_system_prompt(bool korean)
 
 void trim_assist_messages(std::vector<OllamaMessage>& messages)
 {
-    constexpr size_t kKeepTail = 20;
+    constexpr size_t kKeepTail = 60;
     if (messages.size() <= 1 + kKeepTail)
         return;
     std::vector<OllamaMessage> trimmed;
@@ -746,6 +748,18 @@ void OllamaAgentController::proceed_after_tool_execution(const nlohmann::json& e
 
     const nlohmann::json& tool_results =
         m_step_tool_results.empty() ? nlohmann::json::array() : m_step_tool_results.back();
+    if (m_mutations_applied && tool_step_is_readonly(tool_results)) {
+        const bool ko = wxGetApp().current_language_code().StartsWith("ko");
+        OllamaAgentRunResult r;
+        r.completed         = true;
+        r.steps_taken       = m_step;
+        r.step_tool_results = m_step_tool_results;
+        r.final_message     = pick_user_facing_message(m_step_tool_results, assistant_msg, ko);
+        if (r.final_message.empty())
+            r.final_message = ko ? "요청은 반영했습니다." : "The request is applied.";
+        finish(std::move(r));
+        return;
+    }
     std::string           feedback     = std::string("Tool results (JSON):\n") + tool_results.dump(2);
     for (const auto& r : tool_results) {
         if (!r.is_object() || r.value("ok", true))
@@ -760,7 +774,7 @@ void OllamaAgentController::proceed_after_tool_execution(const nlohmann::json& e
     }
     if (!assistant_msg.empty())
         feedback += std::string("\n\nAssistant note:\n") + assistant_msg;
-    feedback += std::string("\n\nContinue toward goal (done:false until complete):\n") + m_user_goal;
+    feedback += std::string("\n\nIf the request is already satisfied, return done:true and stop. Do not keep tuning.\nGoal:\n") + m_user_goal;
     m_messages.push_back({"user", std::move(feedback)});
 
     begin_step();

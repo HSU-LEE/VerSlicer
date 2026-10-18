@@ -1,5 +1,7 @@
 #include "OllamaClient.hpp"
 
+#include "ChatGptAccount.hpp"
+
 #include <boost/log/trivial.hpp>
 #include "OllamaActionExecutor.hpp"
 #include "OllamaToolGateway.hpp"
@@ -582,46 +584,22 @@ void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessag
 
     std::thread([job, tok, kind, started]() {
         ChatAttemptResult result;
-        int               retry_tier = 0;
+        std::vector<ChatGptTurn> turns;
+        turns.reserve(job->messages.size());
+        for (const OllamaMessage& message : job->messages)
+            turns.push_back({message.role, message.content});
 
-        {
-            std::lock_guard<std::recursive_mutex> lock(ollama_chat_mutex());
-
-            std::string model = job->model;
-            std::string list_err;
-            const auto  installed = list_models_sync_impl(job->base_url, &list_err);
-            if (!installed.empty())
-                model = pick_installed_ollama_model(installed, model);
-
-            result = run_chat_http(job->url, model, job->messages, job->cancel_flag, retry_tier, job->kind,
-                                   job->stream_cb, job->tools_json);
-            if (result.content.empty() && !job->tools_json.empty()
-                && (result.http_status == 400 || result.error.find("tool") != std::string::npos)) {
-                result = run_chat_http(job->url, model, job->messages, job->cancel_flag, retry_tier, job->kind,
-                                       job->stream_cb);
-            }
-
-            if (result.content.empty() && result.error.find("HTTP 404") != std::string::npos && !installed.empty()) {
-                model  = pick_installed_ollama_model(installed, model);
-                result = run_chat_http(job->url, model, job->messages, job->cancel_flag, retry_tier, job->kind,
-                                       job->stream_cb);
-            }
-
-            if (result.content.empty() && result.error.find("HTTP 404") == std::string::npos
-                && result.error != "Request cancelled") {
-                if (!job->messages.empty()) {
-                    retry_tier = 1;
-                    result     = run_chat_http(job->url, model, slim_messages_for_retry(job->messages), job->cancel_flag,
-                                           retry_tier, job->kind, job->stream_cb);
-                }
-                if (result.content.empty()) {
-                    retry_tier = 2;
-                    result     = run_chat_http(job->url, model, minimal_messages_for_retry(job->messages),
-                                           job->cancel_flag, retry_tier, job->kind, job->stream_cb);
-                }
-            }
-            result.retry_tier = retry_tier;
-        }
+        const ChatGptCompletion completion = ChatGptAccount::complete(
+            job->model, turns, job->tools_json, job->cancel_flag, job->stream_cb,
+            [kind](Http* http) {
+                std::lock_guard<std::mutex> lock(active_request_state(kind).mutex);
+                active_request_state(kind).http = http;
+            });
+        result.content        = completion.text;
+        result.error          = completion.error;
+        result.http_status    = completion.http_status;
+        result.resolved_model = completion.model.empty() ? job->model : completion.model;
+        result.retry_tier     = 0;
 
         const int latency_ms = static_cast<int>(
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count());
@@ -649,56 +627,15 @@ void OllamaClient::list_models(ModelsCallback callback)
     if (!callback)
         return;
 
-    const std::string url      = m_base_url + "/api/tags";
-    const std::string base_url = m_base_url;
-    Http::get(url)
-        .header("Content-Type", "application/json")
-        .timeout_connect(3)
-        .timeout_max(15)
-        .on_error([callback, base_url](std::string, std::string error, unsigned) {
-            wxGetApp().CallAfter([callback, error = std::move(error), base_url]() {
-                if (wxGetApp().is_closing())
-                    return;
-                std::string cached_err;
-                const auto  names = list_models_sync_impl(base_url, &cached_err);
-                if (!names.empty())
-                    callback(names, {});
-                else
-                    callback({}, error.empty() ? cached_err : error);
-            });
-        })
-        .on_complete([callback, base_url](std::string response, unsigned http_status) {
-            wxGetApp().CallAfter([callback, response = std::move(response), http_status, base_url]() {
-                if (wxGetApp().is_closing())
-                    return;
-                if (http_status < 200 || http_status >= 300) {
-                    callback({}, "Ollama HTTP " + std::to_string(http_status));
-                    return;
-                }
-                try {
-                    const nlohmann::json       j = nlohmann::json::parse(response);
-                    std::vector<std::string> names;
-                    if (j.contains("models") && j["models"].is_array()) {
-                        for (const auto& m : j["models"]) {
-                            if (m.contains("name") && m["name"].is_string())
-                                names.push_back(m["name"].get<std::string>());
-                        }
-                    }
-                    {
-                        std::lock_guard<std::mutex> lock(model_list_cache().mutex);
-                        auto&                       cache = model_list_cache();
-                        cache.base_url                    = base_url;
-                        cache.models                      = names;
-                        cache.error.clear();
-                        cache.fetched                     = std::chrono::steady_clock::now();
-                    }
-                    callback(names, {});
-                } catch (const std::exception& e) {
-                    callback({}, std::string("Parse error: ") + e.what());
-                }
-            });
-        })
-        .perform();
+    std::thread([callback]() {
+        std::string error;
+        const std::vector<std::string> names = ChatGptAccount::list_models(&error);
+        wxGetApp().CallAfter([callback, names, error]() {
+            if (wxGetApp().is_closing())
+                return;
+            callback(names, error);
+        });
+    }).detach();
 }
 
 }} // namespace

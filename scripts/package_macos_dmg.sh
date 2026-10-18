@@ -206,12 +206,10 @@ Install
        xattr -dr com.apple.quarantine /Applications/${APP_NAME}.app
 
 AI assistant
-  Ollama and the qwen2.5:7b model are inside this app.
   Open VerSlicer and use the chat button on the 3D toolbar.
-  The first time, the model is copied into
-  ~/Library/Application Support/VerSlicer/ollama/models
-  (no separate Ollama install and no download).
-  In chat, Mode "적용" applies slicer changes. "질문" is advice only.
+  Connect a ChatGPT account in the assistant panel. The conversation
+  runs through ChatGPT; no local model is required.
+  In chat, Mode "Apply" changes slicer settings. "Question" is advice only.
 
 System requirements
   • macOS 11.3 or later

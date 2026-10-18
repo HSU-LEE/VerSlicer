@@ -34,7 +34,7 @@ void SlicePilotSimpleLayout::initialize_defaults(Slic3r::AppConfig* cfg)
     if (!cfg)
         return;
     if (!cfg->has(kConfigKey))
-        cfg->set_bool(kConfigKey, true);
+        cfg->set_bool(kConfigKey, false);
 }
 
 bool SlicePilotSimpleLayout::is_enabled()

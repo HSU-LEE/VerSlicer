@@ -28,7 +28,7 @@ StepCtrlBase::StepCtrlBase(wxWindow *      parent,
     , clr_tip(0x828280)
 {
     SetFont(Label::Body_14);
-    border_color     = StateColor(*wxLIGHT_GREY);
+    border_color     = StateColor(wxColour("#DBDBDB"));
     StaticBox::radius = 0;
     //wxString reason;
     //IsTransparentBackgroundSupported(&reason);

@@ -138,7 +138,7 @@ int ollama_assist_max_steps()
         } catch (...) {
         }
     }
-    return std::max(1, config_int(kOllamaAssistMaxStepsKey, 12));
+    return std::max(1, config_int(kOllamaAssistMaxStepsKey, 40));
 }
 
 }} // namespace

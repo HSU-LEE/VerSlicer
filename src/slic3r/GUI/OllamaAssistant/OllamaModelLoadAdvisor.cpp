@@ -37,10 +37,10 @@ Think outcome-first: what print failure should we prevent (adhesion, overhang, s
 
 Reply with JSON only (same rules as the system prompt).
 
-- "message": 1–2 friendly sentences in plain language (no raw config key names).
-- Minimum change: at most 1–2 settings in one set_config.
+- "message": a short explanation in plain language (no raw config key names).
+- Change the settings the geometry needs. Several keys may go in one set_config.
 - Overhangs → support; small base → brim; tall narrow → lay flat with rotate.
-- Prefer one set_config; no slice (auto re-slice after settings).
+- Do not slice unless the user asked (auto re-slice after settings).
 
 Allowed: set_config (print), translate, rotate, clone_selection, arrange.
 Forbidden: menu_item, add_model, delete_selection, scale, slice, save_project.

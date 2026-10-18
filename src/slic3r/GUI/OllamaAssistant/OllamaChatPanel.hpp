@@ -4,6 +4,7 @@
 #include "../GUI_Utils.hpp"
 #include "../MakerWorld/MakerWorldImportFlow.hpp"
 #include "../AIPipeline/PrintJobState.hpp"
+#include "ChatGptAccount.hpp"
 #include "OllamaClient.hpp"
 #include "OllamaAgentController.hpp"
 #include "OllamaExecutionPolicy.hpp"
@@ -21,6 +22,7 @@ class Button;
 class ComboBox;
 class ProgressBar;
 class TextInput;
+class wxBoxSizer;
 class wxButton;
 class wxPanel;
 class wxStaticText;
@@ -65,7 +67,9 @@ public:
 private:
     void load_settings();
     void save_settings();
-    void ensure_ollama_running();
+    void ensure_assistant_ready();
+    void refresh_account_button();
+    void connect_chatgpt();
     void ensure_default_model_ready(const std::vector<std::string>& models);
     void append_chat(const wxString& role, const wxString& text);
     void append_chat_message(ChatMessageRole role, const wxString& text,
@@ -137,6 +141,10 @@ private:
     Button*       m_send_btn{nullptr};
     Button*       m_voice_btn{nullptr};
     Button*       m_reset_btn{nullptr};
+    wxBoxSizer*   m_account_row{nullptr};
+    wxStaticText* m_account_label{nullptr};
+    Button*       m_account_btn{nullptr};
+    bool          m_signing_in{false};
     ComboBox*     m_mode_combo{nullptr};
     wxStaticText* m_mode_label{nullptr};
     ComboBox*     m_model_combo{nullptr};

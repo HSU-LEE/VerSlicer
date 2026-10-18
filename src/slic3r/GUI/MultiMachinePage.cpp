@@ -75,10 +75,7 @@ bool MultiMachinePage::Show(bool show)
 
 void MultiMachinePage::init_tabpanel()
 {
-    auto m_side_tools = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(FromDIP(220), FromDIP(18)));
-    wxBoxSizer* sizer_side_tools = new wxBoxSizer(wxHORIZONTAL);
-    sizer_side_tools->Add(m_side_tools, 1, wxEXPAND, 0);
-    m_tabpanel = new Tabbook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, sizer_side_tools, wxNB_LEFT | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME);
+    m_tabpanel = new Tabbook(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, nullptr, wxNB_LEFT | wxTAB_TRAVERSAL | wxNB_NOPAGETHEME);
     m_tabpanel->SetBackgroundColour(wxColour("#FEFFFF"));
     m_tabpanel->Bind(wxEVT_BOOKCTRL_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {; });
 

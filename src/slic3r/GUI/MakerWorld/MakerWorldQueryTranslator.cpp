@@ -1,13 +1,10 @@
 #include "MakerWorldQueryTranslator.hpp"
 
+#include "../OllamaAssistant/ChatGptAccount.hpp"
 #include "../OllamaAssistant/OllamaConfig.hpp"
 #include "MakerWorldTelemetry.hpp"
 
-#include "slic3r/Utils/Http.hpp"
-
 #include <boost/algorithm/string.hpp>
-
-#include <nlohmann/json.hpp>
 
 #include <chrono>
 #include <map>
@@ -55,25 +52,6 @@ bool is_cjk_codepoint(uint32_t cp)
         || (cp >= 0xAC00 && cp <= 0xD7AF) || (cp >= 0x1100 && cp <= 0x11FF);
 }
 
-std::string trim_trailing_slash(std::string url)
-{
-    while (!url.empty() && url.back() == '/')
-        url.pop_back();
-    return url;
-}
-
-std::string extract_chat_content(const nlohmann::json& j)
-{
-    if (j.contains("message") && j["message"].is_object()) {
-        const auto& msg = j["message"];
-        if (msg.contains("content") && msg["content"].is_string())
-            return msg["content"].get<std::string>();
-    }
-    if (j.contains("response") && j["response"].is_string())
-        return j["response"].get<std::string>();
-    return {};
-}
-
 std::string sanitize_translation_output(std::string text)
 {
     boost::algorithm::trim(text);
@@ -114,50 +92,17 @@ std::map<std::string, TranslationCacheEntry>& translation_cache()
 
 std::string ollama_translate_sync(const std::string& host, const std::string& model, const std::string& query)
 {
-    nlohmann::json body;
-    body["model"]  = model;
-    body["stream"] = false;
-    body["options"] = {{"temperature", 0.0}, {"top_p", 0.9}, {"num_predict", 48}};
-    body["messages"] = nlohmann::json::array({
-        {{"role", "system"},
-         {"content",
+    (void) host;
+    const ChatGptCompletion completion = ChatGptAccount::complete(
+        model,
+        {{"system",
           "Translate 3D-print model search queries into concise English keywords for MakerWorld. "
-          "Output ONLY 2-6 English nouns/adjectives. No punctuation, quotes, or explanation."}},
-        {{"role", "user"}, {"content", query}},
-    });
-
-    const std::string url  = trim_trailing_slash(host) + "/api/chat";
-    std::string       response;
-    std::string       http_error;
-    unsigned          http_status = 0;
-
-    Http::post(url)
-        .header("Content-Type", "application/json")
-        .timeout_connect(5)
-        .timeout_max(20)
-        .set_post_body(body.dump())
-        .on_error([&](std::string body, std::string error, unsigned status) {
-            response    = std::move(body);
-            http_error  = std::move(error);
-            http_status = status;
-        })
-        .on_complete([&](std::string body, unsigned status) {
-            response    = std::move(body);
-            http_status = status;
-        })
-        .perform_sync();
-
-    if (!http_error.empty() || http_status < 200 || http_status >= 300 || response.empty())
+          "Output ONLY 2-6 English nouns/adjectives. No punctuation, quotes, or explanation."},
+         {"user", query}},
+        {}, nullptr, nullptr, nullptr);
+    if (!completion.error.empty())
         return {};
-
-    try {
-        const nlohmann::json j = nlohmann::json::parse(response);
-        if (j.contains("error"))
-            return {};
-        return sanitize_translation_output(extract_chat_content(j));
-    } catch (...) {
-        return {};
-    }
+    return sanitize_translation_output(completion.text);
 }
 
 } // namespace

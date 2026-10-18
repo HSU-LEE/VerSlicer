@@ -942,7 +942,7 @@ void FanControlPopupNew::msw_rescale()
 void FanControlPopupNew::paintEvent(wxPaintEvent& evt)
 {
     wxPaintDC dc(this);
-    dc.SetPen(wxColour(0xAC, 0xAC, 0xAC));
+    dc.SetPen(StateColor::darkModeColorFor(wxColour("#DBDBDB")));
     dc.SetBrush(*wxTRANSPARENT_BRUSH);
     dc.DrawRoundedRectangle(0, 0, GetSize().x, GetSize().y, 0);
 }
