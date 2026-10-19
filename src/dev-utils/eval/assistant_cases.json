@@ -1,20 +1,579 @@
 {
-  "cases": [
-    {"id": "infill_explicit_en", "request": "Increase infill to 30%", "expect_actions": ["set_config"], "expect_keys": ["sparse_infill_density"], "forbid_actions": ["send_print"]},
-    {"id": "infill_explicit_ko", "request": "채우기 30%로 올려줘", "expect_actions": ["set_config"], "expect_keys": ["sparse_infill_density"], "forbid_actions": ["send_print"]},
-    {"id": "stronger_en", "request": "Make this stronger", "expect_actions": ["set_config"], "expect_keys": ["wall_loops"], "forbid_actions": ["send_print", "delete_selection"]},
-    {"id": "stronger_ko", "request": "더 튼튼하게 해줘", "expect_actions": ["set_config"], "expect_keys": ["wall_loops"], "forbid_actions": ["send_print", "delete_selection"]},
-    {"id": "support_en", "request": "Turn on supports", "expect_actions": ["set_config"], "expect_keys": ["enable_support"]},
-    {"id": "support_ko", "request": "서포트 켜줘", "expect_actions": ["set_config"], "expect_keys": ["enable_support"]},
-    {"id": "brim_ko", "request": "브림 넣어줘", "expect_actions": ["set_config"], "expect_keys": ["brim_type"]},
-    {"id": "layer_height_en", "request": "Use 0.12 mm layers", "expect_actions": ["set_config"], "expect_keys": ["layer_height"]},
-    {"id": "stringing_en", "request": "My prints are stringy", "expect_actions": ["set_config"], "expect_keys": ["retraction_length"], "forbid_actions": ["send_print"]},
-    {"id": "rotate_en", "request": "Rotate it 45 degrees", "expect_actions": ["rotate"], "forbid_actions": ["set_config"]},
-    {"id": "rotate_ko", "request": "45도 돌려줘", "expect_actions": ["rotate"], "forbid_actions": ["set_config"]},
-    {"id": "scale_half_ko", "request": "절반 크기로 줄여줘", "expect_actions": ["scale"], "forbid_actions": ["set_config"]},
-    {"id": "arrange_en", "request": "Arrange the plate", "expect_actions": ["arrange"]},
-    {"id": "slice_ko", "request": "슬라이스 해줘", "expect_actions": ["slice"], "forbid_actions": ["send_print"]},
-    {"id": "find_print_ko", "request": "용 피규어 출력해줘", "expect_actions": ["makerworld_find_and_print"]},
-    {"id": "undo_en", "request": "Undo the last AI change", "expect_actions": ["rollback_apply"]}
-  ]
+ "cases": [
+  {
+   "id": "infill_explicit_en",
+   "request": "Increase infill to 30%",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "sparse_infill_density"
+   ],
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "infill_explicit_ko",
+   "request": "채우기 30%로 올려줘",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "sparse_infill_density"
+   ],
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "infill_pattern_en",
+   "request": "Use gyroid infill",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "sparse_infill_pattern"
+   ]
+  },
+  {
+   "id": "infill_pattern_ko",
+   "request": "채우기 패턴을 자이로이드로",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "sparse_infill_pattern"
+   ]
+  },
+  {
+   "id": "stronger_en",
+   "request": "Make this stronger",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "wall_loops"
+   ],
+   "forbid_actions": [
+    "send_print",
+    "delete_selection"
+   ]
+  },
+  {
+   "id": "stronger_ko",
+   "request": "더 튼튼하게 해줘",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "wall_loops"
+   ],
+   "forbid_actions": [
+    "send_print",
+    "delete_selection"
+   ]
+  },
+  {
+   "id": "walls_explicit_en",
+   "request": "Set walls to 4",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "wall_loops"
+   ]
+  },
+  {
+   "id": "support_en",
+   "request": "Turn on supports",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "enable_support"
+   ]
+  },
+  {
+   "id": "support_ko",
+   "request": "서포트 켜줘",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "enable_support"
+   ]
+  },
+  {
+   "id": "support_tree_en",
+   "request": "Use tree supports",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "support_type"
+   ]
+  },
+  {
+   "id": "support_off_ko",
+   "request": "서포트 꺼줘",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "enable_support"
+   ]
+  },
+  {
+   "id": "brim_ko",
+   "request": "브림 넣어줘",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "brim_type"
+   ]
+  },
+  {
+   "id": "brim_en",
+   "request": "Add a brim",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "brim_type"
+   ]
+  },
+  {
+   "id": "brim_width_en",
+   "request": "Make the brim 8 mm wide",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "brim_width"
+   ]
+  },
+  {
+   "id": "layer_height_en",
+   "request": "Use 0.12 mm layers",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "layer_height"
+   ]
+  },
+  {
+   "id": "layer_height_ko",
+   "request": "레이어 높이 0.28로",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "layer_height"
+   ]
+  },
+  {
+   "id": "first_layer_height_en",
+   "request": "First layer 0.3 mm",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "initial_layer_print_height"
+   ]
+  },
+  {
+   "id": "nozzle_temp_en",
+   "request": "Nozzle temperature 215",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "nozzle_temperature"
+   ]
+  },
+  {
+   "id": "nozzle_temp_ko",
+   "request": "노즐 온도 220도로",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "nozzle_temperature"
+   ]
+  },
+  {
+   "id": "bed_temp_en",
+   "request": "Bed temperature 65",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "hot_plate_temp"
+   ]
+  },
+  {
+   "id": "stringing_en",
+   "request": "My prints are stringy",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "retraction_length"
+   ],
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "stringing_ko",
+   "request": "실이 너무 많이 생겨",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "retraction_length"
+   ],
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "retraction_speed_en",
+   "request": "Retraction speed 40",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "retraction_speed"
+   ]
+  },
+  {
+   "id": "outer_wall_speed_en",
+   "request": "Slow the outer wall to 100 mm/s",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "outer_wall_speed"
+   ]
+  },
+  {
+   "id": "first_layer_slow_ko",
+   "request": "첫 레이어 천천히",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "initial_layer_speed"
+   ]
+  },
+  {
+   "id": "seam_rear_en",
+   "request": "Put the seam at the back",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "seam_position"
+   ]
+  },
+  {
+   "id": "ironing_en",
+   "request": "Turn on ironing for the top",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "ironing_type"
+   ]
+  },
+  {
+   "id": "top_layers_en",
+   "request": "Six top layers",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "top_shell_layers"
+   ]
+  },
+  {
+   "id": "bottom_layers_ko",
+   "request": "바닥 레이어 5개",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "bottom_shell_layers"
+   ]
+  },
+  {
+   "id": "fan_max_en",
+   "request": "Max fan speed 80%",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "fan_max_speed"
+   ]
+  },
+  {
+   "id": "zhop_en",
+   "request": "Enable z hop",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "z_hop"
+   ]
+  },
+  {
+   "id": "prime_tower_off_en",
+   "request": "Turn off the prime tower",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "enable_prime_tower"
+   ]
+  },
+  {
+   "id": "flow_limit_en",
+   "request": "Limit max volumetric speed to 12",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "filament_max_volumetric_speed"
+   ]
+  },
+  {
+   "id": "elephant_foot_ko",
+   "request": "코끼리발 보정 0.15",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "elefant_foot_compensation"
+   ]
+  },
+  {
+   "id": "hole_comp_en",
+   "request": "Holes come out too small",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "xy_hole_compensation"
+   ],
+   "forbid_actions": [
+    "send_print",
+    "delete_selection"
+   ]
+  },
+  {
+   "id": "by_object_en",
+   "request": "Print one object at a time",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [
+    "print_sequence"
+   ]
+  },
+  {
+   "id": "rotate_en",
+   "request": "Rotate it 45 degrees",
+   "expect_actions": [
+    "rotate"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "set_config"
+   ]
+  },
+  {
+   "id": "rotate_ko",
+   "request": "45도 돌려줘",
+   "expect_actions": [
+    "rotate"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "set_config"
+   ]
+  },
+  {
+   "id": "scale_half_ko",
+   "request": "절반 크기로 줄여줘",
+   "expect_actions": [
+    "scale"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "set_config"
+   ]
+  },
+  {
+   "id": "scale_double_en",
+   "request": "Make it twice as big",
+   "expect_actions": [
+    "scale"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "set_config"
+   ]
+  },
+  {
+   "id": "move_en",
+   "request": "Move it 20 mm to the left",
+   "expect_actions": [
+    "translate"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "set_config"
+   ]
+  },
+  {
+   "id": "arrange_en",
+   "request": "Arrange the plate",
+   "expect_actions": [
+    "arrange"
+   ],
+   "expect_keys": []
+  },
+  {
+   "id": "arrange_ko",
+   "request": "자동 배치해줘",
+   "expect_actions": [
+    "arrange"
+   ],
+   "expect_keys": []
+  },
+  {
+   "id": "clone_en",
+   "request": "Make three copies",
+   "expect_actions": [
+    "clone_selection"
+   ],
+   "expect_keys": []
+  },
+  {
+   "id": "mirror_ko",
+   "request": "좌우 반전해줘",
+   "expect_actions": [
+    "mirror_mesh"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "set_config"
+   ]
+  },
+  {
+   "id": "drill_en",
+   "request": "Drill a 5 mm hole through the middle",
+   "expect_actions": [
+    "mesh_boolean"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "set_config",
+    "slice"
+   ]
+  },
+  {
+   "id": "repair_ko",
+   "request": "메쉬 고쳐줘",
+   "expect_actions": [
+    "repair_mesh"
+   ],
+   "expect_keys": []
+  },
+  {
+   "id": "slice_ko",
+   "request": "슬라이스 해줘",
+   "expect_actions": [
+    "slice"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "slice_en",
+   "request": "Slice it",
+   "expect_actions": [
+    "slice"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "add_plate_en",
+   "request": "Add a new plate",
+   "expect_actions": [
+    "add_plate"
+   ],
+   "expect_keys": []
+  },
+  {
+   "id": "find_print_ko",
+   "request": "용 피규어 출력해줘",
+   "expect_actions": [
+    "makerworld_find_and_print"
+   ],
+   "expect_keys": []
+  },
+  {
+   "id": "find_en",
+   "request": "Find a phone stand on MakerWorld",
+   "expect_actions": [
+    "makerworld_search"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "undo_en",
+   "request": "Undo the last AI change",
+   "expect_actions": [
+    "rollback_apply"
+   ],
+   "expect_keys": []
+  },
+  {
+   "id": "failed_print_en",
+   "request": "My print failed halfway",
+   "expect_actions": [
+    "printer_diagnostics"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "send_print",
+    "set_config"
+   ]
+  },
+  {
+   "id": "failed_print_ko",
+   "request": "출력이 실패했어 왜 그래?",
+   "expect_actions": [
+    "printer_diagnostics"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "send_print",
+    "set_config"
+   ]
+  }
+ ]
 }

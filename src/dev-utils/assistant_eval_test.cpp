@@ -7,6 +7,8 @@
 
 #include "../slic3r/GUI/OllamaAssistant/OllamaEvalGrader.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaFailureDoctor.hpp"
+#include "../slic3r/GUI/OllamaAssistant/OllamaActionRegistry.hpp"
+#include "../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -43,7 +45,20 @@ int main()
         return EXIT_FAILURE;
     }
     const auto cases = OllamaEvalGrader::parse_cases(doc);
-    expect_true(cases.size() >= 15, "golden case count");
+    expect_true(cases.size() >= 50, "golden case count");
+    // A case must only ask for answers the assistant is allowed to give.
+    for (const auto& c : cases) {
+        for (const auto& k : c.expect_keys)
+            if (!OllamaSettingRegistry::is_allowed_key(k)) {
+                std::cerr << "FAIL: case " << c.id << " expects key the registry blocks: " << k << '\n';
+                ++g_failures;
+            }
+        for (const auto& t : c.expect_actions)
+            if (!OllamaActionRegistry::is_allowed_type(t)) {
+                std::cerr << "FAIL: case " << c.id << " expects unknown action: " << t << '\n';
+                ++g_failures;
+            }
+    }
 
     OllamaEvalCase infill{"t", "infill", {"set_config"}, {"sparse_infill_density"}, {"send_print"}};
     expect_true(OllamaEvalGrader::grade(infill, R"({"message":"ok","actions":[{"type":"set_config","preset":"print","options":{"sparse_infill_density":"30%"}}]})").pass,
