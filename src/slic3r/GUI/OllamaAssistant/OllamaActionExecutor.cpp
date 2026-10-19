@@ -1,5 +1,6 @@
 #include "OllamaMeshOps.hpp"
 #include "OllamaActionExecutor.hpp"
+#include "OllamaActionRegistry.hpp"
 #include "OllamaActionJsonExtract.hpp"
 #include "OllamaActionValidator.hpp"
 #include "OllamaConfig.hpp"
@@ -47,6 +48,9 @@
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <cassert>
+#include <functional>
+#include <unordered_map>
 #include <unordered_set>
 #include <wx/filefn.h>
 #include <wx/glcanvas.h>
@@ -1735,6 +1739,82 @@ nlohmann::json OllamaActionExecutor::extract_action_json(const std::string& assi
     return extract_ollama_action_json(assistant_text);
 }
 
+namespace {
+
+OllamaActionResult apply_wiki_search(const nlohmann::json& action)
+{
+    const std::string query = action.value("query", "");
+    const bool        ko    = OllamaContextBuilder::ui_prefers_korean();
+    nlohmann::json    pages = nlohmann::json::array();
+    if (!query.empty()) {
+        // Wiki HTTP is several seconds. Run it off the UI thread and keep
+        // dispatching events so the window still paints and accepts input.
+        auto job = std::async(std::launch::async, [query, ko] {
+            return BambuLabWikiSearch::build_wiki_context_from_queries({query}, ko, 2, 1400);
+        });
+        while (job.wait_for(std::chrono::milliseconds(40)) != std::future_status::ready) {
+            if (wxTheApp && !wxGetApp().is_closing())
+                wxTheApp->ProcessPendingEvents();
+        }
+        pages = job.get();
+    }
+    OllamaActionResult result;
+    result.success          = !query.empty();
+    result.effective_change = false;
+    result.message          = nlohmann::json{{"query", query}, {"pages", std::move(pages)}}.dump();
+    return result;
+}
+
+using ActionHandler = std::function<OllamaActionResult(const nlohmann::json&)>;
+
+// One entry per executable action type. Keep in sync with OllamaActionRegistry;
+// "slice" is deferred by execute() and never dispatched here.
+const std::unordered_map<std::string, ActionHandler>& action_handlers()
+{
+    static const std::unordered_map<std::string, ActionHandler> handlers = [] {
+        std::unordered_map<std::string, ActionHandler> h;
+        h["get_state"]        = apply_get_state;
+        h["find_setting"]     = apply_find_setting;
+        h["wiki_search"]      = apply_wiki_search;
+        h["list_objects"]     = apply_list_objects;
+        h["select_object"]    = apply_select_object;
+        h["set_config"]       = apply_set_config;
+        h["ui_select_tab"]    = apply_ui_select_tab;
+        h["open_calibration"] = [](const nlohmann::json&) { return apply_open_calibration(); };
+        h["delete_selection"] = [](const nlohmann::json&) { return apply_delete_selection(); };
+        h["clone_selection"]  = [](const nlohmann::json&) { return apply_clone_selection(); };
+        h["arrange"]          = [](const nlohmann::json&) { return apply_arrange(); };
+        h["arrange_objects"]  = [](const nlohmann::json&) { return apply_arrange_objects(); };
+        h["split_object"]     = [](const nlohmann::json&) { return apply_split_object(); };
+        h["split_mesh"]       = h["split_object"];
+        h["save_project"]     = apply_save_project;
+        h["add_plate"]        = [](const nlohmann::json&) { return apply_add_plate(); };
+        h["delete_plate"]     = [](const nlohmann::json&) { return apply_delete_plate(); };
+        h["select_plate"]     = apply_select_plate;
+        h["select_preset"]    = apply_select_preset;
+        h["add_model"]        = apply_add_model;
+        h["menu_item"]        = apply_menu_item;
+        for (const char* t : {"translate", "rotate", "scale"})
+            h[t] = [t](const nlohmann::json& a) { return apply_transform(a, t); };
+        h["repair_mesh"]  = OllamaMeshOps::apply_repair_mesh;
+        h["mirror_mesh"]  = OllamaMeshOps::apply_mirror_mesh;
+        h["mesh_boolean"] = OllamaMeshOps::apply_mesh_boolean;
+        for (const char* t : {"open_smart_print", "run_smart_print", "open_setup", "send_print", "export_gcode",
+                              "rollback_apply"})
+            h[t] = [](const nlohmann::json& a) { return OllamaUserFlow::apply_flow_action(a, wxGetApp().plater()); };
+        for (const char* t : {"makerworld_search", "makerworld_find_and_print", "import_makerworld"})
+            h[t] = OllamaMakerWorldActions::apply;
+#ifndef NDEBUG
+        for (const auto& spec : OllamaActionRegistry::all())
+            assert(h.count(spec.type) || std::string(spec.type) == "slice");
+#endif
+        return h;
+    }();
+    return handlers;
+}
+
+} // namespace
+
 std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::json& root)
 {
     std::vector<OllamaActionResult> results;
@@ -1823,80 +1903,10 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
             }
         }
 
-        OllamaActionResult result;
-        if (type == "get_state")
-            result = apply_get_state(action);
-        else if (type == "find_setting")
-            result = apply_find_setting(action);
-        else if (type == "wiki_search") {
-            const std::string query = action.value("query", "");
-            const bool        ko    = OllamaContextBuilder::ui_prefers_korean();
-            nlohmann::json    pages = nlohmann::json::array();
-            if (!query.empty()) {
-                // Wiki HTTP is several seconds. Run it off the UI thread and keep
-                // dispatching events so the window still paints and accepts input.
-                auto job = std::async(std::launch::async, [query, ko] {
-                    return BambuLabWikiSearch::build_wiki_context_from_queries({query}, ko, 2, 1400);
-                });
-                while (job.wait_for(std::chrono::milliseconds(40)) != std::future_status::ready) {
-                    if (wxTheApp && !wxGetApp().is_closing())
-                        wxTheApp->ProcessPendingEvents();
-                }
-                pages = job.get();
-            }
-            result.success          = !query.empty();
-            result.effective_change = false;
-            result.message          = nlohmann::json{{"query", query}, {"pages", std::move(pages)}}.dump();
-        }
-        else if (type == "list_objects")
-            result = apply_list_objects(action);
-        else if (type == "select_object")
-            result = apply_select_object(action);
-        else if (type == "set_config")
-            result = apply_set_config(action);
-        else if (type == "ui_select_tab")
-            result = apply_ui_select_tab(action);
-        else if (type == "open_calibration")
-            result = apply_open_calibration();
-        else if (type == "delete_selection")
-            result = apply_delete_selection();
-        else if (type == "clone_selection")
-            result = apply_clone_selection();
-        else if (type == "arrange")
-            result = apply_arrange();
-        else if (type == "arrange_objects")
-            result = apply_arrange_objects();
-        else if (type == "split_object" || type == "split_mesh")
-            result = apply_split_object();
-        else if (type == "save_project")
-            result = apply_save_project(action);
-        else if (type == "add_plate")
-            result = apply_add_plate();
-        else if (type == "delete_plate")
-            result = apply_delete_plate();
-        else if (type == "select_plate")
-            result = apply_select_plate(action);
-        else if (type == "select_preset")
-            result = apply_select_preset(action);
-        else if (type == "add_model")
-            result = apply_add_model(action);
-        else if (type == "menu_item")
-            result = apply_menu_item(action);
-        else if (type == "translate" || type == "rotate" || type == "scale")
-            result = apply_transform(action, type.c_str());
-        else if (type == "repair_mesh")
-            result = OllamaMeshOps::apply_repair_mesh(action);
-        else if (type == "mirror_mesh")
-            result = OllamaMeshOps::apply_mirror_mesh(action);
-        else if (type == "mesh_boolean")
-            result = OllamaMeshOps::apply_mesh_boolean(action);
-        else if (type == "open_smart_print" || type == "run_smart_print" || type == "open_setup" || type == "send_print"
-                 || type == "export_gcode" || type == "rollback_apply")
-            result = OllamaUserFlow::apply_flow_action(action, wxGetApp().plater());
-        else if (type == "makerworld_search" || type == "makerworld_find_and_print" || type == "import_makerworld")
-            result = OllamaMakerWorldActions::apply(action);
-        else
-            result = OllamaActionResult{false, false, "Unknown action: " + type};
+        const auto&        handlers = action_handlers();
+        const auto         handler  = handlers.find(type);
+        OllamaActionResult result   = handler != handlers.end() ? handler->second(action)
+                                                                : OllamaActionResult{false, false, "Unknown action: " + type};
 
         if (type == "set_config" && result.effective_change)
             config_effective_change = true;
