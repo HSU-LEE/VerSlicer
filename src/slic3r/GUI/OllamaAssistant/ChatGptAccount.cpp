@@ -1,5 +1,6 @@
 #include "ChatGptAccount.hpp"
 
+#include "AiPrivacyConsent.hpp"
 #include "OllamaToolGateway.hpp"
 
 #include "libslic3r/Utils.hpp"
@@ -1085,6 +1086,11 @@ ChatGptCompletion ChatGptAccount::complete(const std::string& model, const std::
                                            const std::function<void(const std::string&)>& on_delta,
                                            const std::function<void(Http*)>& bind_http)
 {
+    if (!ai_privacy_consent_given()) {
+        ChatGptCompletion refused;
+        refused.error = "AI privacy notice not accepted yet.";
+        return refused;
+    }
     ChatGptCompletion out;
     std::string       token_error;
     const std::string token = access_token(&token_error);

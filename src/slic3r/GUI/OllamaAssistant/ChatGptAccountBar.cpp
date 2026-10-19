@@ -1,6 +1,7 @@
 #include "ChatGptAccountBar.hpp"
 
 #include "AiLocale.hpp"
+#include "AiPrivacyConsent.hpp"
 #include "ChatGptAccount.hpp"
 #include "../BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "../GUI_App.hpp"
@@ -107,6 +108,8 @@ void ChatGptAccountBar::toggle()
 
 void ChatGptAccountBar::start_sign_in()
 {
+    if (!ensure_ai_privacy_consent(m_parent))
+        return;
     m_signing_in = true;
     m_button->SetLabel(ko_or("브라우저에서 로그인 중…", "Waiting for the browser…"));
     m_button->Enable(false);

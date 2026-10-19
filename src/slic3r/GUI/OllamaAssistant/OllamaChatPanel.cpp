@@ -1,4 +1,5 @@
 #include "OllamaChatPanel.hpp"
+#include "AiPrivacyConsent.hpp"
 #include "OllamaActionExecutor.hpp"
 #include "OllamaActionPipeline.hpp"
 #include "OllamaIntentContext.hpp"
@@ -125,6 +126,9 @@ static bool looks_like_json_parse_error(const std::string& what)
 static wxString format_chat_error(const std::string& raw)
 {
     const bool ko = AiLocale::korean();
+    if (raw.find("privacy notice not accepted") != std::string::npos)
+        return ko ? wxString::FromUTF8("AI 도우미 개인정보 안내에 동의해야 사용할 수 있습니다. 메시지를 다시 보내면 안내가 열립니다.")
+                  : wxString("Agree to the AI assistant data notice first. Send your message again to see it.");
     if (raw.find("Connect a ChatGPT account") != std::string::npos)
         return ko ? wxString::FromUTF8("먼저 위의 「ChatGPT 계정 연결」을 눌러 주세요.")
                   : wxString("Connect ChatGPT with the button above.");
@@ -1898,6 +1902,9 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
         m_account_bar->toggle();
         return;
     }
+    // Sessions linked before the consent notice existed still need to agree once.
+    if (!ensure_ai_privacy_consent(this))
+        return;
 
     save_settings();
     OllamaClient::cancel_active_requests(OllamaCancelDomain::Chat);

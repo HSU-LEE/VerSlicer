@@ -4,6 +4,7 @@
 #include "GUI_App.hpp"
 #include "OllamaAssistant/OllamaVoiceInput.hpp"
 #include "OllamaAssistant/OllamaClient.hpp"
+#include "OllamaAssistant/AiPrivacyConsent.hpp"
 #include "OllamaAssistant/OllamaMcpServer.hpp"
 #include "GUI_Init.hpp"
 #include "GUI_ObjectList.hpp"
@@ -755,6 +756,7 @@ void GUI_App::post_init()
     if (! this->initialized())
         throw Slic3r::RuntimeError("Calling post_init() while not yet initialized");
 
+    load_ai_privacy_consent();
     OllamaMcpServer::start();
 
     m_open_method = "double_click";
