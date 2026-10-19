@@ -174,8 +174,6 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaProcessingNotice.hpp
     GUI/OllamaAssistant/OllamaResponseNormalizer.cpp
     GUI/OllamaAssistant/OllamaResponseNormalizer.hpp
-    GUI/OllamaAssistant/OllamaServerManager.cpp
-    GUI/OllamaAssistant/OllamaServerManager.hpp
     GUI/OllamaAssistant/OllamaSettingRegistry.cpp
     GUI/OllamaAssistant/OllamaSettingRegistry.hpp
     GUI/OllamaAssistant/OllamaSettingDescriptions.cpp

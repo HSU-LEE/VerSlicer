@@ -3,7 +3,6 @@
 #include "OllamaActionPipeline.hpp"
 #include "OllamaIntentContext.hpp"
 #include "OllamaModelPick.hpp"
-#include "OllamaServerManager.hpp"
 #include "OllamaActionWorkflow.hpp"
 #include "OllamaAgentGoalPlanner.hpp"
 #include "OllamaAgentStateService.hpp"
@@ -2124,7 +2123,6 @@ void OllamaChatPanel::on_models_loaded(const std::vector<std::string>& models, c
 
     m_model_poll_failures = 0;
     m_available_models    = models;
-    OllamaServerManager::note_serve_reachable();
     m_model = resolve_installed_model(models, m_model);
     if (m_assist_controller)
         m_assist_controller->set_model(normalize_ollama_model_tag(m_model));

@@ -4,7 +4,6 @@
 #include "GUI_App.hpp"
 #include "OllamaAssistant/OllamaVoiceInput.hpp"
 #include "OllamaAssistant/OllamaClient.hpp"
-#include "OllamaAssistant/OllamaServerManager.hpp"
 #include "OllamaAssistant/OllamaMcpServer.hpp"
 #include "GUI_Init.hpp"
 #include "GUI_ObjectList.hpp"
@@ -1070,7 +1069,6 @@ void GUI_App::cleanup_ollama_assistant()
     }
 
     OllamaMcpServer::stop();
-    OllamaServerManager::shutdown_if_started();
 
     OllamaChatDialog* dlg = ollama_chat_dialog;
     ollama_chat_dialog    = nullptr;

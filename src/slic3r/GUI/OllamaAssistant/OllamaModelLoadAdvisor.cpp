@@ -7,7 +7,6 @@
 #include "OllamaConfig.hpp"
 #include "OllamaProcessingNotice.hpp"
 #include "OllamaClient.hpp"
-#include "OllamaServerManager.hpp"
 #include "OllamaSettingRegistry.hpp"
 #include "OllamaTelemetry.hpp"
 
@@ -292,31 +291,8 @@ void ensure_ollama_then_run(Plater* plater)
                 return;
             }
 
-            const wxString cmd = OllamaServerManager::resolve_ollama_command();
-            OllamaServerManager::note_serve_spawn_attempt();
-            OllamaTelemetry::server_spawn_attempt(OllamaServerManager::serve_spawn_attempt_count(),
-                                                    cmd.utf8_string());
-            const long     pid = wxExecute(cmd + " serve", wxEXEC_ASYNC);
-            if (pid > 0) {
-                OllamaServerManager::mark_started(pid);
-                OllamaTelemetry::server_spawn_success(pid);
-            } else {
-                OllamaTelemetry::server_spawn_failed("wxExecute failed");
-            }
-
-            OllamaProcessingNotice::show(p, _u8L("Starting Ollama for AI recommendations…"));
-
-            auto* timer = new wxTimer(p);
-            timer->Bind(wxEVT_TIMER, [timer, alive, p](wxTimerEvent&) {
-                timer->Stop();
-                delete timer;
-                if (!alive->load() || wxGetApp().is_closing()) {
-                    finish_schedule();
-                    return;
-                }
-                run_model_load_chat(p);
-            });
-            timer->StartOnce(1500);
+            // ChatGPT is not linked or unreachable: skip the post-load advice quietly.
+            finish_schedule();
         });
     });
 }
