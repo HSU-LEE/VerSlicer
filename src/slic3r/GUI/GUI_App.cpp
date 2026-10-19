@@ -4,6 +4,7 @@
 #include "GUI_App.hpp"
 #include "OllamaAssistant/OllamaVoiceInput.hpp"
 #include "OllamaAssistant/OllamaClient.hpp"
+#include "CrashReporter.hpp"
 #include "OllamaAssistant/AiPrivacyConsent.hpp"
 #include "OllamaAssistant/OllamaMcpServer.hpp"
 #include "GUI_Init.hpp"
@@ -757,6 +758,7 @@ void GUI_App::post_init()
         throw Slic3r::RuntimeError("Calling post_init() while not yet initialized");
 
     load_ai_privacy_consent();
+    CallAfter([this] { CrashReporter::offer_report_from_last_run(mainframe); });
     OllamaMcpServer::start();
 
     m_open_method = "double_click";
@@ -2485,6 +2487,8 @@ void GUI_App::init_app_config()
     } else {
         m_datadir_redefined = true;
     }
+
+    CrashReporter::install();
 
     // start log here
     std::time_t       t        = std::time(0);
