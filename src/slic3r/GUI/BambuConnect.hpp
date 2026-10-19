@@ -12,7 +12,8 @@ class Plater;
  *  needed). See https://wiki.bambulab.com/en/software/third-party-integration */
 namespace BambuConnect {
 
-constexpr const char* kDownloadUrl = "https://bambulab.com/en/software/bambu-connect";
+// Official page with the current installers (direct file links change per version).
+constexpr const char* kDownloadUrl = "https://wiki.bambulab.com/en/software/bambu-connect#download";
 
 /** encodeURIComponent: keep A-Z a-z 0-9 - _ . ! ~ * ' ( ), percent-encode the rest (UTF-8). */
 std::string encode_uri_component(const std::string& s);
