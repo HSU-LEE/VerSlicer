@@ -6,11 +6,11 @@
 
 <p align="center">
   <strong>Just describe what you want. VerSlicer handles the rest.</strong><br/>
-  Turn natural language into real slicing actions — on your Mac, with your printer, locally.
+  Turn natural language into real slicing actions — on your Mac, with your printer.
 </p>
 
 <p align="center">
-  An <a href="https://github.com/SoftFever/OrcaSlicer">OrcaSlicer</a> fork with a built-in <a href="https://ollama.com/">Ollama</a> assistant
+  An <a href="https://github.com/SoftFever/OrcaSlicer">OrcaSlicer</a> fork with a built-in ChatGPT assistant
 </p>
 
 <p align="center">
@@ -23,7 +23,7 @@
 
 VerSlicer is a full OrcaSlicer build plus a local AI layer that understands your intent — in chat or by voice — and turns it into structured actions on the same plater you already use. Rotate a part, stiffen a print, find a model on MakerWorld, slice, and send to the printer. No separate “advisor” window that only talks.
 
-> **macOS only** for now · **Local-first** — Ollama runs on your machine · Inherits **all OrcaSlicer printer profiles and slicing engine**
+> **macOS only** for now · **Sign in with ChatGPT** — no API key or local model needed · Inherits **all OrcaSlicer printer profiles and slicing engine**
 
 # From intent to print
 
@@ -60,7 +60,7 @@ VerSlicer does not replace Orca’s precision. It removes the gap between *what 
 ```mermaid
 flowchart TD
     U[You] --> C[Chat / Voice]
-    C --> O[Ollama — local LLM]
+    C --> O[ChatGPT — your account]
     O --> R[Router & Planner]
     R --> A[Structured JSON Actions]
     A --> V[Validation & Safety]
@@ -72,7 +72,7 @@ flowchart TD
 
 1. **You** type or speak on the 3D view chat panel.
 2. **Router** classifies the request (single-shot, multi-step assist loop, diagnostic pipeline, or find-and-print orchestrator).
-3. **Ollama** returns a short message plus a list of typed actions — never raw G-code rewrites from hallucination.
+3. **ChatGPT** returns a short message plus a list of typed actions — never raw G-code rewrites from hallucination.
 4. **Validator** checks action types, parameters, and preset keys against a fixed registry.
 5. **Executor** applies changes on the live plater (presets, transforms, slice, send, MakerWorld, etc.).
 
@@ -100,19 +100,14 @@ flowchart TD
 
 # Getting started
 
-## 1. Install Ollama and pull a model
+## 1. Connect ChatGPT
 
-```bash
-ollama pull qwen2.5:3b    # fast on Apple Silicon (recommended to start)
-ollama pull qwen2.5:7b    # higher quality, more VRAM/RAM
-```
-
-Install [Ollama](https://ollama.com/), keep it running, then open VerSlicer → **AI assistant** on the 3D toolbar.
+Open VerSlicer → **AI assistant** on the 3D toolbar → **Connect ChatGPT**. The browser opens; sign in and allow VerSlicer. A ChatGPT Plus or Pro plan is required. The session is stored in your macOS Keychain.
 
 ## 2. First session
 
 1. Set **Mode** to **Apply** to allow real changes.
-2. Confirm a model appears in the model dropdown.
+2. Confirm your account email appears next to **Sign out**.
 3. Try: *“Increase infill to 30%”* or *“Make this stronger.”*
 
 ## 3. Chat modes
@@ -138,7 +133,7 @@ Allow Microphone and Speech Recognition. For Korean, add Korean in **System Sett
 | --- | --- |
 | **Chat / Voice UI** | `OllamaChatPanel` — modes, streaming, pipeline stepper, MakerWorld offer dialog |
 | **Send router** | Deterministic pre-router for acquisition intent (“화분 출력해줘”) before LLM |
-| **Assist loop** | Multi-step agent: observe → plan → act (up to 8 steps) |
+| **Assist loop** | Multi-step agent: observe → plan → act (up to 40 steps) |
 | **Diagnostic pipeline** | 4-step quality flow with Bambu Lab Wiki prefetch |
 | **Print job orchestrator** | End-to-end find → import → slice → send with UI adapter |
 | **Action executor** | Maps JSON actions to real `Plater` / preset / network calls |
@@ -187,32 +182,19 @@ Agent loop variant (multi-step):
 
 - **Allow-list registry** — Only registered `actions[].type` values run; unknown types are dropped.
 - **Canonicalization** — Aliases normalize to a single type name before execution.
-- **Category gates** — Tools marked *Dangerous* (e.g. `set_config`, `send_print`) and *Mutating* (geometry, slice) follow stricter policies in the assist loop.
+- **Review dialog for dangerous tools** — Every tool marked *Dangerous* in `OllamaToolRegistry` (`set_config`, `select_preset`, `send_print`, `export_gcode`, `save_project`, `delete_selection`, `delete_plate`) goes through the review dialog. If no window is available to show it, the actions are cancelled, not applied.
 - **Preset key validation** — `set_config` keys are checked against `OllamaSettingRegistry` (no arbitrary option names).
 - **Question mode** — Parser strips mutating actions even if the model returns them.
 - **Rollback** — Last AI-driven preset apply can be undone via `rollback_apply`.
 - **False-completion guard** — Agent cannot claim “done” on acquisition goals without running the right tools.
 
-# Local-first privacy
+# Privacy
 
-- **Ollama on localhost** — Default host `http://127.0.0.1:11434`; chat goes to your machine, not a VerSlicer cloud.
-- **No training upload** — Conversation stays in the app session and local config; no built-in telemetry for prompts.
-- **Wiki prefetch** — Quality help may fetch public Bambu Lab Wiki pages; that is the main optional network use besides MakerWorld/printer APIs you already use in Orca.
+- **ChatGPT** — Requests and plate context go to OpenAI under your ChatGPT account. Tokens live in the macOS Keychain; **Sign out** removes them.
+- **No VerSlicer cloud** — Nothing is sent to a VerSlicer server.
+- **Wiki prefetch** — Quality help may fetch public Bambu Lab Wiki pages.
 - **MakerWorld / printer** — Find-and-print and send use the same Bambu/MakerWorld paths as Orca; optional and user-initiated.
-
-# Models & performance
-
-| Item | Default / notes |
-| --- | --- |
-| **Recommended models** | `qwen2.5:3b` (fast), `qwen2.5:7b` (balanced default in config) |
-| **Also works** | Other Ollama chat models; JSON action quality varies by model |
-| **Context window** | 8192 tokens (`num_ctx`) |
-| **Max reply tokens** | 768 (`num_predict`) — sized for JSON + short message |
-| **Keep-alive** | 30 min — avoids cold-start between messages |
-| **Memory** | Dominated by Ollama model size (~2 GB class for 3B, ~4–5 GB for 7B on Apple Silicon — depends on quant and system) |
-| **Latency** | 3B typically sub-second to a few seconds per turn on M-series; assist loops multiply by step count (max 8) |
-
-Tune in `~/Library/Application Support/verslicer/verslicer.conf` under `"ollama"` or the chat model dropdown.
+- **Local MCP server** — Off by default. Set `"mcp_server": "true"` under `"ollama"` (or `VERSLICER_MCP_SERVER=1`) to let a local agent such as Cursor drive VerSlicer; its token is written to `mcp.json` with owner-only permissions.
 
 # Supported printers
 
@@ -230,6 +212,8 @@ VerSlicer inherits **OrcaSlicer’s full printer profiles**. Guided setup and se
 - [x] Find & print orchestrator (MakerWorld → slice → send)
 - [x] Auto configuration & mesh health in print pipeline
 - [x] Settings rollback (`rollback_apply`)
+- [x] Failure doctor: `printer_diagnostics` reads printer error codes and HMS alerts for “my print failed”
+- [x] Offline accuracy eval of recorded replies (`assistant_eval_test`)
 
 **Planned**
 
@@ -238,37 +222,39 @@ VerSlicer inherits **OrcaSlicer’s full printer profiles**. Guided setup and se
 - [ ] Cloud sync for assistant preferences (optional; local-first remains default)
 - [ ] AI failure prediction from logs and print telemetry
 - [ ] Material recommendation from model geometry and intent
-- [ ] Deeper failure-doctor flow (“my print failed” → log-aware diagnosis)
 
 # Configuration
 
 | Setting | Default | Notes |
 | --- | --- | --- |
-| Model | `qwen2.5:7b` | Use `qwen2.5:3b` for speed |
-| Assist loop | on | Up to 8 steps |
+| Model | first model on your ChatGPT plan | Pick another in the model dropdown |
+| Assist loop | on | Up to 40 steps |
 | Adaptive routing | on | Fast / Standard / Deep |
 | Wiki search | on | Quality diagnostics |
 | Print job orchestrator | on | Find & print |
 | Two-hop planner | off | Deep setting changes |
 | Critic | off | Second-pass review |
 | Keyword inject | off | Fallback only |
+| MCP server | off | Local agents (Cursor etc.) |
 
 ```json
 "ollama": {
-  "model": "qwen2.5:3b",
   "assistant_mode": "assist",
   "assist_loop": "true",
-  "assist_max_steps": "8",
+  "assist_max_steps": "40",
   "adaptive_routing": "true",
   "keyword_inject": "false",
   "two_hop": "false",
   "wiki_search": "true",
   "critic": "false",
-  "print_job_orchestrator": "true"
+  "print_job_orchestrator": "true",
+  "mcp_server": "false"
 }
 ```
 
-Environment overrides: `OLLAMA_ASSIST_LOOP`, `OLLAMA_ASSIST_MAX_STEPS`, `OLLAMA_ADAPTIVE_ROUTING`, `OLLAMA_TWO_HOP`, `OLLAMA_KEYWORD_INJECT`, `OLLAMA_WIKI_SEARCH`, `OLLAMA_CRITIC`.
+Environment overrides: `OLLAMA_ASSIST_LOOP`, `OLLAMA_ASSIST_MAX_STEPS`, `OLLAMA_ADAPTIVE_ROUTING`, `OLLAMA_TWO_HOP`, `OLLAMA_KEYWORD_INJECT`, `OLLAMA_WIKI_SEARCH`, `OLLAMA_CRITIC`, `VERSLICER_MCP_SERVER`.
+
+The `"ollama"` section and `OLLAMA_*` names are kept from earlier versions for compatibility.
 
 # How to build
 
@@ -309,7 +295,7 @@ open src/Release/verslicer.app
 ./build_release_macos.sh -s -x -M              # build + DMG
 ```
 
-**On another Mac:** Open DMG → Applications → install Ollama → `ollama pull qwen2.5:3b`. If blocked: right-click **Open**, or `xattr -dr com.apple.quarantine /Applications/VerSlicer.app`.
+**On another Mac:** Open DMG → Applications → launch → **Connect ChatGPT**. If blocked: right-click **Open**, or `xattr -dr com.apple.quarantine /Applications/VerSlicer.app`.
 
 # Dev tests
 
@@ -317,7 +303,13 @@ open src/Release/verslicer.app
 ./scripts/run_orca_tools_test.sh
 ```
 
-Headless tests: `ollama_assistant_test`, `ollama_pipeline_test`, `makerworld_search_test`.
+Runs all ten headless tests (`ollama_*`, `makerworld_search_test`, `assistant_eval_test`, …). The same script runs on GitHub Actions (`.github/workflows/headless-tests.yml`).
+
+**Model accuracy:** launch the app with `VERSLICER_EVAL_LOG=/tmp/eval.jsonl`, try the requests in `src/dev-utils/eval/assistant_cases.json`, then:
+
+```bash
+ASSISTANT_EVAL_LOG=/tmp/eval.jsonl ./scripts/run_orca_tools_test.sh test
+```
 
 # Some background
 
@@ -332,4 +324,4 @@ VerSlicer is based on OrcaSlicer; upstream code remains under its original licen
 # Links
 
 - [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer) · [Wiki](https://www.orcaslicer.com/wiki)
-- [Ollama](https://ollama.com/) · [API docs](https://github.com/ollama/ollama/blob/main/docs/api.md)
+
