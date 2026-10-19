@@ -319,7 +319,7 @@ Open-source slicing has always been built on collaboration and attribution. [Sli
 
 # License
 
-VerSlicer is based on OrcaSlicer; upstream code remains under its original licenses. Additional AI and UI work is copyright **Lee Hee Seung**. See [LICENSE](LICENSE).
+VerSlicer is based on OrcaSlicer and, like it, is licensed under the **GNU AGPL-3.0** ([LICENSE](LICENSE)). AI and UI additions are copyright **Lee Hee Seung**; see [NOTICE](NOTICE) for attribution and trademarks. If you distribute a build, publish the matching source.
 
 # Links
 
