@@ -1,6 +1,7 @@
 #include "BambuConnect.hpp"
 
 #include "libslic3r/Format/bbs_3mf.hpp"
+#include "libslic3r/PresetBundle.hpp"
 #include "libslic3r/Utils.hpp"
 
 #include "GUI.hpp"
@@ -40,6 +41,12 @@ std::string import_url(const std::string& absolute_path, const std::string& disp
 {
     return "bambu-connect://import-file?path=" + encode_uri_component(absolute_path) + "&name=" +
            encode_uri_component(display_name) + "&version=1.0.0";
+}
+
+bool preferred()
+{
+    auto* bundle = wxGetApp().preset_bundle;
+    return bundle && bundle->use_bbl_network() && wxGetApp().app_config->get("print_button_mode") != "plate";
 }
 
 bool installed()

@@ -20,6 +20,10 @@ std::string encode_uri_component(const std::string& s);
 /** bambu-connect://import-file?path=...&name=...&version=1.0.0 */
 std::string import_url(const std::string& absolute_path, const std::string& display_name);
 
+/** Should prints go through Bambu Connect? True for Bambu printers unless the
+ *  user chose "Print plate" (LAN / Developer Mode) in the print button menu. */
+bool preferred();
+
 /** Is the Bambu Connect app present (/Applications or ~/Applications)? */
 bool installed();
 

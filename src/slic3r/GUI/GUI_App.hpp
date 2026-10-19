@@ -616,6 +616,8 @@ public:
     bool            is_localized() const { return m_wxLocale->GetLocale() != "English"; }
 
     void            open_preferences(size_t open_on_tab = 0, const std::string& highlight_option = std::string());
+    /** Open Preferences on the tab with this label (e.g. "Smart Print"). */
+    void            open_preferences_tab(const wxString& tab_label);
     void            open_smart_print();
     void            open_presetbundledialog(size_t open_on_tab = 0, const std::string& highlight_option = std::string());
     void            open_exportpresetbundledialog(size_t open_on_tab = 0, const std::string& highlight_option = std::string());

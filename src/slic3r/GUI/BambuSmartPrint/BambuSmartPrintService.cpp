@@ -1,3 +1,4 @@
+#include "../BambuConnect.hpp"
 #include "BambuSmartPrintService.hpp"
 #include "../UiDispatch.hpp"
 #include "BambuSmartPrintPanel.hpp"
@@ -1935,7 +1936,10 @@ void BambuSmartPrintService::on_slice_completed(Plater* plater, const Print* pri
         post_to_ui([this, plater, plate_index]() {
             if (!plater)
                 return;
-            plater->send_print_job_for_plate(plate_index, true);
+            if (BambuConnect::preferred())
+                BambuConnect::send_current_plate(plater);
+            else
+                plater->send_print_job_for_plate(plate_index, true);
             BambuSmartPrintService::instance().set_one_click_phase(OneClickPhase::None);
             BambuSmartPrintService::instance().refresh_all_panels();
         });

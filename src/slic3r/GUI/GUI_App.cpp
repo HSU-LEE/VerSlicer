@@ -7805,6 +7805,12 @@ void GUI_App::open_exportpresetbundledialog(size_t open_on_tab, const std::strin
     }
 }
 
+void GUI_App::open_preferences_tab(const wxString& tab_label)
+{
+    PreferencesDialog::request_tab(tab_label);
+    open_preferences();
+}
+
 void GUI_App::open_preferences(size_t open_on_tab, const std::string& highlight_option)
 {
     static constexpr const char* opengl_fxaa_setting_key = "opengl_fxaa_enabled";

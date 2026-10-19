@@ -62,6 +62,14 @@ public:
 
     ~PreferencesDialog();
 
+    /** The next PreferencesDialog opens on the tab with this label (e.g. "Smart Print"). */
+    static void request_tab(const wxString& label);
+
+private:
+    static wxString s_requested_tab;
+
+public:
+
     wxString m_backup_interval_time;
     wxTimer m_filament_height_timer;
 

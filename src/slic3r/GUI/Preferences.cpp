@@ -1314,7 +1314,14 @@ void PreferencesDialog::create()
     for (size_t i = 0; i < m_pref_tabs->GetCount(); ++i)
         m_pref_tabs->SetItemTextColour(i, item_color);
 
-    m_pref_tabs->SelectItem(0);
+    unsigned int initial_tab = 0;
+    if (!s_requested_tab.empty()) {
+        for (unsigned int i = 0; i < m_pref_tabs->GetCount(); ++i)
+            if (m_pref_tabs->GetItemText(i) == s_requested_tab)
+                initial_tab = i;
+        s_requested_tab.clear();
+    }
+    m_pref_tabs->SelectItem(initial_tab);
 
     m_sizer_body->Add(m_pref_tabs, 0, wxEXPAND | wxBOTTOM | wxTOP, FromDIP(5));
     m_sizer_body->Add(m_parent, 1, wxEXPAND);
@@ -1328,6 +1335,10 @@ void PreferencesDialog::create()
 PreferencesDialog::~PreferencesDialog()
 {
 }
+
+wxString PreferencesDialog::s_requested_tab;
+
+void PreferencesDialog::request_tab(const wxString& label) { s_requested_tab = label; }
 
 void PreferencesDialog::on_dpi_changed(const wxRect &suggested_rect) { this->Refresh(); }
 

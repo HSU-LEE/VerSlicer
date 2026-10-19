@@ -136,6 +136,16 @@ BambuSmartPrintPanel::BambuSmartPrintPanel(wxWindow* parent, LayoutStyle style)
     m_filament_banner->Hide();
     body->Add(m_filament_banner, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, gap);
 
+    // The docked panel is for acting on the plate. Account, assistant options,
+    // history and learning are settings: they live on the Preferences page
+    // (same panel, Preferences layout), reached with the link at the bottom.
+    auto add_secondary = [&](wxWindow* card) {
+        if (in_preferences)
+            body->Add(card, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, gap);
+        else
+            card->Hide();
+    };
+
     wxBoxSizer* account_inner = nullptr;
     wxPanel* account_body = nullptr;
     auto* account_card = create_card(content, &account_inner, &account_body, 12);
@@ -170,7 +180,7 @@ BambuSmartPrintPanel::BambuSmartPrintPanel(wxWindow* parent, LayoutStyle style)
     status_row->Add(m_login_btn, 0, wxRIGHT, FromDIP(6));
     status_row->Add(m_logout_btn, 0);
     account_inner->Add(status_row, 0, wxEXPAND);
-    body->Add(account_card, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, gap);
+    add_secondary(account_card);
 
     wxBoxSizer* assistant_inner = nullptr;
     wxPanel* assistant_body = nullptr;
@@ -191,7 +201,7 @@ BambuSmartPrintPanel::BambuSmartPrintPanel(wxWindow* parent, LayoutStyle style)
         {
             _L("Do not show automatically"),
             _L("Brief notification (recommended)"),
-            _L("Apply AI recommendations (Ollama)"),
+            _L("Apply AI recommendations (ChatGPT)"),
         },
         _L("How the assistant responds after you load a model on the plate"));
     if (m_auto_load_choice) {
@@ -244,7 +254,7 @@ BambuSmartPrintPanel::BambuSmartPrintPanel(wxWindow* parent, LayoutStyle style)
     add_tool_button_rows(assistant_body, assistant_inner,
         { m_rollback_btn, m_scan_btn, m_load_profile_btn }, 3, true);
 
-    body->Add(assistant_card, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, gap);
+    add_secondary(assistant_card);
 
     wxBoxSizer* history_inner = nullptr;
     wxPanel* history_body = nullptr;
@@ -264,7 +274,7 @@ BambuSmartPrintPanel::BambuSmartPrintPanel(wxWindow* parent, LayoutStyle style)
         BambuSmartPrintService::instance().show_privacy_dialog(this);
     });
     add_tool_button_rows(history_body, history_inner, { m_history_btn, m_privacy_btn }, 2, true);
-    body->Add(history_card, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, gap);
+    add_secondary(history_card);
 
     wxBoxSizer* learn_inner = nullptr;
     wxPanel* learn_body = nullptr;
@@ -273,7 +283,7 @@ BambuSmartPrintPanel::BambuSmartPrintPanel(wxWindow* parent, LayoutStyle style)
     m_printer_learning = new wxStaticText(learn_body, wxID_ANY, "");
     style_body_text(m_printer_learning, true);
     learn_inner->Add(m_printer_learning, 0, wxEXPAND);
-    body->Add(learn_card, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, gap);
+    add_secondary(learn_card);
 
     if (m_analyze_btn) {
         m_analyze_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
@@ -317,6 +327,15 @@ BambuSmartPrintPanel::BambuSmartPrintPanel(wxWindow* parent, LayoutStyle style)
     auto* tip_banner = create_banner(content, &tip_txt, BannerKind::Info);
     m_tip_text = tip_txt;
     body->Add(tip_banner, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, gap);
+    if (!in_preferences) {
+        auto* settings_btn = new Button(content, _L("Smart Print settings, account and history…"));
+        style_dialog_button(settings_btn, false);
+        size_action_button(content, settings_btn, 32);
+        settings_btn->Bind(wxEVT_BUTTON, [](wxCommandEvent&) {
+            wxGetApp().open_preferences_tab(_L("Smart Print"));
+        });
+        body->Add(settings_btn, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, gap);
+    }
     body->AddSpacer(FromDIP(12));
 
     if (in_preferences) {
