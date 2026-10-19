@@ -102,7 +102,7 @@ flowchart TD
 
 ## 1. Connect ChatGPT
 
-Open VerSlicer → **AI assistant** on the 3D toolbar → **Connect ChatGPT**. The browser opens; sign in and allow VerSlicer. A ChatGPT Plus or Pro plan is required. The session is stored in your macOS Keychain.
+Open VerSlicer → **AI assistant** on the 3D toolbar → **Connect ChatGPT**. A one-time notice explains what is sent to OpenAI; after you agree, the browser opens; sign in and allow VerSlicer. A ChatGPT Plus or Pro plan is required. The session is stored in your macOS Keychain.
 
 ## 2. First session
 
@@ -191,7 +191,9 @@ Agent loop variant (multi-step):
 # Privacy
 
 - **ChatGPT** — Requests and plate context go to OpenAI under your ChatGPT account. Tokens live in the macOS Keychain; **Sign out** removes them.
+- **Consent first** — Nothing goes to OpenAI until you accept the in-app data notice. Model files (STL/3MF) and G-code are never sent.
 - **No VerSlicer cloud** — Nothing is sent to a VerSlicer server.
+- **Crash reports stay local** — A crash writes `crash/last_crash.txt` in the data folder; on the next launch you can open a prefilled GitHub issue, which you review before submitting.
 - **Wiki prefetch** — Quality help may fetch public Bambu Lab Wiki pages.
 - **MakerWorld / printer** — Find-and-print and send use the same Bambu/MakerWorld paths as Orca; optional and user-initiated.
 - **Local MCP server** — Off by default. Set `"mcp_server": "true"` under `"ollama"` (or `VERSLICER_MCP_SERVER=1`) to let a local agent such as Cursor drive VerSlicer; its token is written to `mcp.json` with owner-only permissions.
@@ -202,7 +204,7 @@ VerSlicer inherits **OrcaSlicer’s full printer profiles**. Guided setup and se
 
 # Roadmap
 
-**Shipped (v3.1.x)**
+**Shipped (v3.2)**
 
 - [x] AI chat on the 3D view (Question + Apply)
 - [x] Voice input (macOS)
@@ -255,6 +257,10 @@ VerSlicer inherits **OrcaSlicer’s full printer profiles**. Guided setup and se
 Environment overrides: `OLLAMA_ASSIST_LOOP`, `OLLAMA_ASSIST_MAX_STEPS`, `OLLAMA_ADAPTIVE_ROUTING`, `OLLAMA_TWO_HOP`, `OLLAMA_KEYWORD_INJECT`, `OLLAMA_WIKI_SEARCH`, `OLLAMA_CRITIC`, `VERSLICER_MCP_SERVER`.
 
 The `"ollama"` section and `OLLAMA_*` names are kept from earlier versions for compatibility.
+
+# Releases
+
+Versioning, signing, notarization and the tag-driven release workflow are described in [docs/RELEASING.md](docs/RELEASING.md); manual checks before each release are in [docs/QA_CHECKLIST.md](docs/QA_CHECKLIST.md). See [CHANGELOG.md](CHANGELOG.md) for what changed.
 
 # How to build
 
