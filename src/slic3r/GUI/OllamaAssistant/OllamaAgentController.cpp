@@ -118,8 +118,7 @@ std::string mutating_action_fingerprint(const nlohmann::json& root)
         if (!action.is_object())
             continue;
         const std::string type = action.value("type", "");
-        if (type.empty() || type == "get_state" || type == "list_objects" || type == "select_object"
-            || type == "wiki_search" || type == "find_setting" || type == "printer_diagnostics")
+        if (type.empty() || OllamaToolRegistry::is_observation(type))
             continue;
         out += type;
         out += '\n';
@@ -138,8 +137,7 @@ bool step_has_substantive_change(const std::vector<nlohmann::json>& steps)
             if (!r.is_object() || !r.value("changed", false))
                 continue;
             const std::string tool = r.value("tool", "");
-            if (tool == "get_state" || tool == "list_objects" || tool == "select_object" || tool == "wiki_search"
-                || tool == "find_setting" || tool == "printer_diagnostics" || tool == "verify_config" || tool == "ui_select_tab")
+            if (OllamaToolRegistry::is_observation(tool) || tool == "verify_config" || tool == "ui_select_tab")
                 continue;
             return true;
         }
@@ -155,8 +153,7 @@ bool tool_step_is_readonly(const nlohmann::json& step)
         if (!r.is_object())
             return false;
         const std::string tool = r.value("tool", "");
-        if (tool != "get_state" && tool != "list_objects" && tool != "select_object" && tool != "wiki_search"
-            && tool != "find_setting" && tool != "printer_diagnostics")
+        if (!OllamaToolRegistry::is_observation(tool))
             return false;
     }
     return true;

@@ -73,6 +73,11 @@ OllamaToolCategory OllamaToolRegistry::category_for(const std::string& tool_id)
     return OllamaToolCategory::Dangerous;
 }
 
+bool OllamaToolRegistry::is_observation(const std::string& tool_id)
+{
+    return tool_id == "select_object" || category_for(tool_id) == OllamaToolCategory::Readonly;
+}
+
 bool OllamaToolRegistry::is_agent_tool(const std::string& tool_id)
 {
     if (tool_id == "get_state" || tool_id == "list_objects")

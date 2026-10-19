@@ -1,4 +1,5 @@
 #include "OllamaToolResult.hpp"
+#include "OllamaToolRegistry.hpp"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
@@ -219,9 +220,7 @@ std::string ollama_verified_user_message(const std::vector<nlohmann::json>& step
                 continue;
             saw_tool = true;
             const std::string tool = r.value("tool", "");
-            const bool readonly = tool == "get_state" || tool == "list_objects" || tool == "select_object"
-                                  || tool == "wiki_search" || tool == "find_setting" || tool == "verify_config"
-                                  || tool == "printer_diagnostics";
+            const bool readonly = OllamaToolRegistry::is_observation(tool) || tool == "verify_config";
             if (!readonly)
                 saw_mutating = true;
             if (!r.value("ok", true)) {
@@ -468,8 +467,7 @@ std::string ollama_thinking_after_tools(const nlohmann::json& tool_results, bool
         if (!r.is_object())
             continue;
         const std::string tool = r.value("tool", "");
-        if (tool == "get_state" || tool == "list_objects" || tool == "select_object" || tool == "wiki_search"
-            || tool == "find_setting" || tool == "printer_diagnostics")
+        if (OllamaToolRegistry::is_observation(tool))
             continue;
         if (!r.value("ok", false)) {
             add(korean ? "이 단계는 적용되지 않았습니다. 다른 방법을 시도합니다."
