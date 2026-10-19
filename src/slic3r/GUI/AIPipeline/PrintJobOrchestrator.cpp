@@ -199,7 +199,8 @@ bool PrintJobOrchestrator::start(const std::string& user_utterance, wxWindow* pa
     job->apply_mode          = apply_mode;
     job->parent              = parent;
     job->ui                  = std::move(ui);
-    job->auto_slice_and_send = true; // full "find and print" intent
+    // 3.2 release: stop after slicing; the user sends with Print plate.
+    job->auto_slice_and_send = false;
     m_job                    = job;
     m_last_terminal          = PrintJobState::Idle;
 
@@ -730,10 +731,11 @@ void PrintJobOrchestrator::step_ready()
         transition_to(PrintJobState::Sending);
         return;
     }
-    // Manual confirmation path: wait for confirm_print().
-    chat(AiLocale::text("Ready to print. Confirm to send to the printer.",
-           "출력 준비가 되었습니다. 확인하면 프린터로 전송합니다."));
-    set_busy(false);
+    // Nothing in the UI calls confirm_print() yet, so finish here and let the
+    // user send with the regular Print plate button.
+    chat(AiLocale::text("Sliced and ready. Check the preview, then press Print plate to send it to your printer.",
+           "슬라이스가 끝났습니다. 미리보기를 확인한 뒤 「플레이트 출력」을 눌러 프린터로 보내세요."));
+    finish_success();
 }
 
 void PrintJobOrchestrator::step_send()

@@ -8906,6 +8906,7 @@ void GLCanvas3D::_render_canvas_toolbar()
             }
         );
 
+        if (kAiModelCreateEnabled)
         create_menu_item(_utf8(L("Create Model")),
             m_canvas_type == ECanvasType::CanvasView3D,
             true,

@@ -30,6 +30,9 @@ private:
 
 void show_ai_model_create_dialog();
 
+/** AI Model Create is hidden for the 3.2 release until it has been tested in real use. */
+constexpr bool kAiModelCreateEnabled = false;
+
 }} // namespace
 
 #endif
