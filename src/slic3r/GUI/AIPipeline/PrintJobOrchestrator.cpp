@@ -704,9 +704,9 @@ void PrintJobOrchestrator::step_estimate()
 
 void PrintJobOrchestrator::step_ready()
 {
-    // The AI never sends to the printer: the job ends here and the user
-    // prints with the regular Print plate button.
-    chat(AiLocale::text("Sliced and ready. Check the preview, then press Print plate to send it to your printer."));
+    // The AI never sends to the printer. The visible print button is
+    // "Print with Bambu Connect" unless the user chose Print plate.
+    chat(AiLocale::text("Slicing finished. Check the preview, then press the Print button to send it to your printer."));
     finish_success();
 }
 

@@ -8,6 +8,7 @@
 - The Device tab shows a short, dismissible note for cloud-connected Bambu printers, with an **Open Bambu Connect** button (or a link to download it).
 
 ### AI assistant
+- Find-and-print now ends by telling you to press the Print button on screen. On a Bambu printer that button is **Print with Bambu Connect**, not Print plate.
 - An expired ChatGPT sign-in ("invalid_grant") no longer leaves the panel looking connected with a raw error code; it asks you to connect again.
 - Mode, model and **New chat** share one row, leaving more room for the conversation.
 - On cloud-connected printers, AI printer control says the printer may ignore the command instead of claiming success.

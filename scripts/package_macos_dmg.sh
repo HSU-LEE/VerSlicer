@@ -217,7 +217,7 @@ System requirements
   • Internet for MakerWorld / cloud features (optional)
 
 Support
-  • https://github.com/SoftFever/OrcaSlicer (upstream)
+  • https://github.com/HSU-LEE/VerSlicer/issues
 EOF
 
 ln -sfn /Applications "${STAGING}/Applications"

@@ -9,7 +9,7 @@ namespace Slic3r { namespace GUI { namespace AIPipeline {
  * The happy path advances monotonically:
  *   Idle -> IntentExtracted -> [Clarifying] -> Searching -> CandidateSelect ->
  *   Importing -> MeshHealth -> [Repairing] -> GeometryAnalysis -> AutoConfig ->
- *   Slicing -> Estimating -> ReadyToPrint -> Done (the user sends with Print plate)
+ *   Slicing -> Estimating -> ReadyToPrint -> Done (the user presses the Print button)
  *
  * Terminal states are Done / Failed / Cancelled. Clarifying / Repairing
  * are optional and entered conditionally.
