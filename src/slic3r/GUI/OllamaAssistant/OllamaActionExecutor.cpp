@@ -1896,7 +1896,7 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
                 continue;
             }
         } else if (type == "mesh_boolean") {
-            const std::string fp = type + "|" + action.value("operation", "");
+            const std::string fp = type + "|" + (action.contains("operation") ? action["operation"].dump() : std::string());
             if (!mesh_action_fps.insert(fp).second) {
                 OllamaActionResult skipped;
                 skipped.success          = true;
@@ -1909,8 +1909,16 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
 
         const auto&        handlers = action_handlers();
         const auto         handler  = handlers.find(type);
-        OllamaActionResult result   = handler != handlers.end() ? handler->second(action)
-                                                                : OllamaActionResult{false, false, "Unknown action: " + type};
+        OllamaActionResult result;
+        try {
+            // Model-written JSON can carry unexpected types (e.g. "query": 123), and
+            // nlohmann's value() throws on those. One bad action must not end the app.
+            result = handler != handlers.end() ? handler->second(action)
+                                               : OllamaActionResult{false, false, "Unknown action: " + type};
+        } catch (const std::exception& e) {
+            BOOST_LOG_TRIVIAL(error) << "AI action " << type << " threw: " << e.what();
+            result = OllamaActionResult{false, false, "Action failed: " + type + " (" + e.what() + ")"};
+        }
 
         if (type == "set_config" && result.effective_change)
             config_effective_change = true;

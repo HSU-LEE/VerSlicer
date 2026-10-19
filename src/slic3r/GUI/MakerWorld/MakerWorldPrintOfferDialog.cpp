@@ -1,5 +1,6 @@
 #include "MakerWorldPrintOfferDialog.hpp"
 
+#include "../UiDispatch.hpp"
 #include "../BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
@@ -272,7 +273,7 @@ void MakerWorldPrintOfferDialog::start_thumbnail_fetch(int index, const std::str
         .on_complete([this, alive, index](std::string body, unsigned status) {
             if (!alive->load() || status < 200 || status >= 300 || body.empty())
                 return;
-            wxGetApp().CallAfter([this, alive, index, body = std::move(body)]() {
+            post_to_ui([this, alive, index, body = std::move(body)]() {
                 if (!alive->load() || wxGetApp().is_closing())
                     return;
                 if (index < 0 || index >= static_cast<int>(m_cards.size()) || !m_cards[index].thumb)

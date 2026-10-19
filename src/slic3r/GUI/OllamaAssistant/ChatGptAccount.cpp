@@ -1,5 +1,6 @@
 #include "ChatGptAccount.hpp"
 
+#include "../UiDispatch.hpp"
 #include "AiPrivacyConsent.hpp"
 #include "OllamaToolGateway.hpp"
 
@@ -1000,7 +1001,7 @@ std::string ChatGptAccount::sign_in()
 
     const std::string authorize = url.str();
     if (wxTheApp) {
-        wxGetApp().CallAfter([authorize]() {
+        post_to_ui([authorize]() {
             if (!wxGetApp().is_closing())
                 wxLaunchDefaultBrowser(wxString::FromUTF8(authorize));
         });

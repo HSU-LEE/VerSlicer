@@ -1,5 +1,6 @@
 #include "PrintJobOrchestrator.hpp"
 
+#include "../UiDispatch.hpp"
 #include "PrintJobStepExecutors.hpp"
 
 #include "../GUI.hpp"
@@ -308,7 +309,7 @@ void PrintJobOrchestrator::transition_to(PrintJobState next)
     std::weak_ptr<PrintJob>          weak_job   = m_job;
     const std::uint64_t              jid        = m_job->job_id;
 
-    wxGetApp().CallAfter([this, weak_alive, weak_job, jid]() {
+    post_to_ui([this, weak_alive, weak_job, jid]() {
         auto alive = weak_alive.lock();
         if (!alive || !alive->load())
             return;
@@ -663,7 +664,7 @@ void PrintJobOrchestrator::step_slice()
             if (!alive || !alive->load())
                 return;
             // Marshal onto the main thread and re-validate before mutating state.
-            wxGetApp().CallAfter([this, weak_alive, weak_job, jid, evt]() {
+            post_to_ui([this, weak_alive, weak_job, jid, evt]() {
                 auto a = weak_alive.lock();
                 if (!a || !a->load())
                     return;

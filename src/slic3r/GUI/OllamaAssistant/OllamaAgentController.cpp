@@ -1,5 +1,6 @@
 #include "OllamaAgentController.hpp"
 
+#include "../UiDispatch.hpp"
 #include "OllamaActionExecutor.hpp"
 #include "OllamaActionPipeline.hpp"
 #include "OllamaActionWorkflow.hpp"
@@ -173,7 +174,7 @@ void on_global_agent_event(const OllamaAgentEvent& evt)
     if (!agent || !agent->is_running())
         return;
     const bool success = evt.payload.value("success", false);
-    wxGetApp().CallAfter([agent, success]() {
+    post_to_ui([agent, success]() {
         if (!wxGetApp().initialized() || wxGetApp().is_closing())
             return;
         if (!g_active_agent || g_active_agent != agent || !agent->is_running())
@@ -313,7 +314,7 @@ void OllamaAgentController::begin_step()
     const std::string model = m_model;
     m_client.chat(model, m_messages,
                   [this, alive](const std::string& text, const std::string& error) {
-                      wxGetApp().CallAfter([this, alive, text, error]() {
+                      post_to_ui([this, alive, text, error]() {
                           if (!alive->load() || wxGetApp().is_closing())
                               return;
                           on_llm_response(text, error);
@@ -480,7 +481,7 @@ void OllamaAgentController::schedule_post_apply_verification(const nlohmann::jso
                                                              OllamaWorkflowRun workflow)
 {
     const auto alive = m_alive;
-    wxGetApp().CallAfter([this, alive, root, assistant_msg, raw_text, applied, workflow = std::move(workflow)]() mutable {
+    post_to_ui([this, alive, root, assistant_msg, raw_text, applied, workflow = std::move(workflow)]() mutable {
         if (!alive->load() || wxGetApp().is_closing() || !m_running || m_cancelled)
             return;
         handle_post_apply_verification(root, assistant_msg, raw_text, applied, workflow);

@@ -169,80 +169,81 @@ void ai_model_create_generate_async(const std::string& user_text,
     if (!callback)
         return;
 
-    std::thread([user_text, strokes_norm, callback = std::move(callback)]() {
+    // OllamaClient::chat is already asynchronous and answers on the UI thread,
+    // so no worker thread is needed. Everything the reply handler touches lives
+    // in `state`; the old version captured stack locals by reference from a
+    // thread that had already returned.
+    struct State
+    {
+        std::vector<std::vector<Vec2d>>           strokes_norm;
+        TriangleMesh                              sketch_mesh;
+        std::function<void(AIModelCreateResult)> callback;
+    };
+    auto state          = std::make_shared<State>();
+    state->strokes_norm = strokes_norm;
+    state->callback     = std::move(callback);
+    if (!strokes_norm.empty())
+        state->sketch_mesh = ai_model_create_mesh_from_sketch(strokes_norm, kDefaultBedMm, 20.0);
+
+    const std::string system =
+        "You generate simple 3D printable models as JSON only. "
+        "Reply with a single JSON object: {\"primitives\":[{\"type\":\"box|cylinder|sphere\","
+        "\"center_mm\":[x,y,z],\"size_mm\":[w,d,h] or \"radius_mm\":r,\"height_mm\":h}]}. "
+        "Units are millimeters. Z=0 is the build plate; keep height positive. "
+        "Fit within 80x80x80 mm. No markdown, no explanation.";
+    const std::string user = std::string("Description:\n") + user_text + "\n\n" + sketch_summary(strokes_norm, kDefaultBedMm);
+    std::vector<OllamaMessage> messages{
+        {"system", system},
+        {"user", user},
+    };
+
+    OllamaClient client(ollama_host_from_config());
+    client.chat(ollama_model_from_config(), messages, [state](const std::string& text, const std::string& err) {
         AIModelCreateResult out;
-        TriangleMesh        sketch_mesh;
-        if (!strokes_norm.empty())
-            sketch_mesh = ai_model_create_mesh_from_sketch(strokes_norm, kDefaultBedMm, 20.0);
-
-        const std::string model = ollama_model_from_config();
-        OllamaClient      client(ollama_host_from_config());
-
-        const std::string system =
-            "You generate simple 3D printable models as JSON only. "
-            "Reply with a single JSON object: {\"primitives\":[{\"type\":\"box|cylinder|sphere\","
-            "\"center_mm\":[x,y,z],\"size_mm\":[w,d,h] or \"radius_mm\":r,\"height_mm\":h}]}. "
-            "Units are millimeters. Z=0 is the build plate; keep height positive. "
-            "Fit within 80x80x80 mm. No markdown, no explanation.";
-
-        const std::string user = std::string("Description:\n") + user_text + "\n\n" + sketch_summary(strokes_norm, kDefaultBedMm);
-
-        std::vector<OllamaMessage> messages{
-            {"system", system},
-            {"user", user},
-        };
-
-        bool done = false;
-        client.chat(model, messages, [&](const std::string& text, const std::string& err) {
-            if (done)
-                return;
-            done = true;
-
-            if (!err.empty()) {
-                if (!sketch_mesh.empty()) {
-                    out.mesh    = std::move(sketch_mesh);
-                    out.success = ai_model_create_validate_mesh(out.mesh, &out.error);
-                    out.summary = out.success ? "Used sketch geometry (AI unavailable)." : "";
-                    if (!out.success && out.error.empty())
-                        out.error = err;
-                } else {
-                    out.success = false;
-                    out.error   = err;
-                    out.summary = "AI service unavailable. Start Ollama or draw a sketch.";
-                }
-                callback(std::move(out));
-                return;
+        if (!err.empty()) {
+            if (!state->sketch_mesh.empty()) {
+                out.mesh    = std::move(state->sketch_mesh);
+                out.success = ai_model_create_validate_mesh(out.mesh, &out.error);
+                out.summary = out.success ? "Used sketch geometry (AI unavailable)." : "";
+                if (!out.success && out.error.empty())
+                    out.error = err;
+            } else {
+                out.success = false;
+                out.error   = err;
+                out.summary = "AI is unavailable. Connect ChatGPT or draw a sketch.";
             }
+            state->callback(std::move(out));
+            return;
+        }
 
-            try {
-                const nlohmann::json root     = extract_ollama_action_json_with_repair(text);
-                TriangleMesh         llm_mesh   = mesh_from_primitives_json(root);
-                if (!llm_mesh.empty()) {
-                    out.mesh = std::move(llm_mesh);
-                    if (!sketch_mesh.empty())
-                        out.mesh.merge(sketch_mesh);
-                } else {
-                    out.mesh = std::move(sketch_mesh);
-                }
-                if (out.mesh.empty())
-                    out.mesh = ai_model_create_mesh_from_sketch(strokes_norm);
+        try {
+            const nlohmann::json root     = extract_ollama_action_json_with_repair(text);
+            TriangleMesh         llm_mesh = mesh_from_primitives_json(root);
+            if (!llm_mesh.empty()) {
+                out.mesh = std::move(llm_mesh);
+                if (!state->sketch_mesh.empty())
+                    out.mesh.merge(state->sketch_mesh);
+            } else {
+                out.mesh = std::move(state->sketch_mesh);
+            }
+            if (out.mesh.empty())
+                out.mesh = ai_model_create_mesh_from_sketch(state->strokes_norm);
 
+            its_merge_vertices(out.mesh.its, true);
+            out.success = ai_model_create_validate_mesh(out.mesh, &out.error);
+            out.summary = out.success ? "Model generated." : "Generation produced an invalid mesh.";
+        } catch (const std::exception& ex) {
+            if (!state->sketch_mesh.empty()) {
+                out.mesh = std::move(state->sketch_mesh);
                 its_merge_vertices(out.mesh.its, true);
                 out.success = ai_model_create_validate_mesh(out.mesh, &out.error);
-                out.summary = out.success ? "Model generated." : "Generation produced an invalid mesh.";
-            } catch (const std::exception& ex) {
-                if (!sketch_mesh.empty()) {
-                    out.mesh    = std::move(sketch_mesh);
-                    its_merge_vertices(out.mesh.its, true);
-                    out.success = ai_model_create_validate_mesh(out.mesh, &out.error);
-                    out.summary = out.success ? "Used sketch geometry (could not parse AI response)." : "";
-                }
-                if (!out.success && out.error.empty())
-                    out.error = ex.what();
+                out.summary = out.success ? "Used sketch geometry (could not parse AI response)." : "";
             }
-            callback(std::move(out));
-        });
-    }).detach();
+            if (!out.success && out.error.empty())
+                out.error = ex.what();
+        }
+        state->callback(std::move(out));
+    }, OllamaRequestKind::ModelCreate);
 }
 
 }} // namespace

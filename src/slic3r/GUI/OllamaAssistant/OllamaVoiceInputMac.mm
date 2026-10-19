@@ -1,5 +1,6 @@
 #ifdef __APPLE__
 
+#include "../UiDispatch.hpp"
 #include "OllamaVoiceInput.hpp"
 #include "OllamaVoiceTranscript.hpp"
 #include "../GUI_App.hpp"
@@ -20,7 +21,7 @@ static void deliver_voice_final(OllamaVoiceInput::FinalTextCallback cb, std::str
 {
     if (!cb)
         return;
-    wxGetApp().CallAfter([cb = std::move(cb), text = std::move(text)]() {
+    post_to_ui([cb = std::move(cb), text = std::move(text)]() {
         if (cb)
             cb(text);
     });
@@ -30,7 +31,7 @@ static void deliver_voice_error(OllamaVoiceInput::ErrorCallback cb, std::string 
 {
     if (!cb)
         return;
-    wxGetApp().CallAfter([cb = std::move(cb), message = std::move(message)]() {
+    post_to_ui([cb = std::move(cb), message = std::move(message)]() {
         if (cb)
             cb(message);
     });

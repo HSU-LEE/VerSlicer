@@ -1,5 +1,6 @@
 #include "OllamaModelLoadAdvisor.hpp"
 
+#include "../UiDispatch.hpp"
 #include "OllamaActionExecutor.hpp"
 #include "OllamaActionPipeline.hpp"
 #include "OllamaActionRegistry.hpp"
@@ -178,7 +179,7 @@ void run_model_load_chat(Plater* plater)
     client.chat(
         ollama_model_from_config(), messages,
         [alive, plater](const std::string& text, const std::string& error) {
-            wxGetApp().CallAfter([alive, plater, text, error]() {
+            post_to_ui([alive, plater, text, error]() {
                 if (!alive->load() || wxGetApp().is_closing()) {
                     finish_schedule();
                     return;
@@ -273,7 +274,7 @@ void ensure_ollama_then_run(Plater* plater)
     const auto alive = s_alive;
     OllamaClient client(ollama_host_from_config());
     client.list_models([alive, plater](const std::vector<std::string>&, const std::string& error) {
-        wxGetApp().CallAfter([alive, plater, error]() {
+        post_to_ui([alive, plater, error]() {
             if (!alive->load() || wxGetApp().is_closing()) {
                 finish_schedule();
                 return;
@@ -307,7 +308,7 @@ void OllamaModelLoadAdvisor::schedule_after_model_load(Plater* plater)
         return;
 
     const auto alive = s_alive;
-    wxGetApp().CallAfter([alive, plater]() {
+    post_to_ui([alive, plater]() {
         if (!alive->load() || wxGetApp().is_closing())
             return;
         Plater* p = wxGetApp().plater();

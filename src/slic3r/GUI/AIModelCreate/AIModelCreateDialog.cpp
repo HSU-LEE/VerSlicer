@@ -8,6 +8,7 @@
 #include "../I18N.hpp"
 #include "../Plater.hpp"
 
+#include <wx/weakref.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
@@ -110,16 +111,12 @@ void AIModelCreateDialog::on_generate(wxCommandEvent& /*evt*/)
     std::vector<std::vector<Vec2d>> strokes   = m_sketch ? m_sketch->normalized_strokes()
                                                          : std::vector<std::vector<Vec2d>>{};
 
-    wxWindow* self = this;
+    // The reply can arrive after the dialog is closed; a weak ref turns null then.
+    wxWeakRef<AIModelCreateDialog> self(this);
     ai_model_create_generate_async(text_utf8, strokes, [self](AIModelCreateResult result) {
-        wxGetApp().CallAfter([self, result = std::move(result)]() mutable {
-            if (!self || self->IsBeingDeleted())
-                return;
-            auto* dlg = dynamic_cast<AIModelCreateDialog*>(self);
-            if (!dlg)
-                return;
-            dlg->on_generation_done(std::move(result));
-        });
+        if (!self || self->IsBeingDeleted())
+            return;
+        self->on_generation_done(std::move(result));
     });
 }
 

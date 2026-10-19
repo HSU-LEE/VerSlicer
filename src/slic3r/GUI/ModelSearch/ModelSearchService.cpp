@@ -1,5 +1,6 @@
 #include "ModelSearchService.hpp"
 
+#include "../UiDispatch.hpp"
 #include "MakerWorldProvider.hpp"
 #include "ModelSearchDedupe.hpp"
 #include "ModelSearchQueryBuilder.hpp"
@@ -235,9 +236,7 @@ void ModelSearchService::search_all_providers(const std::string&           user_
         const ModelSearchQuery     query = ModelSearchService::build_query(user_text, /*allow_translation=*/true);
         ModelSearchAggregateResult agg   = this->search_sync(query, ctx, rank_cfg);
 
-        if (wxGetApp().is_closing())
-            return; // shutting down: never post to a dying main loop
-        wxGetApp().CallAfter([this, cb, agg, generation]() {
+        post_to_ui([this, cb, agg, generation]() {
             if (wxGetApp().is_closing())
                 return;
             if (generation != m_generation.load())

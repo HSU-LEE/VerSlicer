@@ -1,5 +1,6 @@
 #include "PrintPlannerGui.hpp"
 
+#include "../UiDispatch.hpp"
 #include "BambuSmartPrintService.hpp"
 #include "BambuSmartPrintUi.hpp"
 #include "BambuSmartPrintWorkflowDialog.hpp"
@@ -220,7 +221,7 @@ void PrintPlannerGui::dispatch_model_loaded(Plater* plater)
             plater, plan.base_config, plan.proposed_config, false, false);
     }
 
-    wxGetApp().CallAfter([]() { BambuSmartPrintService::instance().refresh_all_panels(); });
+    post_to_ui([]() { BambuSmartPrintService::instance().refresh_all_panels(); });
 }
 
 std::vector<AICoachCard> PrintPlannerGui::coach_cards_from_plan(Plater* plater, const PrintPlan& plan)

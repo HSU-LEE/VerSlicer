@@ -1,5 +1,6 @@
 #include "ChatGptAccountBar.hpp"
 
+#include "../UiDispatch.hpp"
 #include "AiLocale.hpp"
 #include "AiPrivacyConsent.hpp"
 #include "ChatGptAccount.hpp"
@@ -119,7 +120,7 @@ void ChatGptAccountBar::start_sign_in()
     const auto alive = m_alive;
     std::thread([this, alive]() {
         const std::string error = ChatGptAccount::sign_in();
-        wxGetApp().CallAfter([this, alive, error]() {
+        post_to_ui([this, alive, error]() {
             if (!alive->load() || wxGetApp().is_closing())
                 return;
             finish_sign_in(error);

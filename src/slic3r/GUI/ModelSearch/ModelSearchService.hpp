@@ -42,7 +42,7 @@ public:
 
     // Asynchronous fan-out. Spawns a worker that builds the query (with
     // translation), runs search_sync, and marshals the result to the main thread
-    // via wxGetApp().CallAfter, guarded by is_closing() and a generation match
+    // via post_to_ui (dropped once shutdown begins) and a generation match
     // for cancellation (mirrors MakerWorldSearchService::search_async).
     void search_all_providers(const std::string&        user_text,
                               ModelSearchResultCallback callback,

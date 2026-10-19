@@ -1,4 +1,5 @@
 #include "MakerWorldImportFlow.hpp"
+#include "../UiDispatch.hpp"
 #include "MakerWorldIntent.hpp"
 #include "MakerWorldPickDialog.hpp"
 #include "MakerWorldPrintOfferDialog.hpp"
@@ -133,7 +134,7 @@ void schedule_slice_and_send(MakerWorldFlowUiCallbacks cb)
         OllamaAgentEventBus::instance().unsubscribe(*sub_id);
 
         const bool ok = evt.payload.value("success", false);
-        wxGetApp().CallAfter([ok, cb]() {
+        post_to_ui([ok, cb]() {
             Plater* p = wxGetApp().plater();
             if (!p) {
                 chat_notify(cb, _L("The slicer is no longer available."));

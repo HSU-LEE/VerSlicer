@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include "UiDispatch.hpp"
 #include "ImGuiWrapper.hpp"
 #include "ConfigWizard.hpp"
 #include "OpenGLManager.hpp"
@@ -366,7 +367,12 @@ public:
     std::string logo_name() const { return is_editor() ? "Verslicer" : "Verslicer-gcodeviewer"; }
 
     bool is_closing() const { return m_is_closing.load(std::memory_order_acquire); }
-    void set_closing(bool closing) { m_is_closing.store(closing, std::memory_order_release); }
+    void set_closing(bool closing)
+    {
+        m_is_closing.store(closing, std::memory_order_release);
+        if (closing)
+            ui_dispatch_close();
+    }
     
     // Verslicer
     bool show_gcode_window() const { return m_show_gcode_window; }

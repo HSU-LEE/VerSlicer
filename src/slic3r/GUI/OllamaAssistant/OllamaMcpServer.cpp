@@ -1,5 +1,6 @@
 #include "OllamaMcpServer.hpp"
 
+#include "../UiDispatch.hpp"
 #include "OllamaConfig.hpp"
 #include "OllamaToolGateway.hpp"
 
@@ -108,7 +109,9 @@ nlohmann::json call_on_ui(const std::string& name, const nlohmann::json& argumen
 {
     auto done = std::make_shared<std::promise<nlohmann::json>>();
     std::future<nlohmann::json> fut = done->get_future();
-    wxGetApp().CallAfter([name, arguments, done]() {
+    if (!ui_dispatch_open())
+        return rpc_error(nullptr, -32000, "Application is closing");
+    post_to_ui([name, arguments, done]() {
         if (wxGetApp().is_closing()) {
             done->set_value(rpc_error(nullptr, -32000, "Application is closing"));
             return;

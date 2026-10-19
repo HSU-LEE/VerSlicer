@@ -1,5 +1,6 @@
 #include "PrintJobStepExecutors.hpp"
 
+#include "../UiDispatch.hpp"
 #include "../GUI_App.hpp"
 #include "../GLToolbar.hpp"          // EVT_GLTOOLBAR_SLICE_PLATE, SimpleEvent
 #include "../PartPlate.hpp"
@@ -155,9 +156,7 @@ void PrintJobStepExecutors::resolve_import_async(const ModelCandidate& candidate
             res.error = AiLocale::text("Could not resolve the model download.",
                                        "모델 다운로드 정보를 가져오지 못했습니다.").utf8_string();
         }
-        if (wxGetApp().is_closing())
-            return; // shutting down: never post to a dying main loop
-        wxGetApp().CallAfter([cb, res]() {
+        post_to_ui([cb, res]() {
             if (wxGetApp().is_closing())
                 return;
             if (cb)

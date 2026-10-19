@@ -1,5 +1,6 @@
 #include "AICoachController.hpp"
 
+#include "../UiDispatch.hpp"
 #include "AICoachApplyDedup.hpp"
 #include "AICoachFinishingBuilder.hpp"
 #include "AICoachRulesEngine.hpp"
@@ -211,7 +212,7 @@ void AICoachController::on_model_loaded(Plater* plater)
 {
     if (!plater || !is_enabled_for_current_mode())
         return;
-    wxGetApp().CallAfter([plater]() {
+    post_to_ui([plater]() {
         if (!wxGetApp().plater())
             return;
         AICoachController::instance().enqueue_cards(
@@ -392,7 +393,7 @@ bool AICoachController::update(GLCanvas3D& canvas, bool paused, int64_t delta_ms
                 const AICoachButton button = card.buttons[static_cast<size_t>(btn_idx)];
                 const AICoachCard   card_copy = card;
                 m_button_dispatch_pending = true;
-                wxGetApp().CallAfter([button, card_copy]() {
+                post_to_ui([button, card_copy]() {
                     AICoachController& self = AICoachController::instance();
                     self.m_button_dispatch_pending = false;
                     Plater* plater = wxGetApp().plater();

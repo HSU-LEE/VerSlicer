@@ -95,6 +95,7 @@ private:
     void start_assist_loop_turn(const std::string& user_utf8);
     void on_assist_loop_finished(const OllamaAgentRunResult& result);
     void on_chat_response(const std::string& assistant_text, const std::string& error);
+    void on_chat_response_impl(const std::string& assistant_text, const std::string& error);
     void schedule_model_poll(int delay_ms);
     void trim_message_history();
     void reset_conversation();

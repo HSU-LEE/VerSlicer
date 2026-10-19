@@ -1,4 +1,5 @@
 #include "OllamaChatPanel.hpp"
+#include "../UiDispatch.hpp"
 #include "AiPrivacyConsent.hpp"
 #include "OllamaActionExecutor.hpp"
 #include "OllamaActionPipeline.hpp"
@@ -1359,7 +1360,7 @@ void OllamaChatPanel::refresh_models()
     const auto alive = m_alive;
     wxWeakRef<wxWindow> weak(this);
     m_client.list_models([alive, weak](const std::vector<std::string>& models, const std::string& error) {
-        wxGetApp().CallAfter([alive, weak, models, error]() {
+        post_to_ui([alive, weak, models, error]() {
             if (!alive->load() || wxGetApp().is_closing())
                 return;
             auto* panel = dynamic_cast<OllamaChatPanel*>(weak.get());
@@ -1406,7 +1407,7 @@ MakerWorldFlowUiCallbacks OllamaChatPanel::makerworld_flow_callbacks()
         }
     };
     cb.on_flow_finished = [weak]() {
-        wxGetApp().CallAfter([weak]() {
+        post_to_ui([weak]() {
             if (auto* panel = weak.get()) {
                 const wxString last = panel->m_history_list ? panel->m_history_list->last_assistant_text()
                                                             : wxString{};
@@ -1459,7 +1460,7 @@ AIPipeline::PrintJobUiCallbacks OllamaChatPanel::orchestrator_ui_callbacks()
             panel->on_pipeline_step(state, detail);
     };
     ui.on_finished = [weak]() {
-        wxGetApp().CallAfter([weak]() {
+        post_to_ui([weak]() {
             if (auto* panel = weak.get()) {
                 // Belt-and-braces: the job is over, so no indicator may survive
                 // even if a set_busy(false) was missed on some path.
@@ -1629,7 +1630,7 @@ OllamaClient::StreamCallback OllamaChatPanel::make_stream_callback(uint64_t gen)
     return [alive, gen, weak](const std::string& chunk) {
         if (!alive->load())
             return;
-        wxGetApp().CallAfter([alive, gen, weak, chunk]() {
+        post_to_ui([alive, gen, weak, chunk]() {
             if (!alive->load() || wxGetApp().is_closing())
                 return;
             auto* panel = dynamic_cast<OllamaChatPanel*>(weak.get());
@@ -1796,7 +1797,7 @@ void OllamaChatPanel::dispatch_single_shot_chat(const std::string& user_msg, con
     const uint64_t    gen   = ++m_request_gen;
     wxWeakRef<wxWindow> weak_panel(this);
     m_client.chat(model, m_messages, [alive, gen, weak_panel](const std::string& text, const std::string& error) {
-        wxGetApp().CallAfter([alive, gen, weak_panel, text, error]() {
+        post_to_ui([alive, gen, weak_panel, text, error]() {
             if (!alive->load() || wxGetApp().is_closing())
                 return;
             auto* panel = dynamic_cast<OllamaChatPanel*>(weak_panel.get());
@@ -1871,7 +1872,7 @@ void OllamaChatPanel::toggle_voice()
     const auto alive = m_alive;
     wxWeakRef<wxWindow> weak(this);
     app.ollama_voice_input->set_on_error([alive, weak](const std::string& err) {
-        wxGetApp().CallAfter([alive, weak, err]() {
+        post_to_ui([alive, weak, err]() {
             if (!alive->load() || wxGetApp().is_closing())
                 return;
             auto* panel = dynamic_cast<OllamaChatPanel*>(weak.get());
@@ -1884,7 +1885,7 @@ void OllamaChatPanel::toggle_voice()
     app.ollama_voice_input->set_on_final_text([alive, weak](const std::string& text) {
         if (text.empty())
             return;
-        wxGetApp().CallAfter([alive, weak, text]() {
+        post_to_ui([alive, weak, text]() {
             if (!alive->load() || wxGetApp().is_closing())
                 return;
             auto* panel = dynamic_cast<OllamaChatPanel*>(weak.get());
@@ -2039,7 +2040,7 @@ void OllamaChatPanel::retry_last_chat_simple()
     const uint64_t gen      = m_request_gen;
     wxWeakRef<wxWindow> weak_panel(this);
     m_client.chat(model, m_messages, [alive, gen, weak_panel](const std::string& text, const std::string& error) {
-        wxGetApp().CallAfter([alive, gen, weak_panel, text, error]() {
+        post_to_ui([alive, gen, weak_panel, text, error]() {
             if (!alive->load() || wxGetApp().is_closing())
                 return;
             auto* panel = dynamic_cast<OllamaChatPanel*>(weak_panel.get());
@@ -2079,6 +2080,23 @@ void OllamaChatPanel::ensure_default_model_ready(const std::vector<std::string>&
 }
 
 void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const std::string& error)
+{
+    try {
+        on_chat_response_impl(assistant_text, error);
+    } catch (const std::exception& e) {
+        BOOST_LOG_TRIVIAL(error) << "Assistant reply handling threw: " << e.what();
+        if (!m_alive->load() || wxGetApp().is_closing())
+            return;
+        set_busy(false);
+        const wxString msg = AiLocale::korean()
+            ? wxString::FromUTF8("AI 응답을 처리하지 못했습니다. 다시 보내 보세요.")
+            : wxString("Couldn't process the AI reply. Try sending again.");
+        append_chat(_L("System"), msg);
+        set_status_text(msg);
+    }
+}
+
+void OllamaChatPanel::on_chat_response_impl(const std::string& assistant_text, const std::string& error)
 {
     if (!m_alive->load() || wxGetApp().is_closing())
         return;
