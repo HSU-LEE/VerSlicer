@@ -8,7 +8,8 @@ on:
 
 concurrency:
   group: headless-tests-${{ github.ref }}
-  cancel-in-progress: true
+  # Only PR runs are replaced; main runs finish so the dependency cache gets saved.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   dev-utils:
@@ -26,7 +27,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: deps/build/arm64/OrcaSlicer_dep
-          key: deps-macos-arm64-${{ hashFiles('deps/**') }}
+          key: deps-macos-arm64-${{ hashFiles('deps/**', '!deps/build/**', '!deps/DL_CACHE/**') }}
 
       - name: Build dependencies
         if: steps.deps-cache.outputs.cache-hit != 'true'
