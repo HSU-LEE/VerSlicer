@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and run ORCA_TOOLS dev-utils tests (Ollama + MakerWorld).
+# Build and run ORCA_TOOLS dev-utils tests (Ollama, MakerWorld, mesh, planner).
 #
 # Usage:
 #   ./scripts/run_orca_tools_test.sh stop          # stop running builds, clean PCH tmp
@@ -36,8 +36,15 @@ JOBS="${JOBS:-$(macos_default_build_jobs)}"
 TEST_TARGETS=(
     ollama_assistant_test
     ollama_pipeline_test
+    ollama_apply_golden_test
+    ollama_benchmark_test
+    bambu_wiki_search_test
     makerworld_search_test
+    model_search_ranker_test
+    mesh_assist_test
+    print_planner_test
 )
+TEST_REGEX="^($(IFS='|'; echo "${TEST_TARGETS[*]}"))\$"
 
 stop_builds() {
     echo "Stopping cmake/ninja builds under ${BUILD_DIR}..."
@@ -84,7 +91,7 @@ run_tests() {
     require_build_dir
     cd "${BUILD_DIR}"
     ctest -C "${CONFIG}" \
-        -R 'ollama_assistant_test|ollama_pipeline_test|makerworld_search_test' \
+        -R "${TEST_REGEX}" \
         --output-on-failure
 }
 
