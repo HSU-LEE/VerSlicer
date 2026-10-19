@@ -7,3 +7,8 @@ compile_commands.json
 # GitHub Actions / Dependabot — not used for this macOS-only fork
 .github/workflows/
 .github/dependabot.yml
+
+# Local build logs and scratch helpers
+*.log
+__pycache__/
+.detached_build.py
