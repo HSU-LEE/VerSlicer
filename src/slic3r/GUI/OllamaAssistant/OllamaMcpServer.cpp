@@ -1,5 +1,6 @@
 #include "OllamaMcpServer.hpp"
 
+#include "OllamaConfig.hpp"
 #include "OllamaToolGateway.hpp"
 
 #include "libslic3r/Utils.hpp"
@@ -12,15 +13,17 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
-#include <fstream>
+#include <iomanip>
 #include <future>
 #include <mutex>
-#include <random>
 #include <sstream>
 #include <string>
 #include <thread>
 
 #include <arpa/inet.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <cstdlib>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -37,11 +40,13 @@ std::string       g_token;
 
 std::string random_token()
 {
-    std::random_device rd;
-    std::mt19937_64 gen(rd());
-    std::uniform_int_distribution<uint64_t> dist;
+    // arc4random_buf is a CSPRNG on macOS; std::mt19937 is not.
+    unsigned char bytes[32];
+    arc4random_buf(bytes, sizeof(bytes));
     std::ostringstream oss;
-    oss << std::hex << dist(gen) << dist(gen);
+    oss << std::hex << std::setfill('0');
+    for (unsigned char b : bytes)
+        oss << std::setw(2) << static_cast<int>(b);
     return oss.str();
 }
 
@@ -54,10 +59,16 @@ void write_cursor_config(int port)
            {{"url", "http://127.0.0.1:" + std::to_string(port) + "/mcp"},
             {"headers", {{"Authorization", "Bearer " + g_token}}}}}}},
     };
-    std::ofstream out(path, std::ios::trunc);
-    if (!out)
+    // The file holds the bearer token, so keep it owner-only.
+    const int fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0)
         return;
-    out << cfg.dump(2);
+    ::fchmod(fd, 0600);
+    const std::string body = cfg.dump(2);
+    const bool ok = ::write(fd, body.data(), body.size()) == static_cast<ssize_t>(body.size());
+    ::close(fd);
+    if (!ok)
+        return;
     BOOST_LOG_TRIVIAL(info) << "VerSlicer MCP config written to " << path;
 }
 
@@ -237,6 +248,10 @@ void OllamaMcpServer::start()
 {
     if (g_thread.joinable())
         return;
+    if (!ollama_mcp_server_enabled()) {
+        BOOST_LOG_TRIVIAL(info) << "VerSlicer MCP server is off (set ollama.mcp_server or VERSLICER_MCP_SERVER=1)";
+        return;
+    }
     g_stop = false;
     g_token = random_token();
 

@@ -20,6 +20,7 @@ constexpr const char* kOllamaTwoHopKey         = "two_hop";
 constexpr const char* kOllamaAdaptiveRouteKey  = "adaptive_routing";
 constexpr const char* kOllamaWikiSearchKey     = "wiki_search";
 constexpr const char* kOllamaCriticKey         = "critic";
+constexpr const char* kOllamaMcpServerKey      = "mcp_server";
 constexpr const char* kOllamaAssistLoopKey     = "assist_loop";
 constexpr const char* kOllamaAssistMaxStepsKey = "assist_max_steps";
 
@@ -33,6 +34,8 @@ bool ollama_two_hop_enabled();
 bool ollama_adaptive_routing_enabled();
 bool ollama_wiki_search_enabled();
 bool ollama_critic_enabled();
+/** Local MCP server for external agents (Cursor etc.). Off unless opted in. */
+bool ollama_mcp_server_enabled();
 bool ollama_assist_loop_enabled();
 int  ollama_assist_max_steps();
 
