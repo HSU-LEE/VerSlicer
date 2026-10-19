@@ -22,7 +22,7 @@ jobs:
           [ "v${want}" = "${GITHUB_REF_NAME}" ] || { echo "tag ${GITHUB_REF_NAME} != version.inc v${want}"; exit 1; }
 
       - name: Install build tools
-        run: brew install ninja ccache xz
+        run: brew install ninja ccache xz autoconf automake libtool texinfo
 
       - name: Restore dependencies
         id: deps-cache

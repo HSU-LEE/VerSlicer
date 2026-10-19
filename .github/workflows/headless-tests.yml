@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install build tools
-        run: brew install ninja ccache xz
+        run: brew install ninja ccache xz autoconf automake libtool texinfo
 
       # Dependencies take ~1h to build; rebuild only when deps/ changes.
       - name: Restore dependencies
