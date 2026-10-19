@@ -109,6 +109,12 @@ private:
     bool update_flag{false};
     wxTimer* m_refresh_timer = nullptr;
 
+    // Shown for Bambu printers reached over the cloud: their firmware only
+    // accepts print and control commands from other slicers via Bambu Connect.
+    wxPanel*      m_connect_notice{nullptr};
+    void          build_connect_notice();
+    void          update_connect_notice();
+
 public:
     MonitorPanel(wxWindow* parent, wxWindowID id = wxID_ANY, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize, long style = wxTAB_TRAVERSAL);
     ~MonitorPanel();

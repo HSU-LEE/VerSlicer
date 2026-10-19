@@ -1,3 +1,4 @@
+#include "BambuConnect.hpp"
 #include "OllamaAssistant/OllamaPrinterControl.hpp"
 #include "MainFrame.hpp"
 
@@ -1974,6 +1975,8 @@ wxBoxSizer* MainFrame::create_side_tools()
                          wxPostEvent(m_plater, SimpleEvent(EVT_GLTOOLBAR_PRINT_MULTI_MACHINE));
                 }
             }
+            else if (m_print_select == ePrintBambuConnect)
+                BambuConnect::send_current_plate(m_plater);
             else if (m_print_select == eExportGcode)
                 wxPostEvent(m_plater, SimpleEvent(EVT_GLTOOLBAR_EXPORT_GCODE));
             else if (m_print_select == eSendGcode)
@@ -2078,9 +2081,25 @@ wxBoxSizer* MainFrame::create_side_tools()
                 SideButton* export_all_sliced_file_btn = new SideButton(p, _L("Export all sliced file"), "");
                 export_all_sliced_file_btn->SetCornerRadius(0);
 
+                // Bambu Lab's supported path on Authorization Control firmware:
+                // no Developer Mode, works over the cloud like Bambu Studio.
+                SideButton* bambu_connect_btn = new SideButton(p, _L("Print with Bambu Connect"), "");
+                bambu_connect_btn->SetCornerRadius(0);
+                bambu_connect_btn->Bind(wxEVT_BUTTON, [this, p](wxCommandEvent&) {
+                    m_print_btn->SetLabel(_L("Print with Bambu Connect"));
+                    m_print_select = ePrintBambuConnect;
+                    wxGetApp().app_config->set("print_button_mode", "bambu_connect");
+                    m_print_enable = get_enable_print_status();
+                    m_print_btn->Enable(m_print_enable);
+                    this->Layout();
+                    fit_tab_labels();
+                    p->Dismiss();
+                    });
+
                 print_plate_btn->Bind(wxEVT_BUTTON, [this, p](wxCommandEvent&) {
                     m_print_btn->SetLabel(_L("Print plate"));
                     m_print_select = ePrintPlate;
+                    wxGetApp().app_config->set("print_button_mode", "plate");
                     m_print_enable = get_enable_print_status();
                     m_print_btn->Enable(m_print_enable);
                     this->Layout();
@@ -2160,6 +2179,8 @@ wxBoxSizer* MainFrame::create_side_tools()
                     }
                 }
 
+                if (preset_bundle && preset_bundle->use_bbl_network())
+                    p->append_button(bambu_connect_btn);
                 p->append_button(print_plate_btn);
                 if (support_print_all) {
                     p->append_button(print_all_btn);
@@ -2338,6 +2359,10 @@ bool MainFrame::get_enable_print_status()
         {
             enable = false;
         }
+    }
+    else if (m_print_select == ePrintBambuConnect)
+    {
+        enable = enable && current_plate->is_slice_result_ready_for_export() && !is_all_plates;
     }
     else if (m_print_select == ePrintMultiMachine)
     {
@@ -4190,6 +4215,21 @@ void MainFrame::on_config_changed(DynamicPrintConfig* config) const
 
 void MainFrame::set_print_button_to_default(PrintSelectType select_type)
 {
+    // Bambu printers default to Bambu Connect: on Authorization Control firmware it
+    // is the only way to print without Developer Mode. "Print plate" stays one
+    // menu pick away and is remembered once chosen.
+    if (select_type == PrintSelectType::ePrintPlate && wxGetApp().preset_bundle
+        && wxGetApp().preset_bundle->use_bbl_network()
+        && wxGetApp().app_config->get("print_button_mode") != "plate") {
+        m_print_btn->SetLabel(_L("Print with Bambu Connect"));
+        m_print_select = ePrintBambuConnect;
+        if (m_print_enable)
+            m_print_enable = get_enable_print_status();
+        m_print_btn->Enable(m_print_enable);
+        this->Layout();
+        fit_tab_labels();
+        return;
+    }
     if (select_type == PrintSelectType::ePrintPlate) {
         m_print_btn->SetLabel(_L("Print plate"));
         m_print_select = ePrintPlate;

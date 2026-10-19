@@ -1,3 +1,5 @@
+#include "Widgets/Button.hpp"
+#include "BambuConnect.hpp"
 #include "Tab.hpp"
 #include "libslic3r/Utils.hpp"
 #include "libslic3r/Model.hpp"
@@ -118,6 +120,8 @@ MonitorPanel::MonitorPanel(wxWindow* parent, wxWindowID id, const wxPoint& pos, 
     m_smart_print_summary->Hide();
 
     m_main_sizer = new wxBoxSizer(wxVERTICAL);
+    build_connect_notice();
+    m_main_sizer->Add(m_connect_notice, 0, wxEXPAND, 0);
     m_main_sizer->Add(m_tabpanel, 1, wxEXPAND | wxLEFT, 0);
     SetSizerAndFit(m_main_sizer);
 
@@ -335,6 +339,44 @@ void MonitorPanel::on_size(wxSizeEvent &event)
     //Refresh();
 }
 
+void MonitorPanel::build_connect_notice()
+{
+    m_connect_notice = new wxPanel(this);
+    m_connect_notice->SetBackgroundColour(wxColour("#3A3326"));
+    auto* row  = new wxBoxSizer(wxHORIZONTAL);
+    auto* text = new wxStaticText(m_connect_notice, wxID_ANY,
+        _L("Bambu Lab firmware only accepts print jobs and controls (temperature, movement, fans) from other slicers "
+           "through Bambu Connect. Status shows here as usual. To print, use \"Print with Bambu Connect\"."));
+    text->SetForegroundColour(wxColour("#F2D9A6"));
+    text->Wrap(FromDIP(720));
+    auto* open_btn = new Button(m_connect_notice, _L("Open Bambu Connect"));
+    open_btn->SetStyle(ButtonStyle::Confirm, ButtonType::Compact);
+    auto* hide_btn = new Button(m_connect_notice, _L("Dismiss"));
+    hide_btn->SetStyle(ButtonStyle::Regular, ButtonType::Compact);
+    row->Add(text, 1, wxALIGN_CENTER_VERTICAL | wxALL, FromDIP(10));
+    row->Add(open_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(8));
+    row->Add(hide_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(10));
+    m_connect_notice->SetSizer(row);
+    m_connect_notice->Hide();
+    open_btn->Bind(wxEVT_BUTTON, [](wxCommandEvent&) { BambuConnect::open_app(); });
+    hide_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        wxGetApp().app_config->set("bambu_connect_notice_dismissed", "1");
+        update_connect_notice();
+    });
+}
+
+void MonitorPanel::update_connect_notice()
+{
+    if (!m_connect_notice)
+        return;
+    const std::string dismissed = wxGetApp().app_config->get("bambu_connect_notice_dismissed");
+    const bool show = obj && !obj->is_lan_mode_printer() && dismissed != "1" && dismissed != "true";
+    if (show != m_connect_notice->IsShown()) {
+        m_connect_notice->Show(show);
+        Layout();
+    }
+}
+
 void MonitorPanel::update_all()
 {
     if (!m_initialized)
@@ -344,6 +386,7 @@ void MonitorPanel::update_all()
     Slic3r::DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
     if (!dev) return;
     obj = dev->get_selected_machine();
+    update_connect_notice();
 
     if (!obj) {
         if (m_smart_print_summary)

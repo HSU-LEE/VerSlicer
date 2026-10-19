@@ -301,6 +301,11 @@ OllamaActionResult OllamaPrinterControl::apply(const nlohmann::json& action)
     result.success          = true;
     result.effective_change = true;
     result.message          = (ko ? "프린터 설정 변경: " : "Printer set: ") + describe(*req, ko);
+    if (!obj->is_lan_mode_printer())
+        // Authorization Control firmware ignores control commands from other
+        // slicers over the cloud; say so instead of claiming success.
+        result.message += ko ? " (명령을 보냈습니다. 최신 펌웨어는 다른 슬라이서의 클라우드 제어를 무시할 수 있으니 프린터 화면에서 확인하세요. 안 바뀌면 Bambu Connect에서 바꾸세요.)"
+                             : " (Command sent. Bambu firmware with Authorization Control may ignore control from other slicers over the cloud; check the printer, and use Bambu Connect if it did not change.)";
     return result;
 }
 
