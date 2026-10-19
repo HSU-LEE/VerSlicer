@@ -2309,8 +2309,10 @@ GUI_App::~GUI_App()
         delete preset_updater;
     }
 
-    StaticBambuLib::release();
-    BBLNetworkPlugin::shutdown();
+    if (!m_bambu_libs_released) {
+        StaticBambuLib::release();
+        BBLNetworkPlugin::shutdown();
+    }
 
 
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< boost::format(": exit");
@@ -2640,14 +2642,8 @@ bool GUI_App::OnInit()
     }
 }
 
-int GUI_App::OnExit()
+void GUI_App::release_network_for_exit()
 {
-    set_closing(true);
-    cleanup_ollama_assistant();
-
-    stop_http_server();
-    stop_sync_user_preset();
-
     if (m_device_manager) {
         delete m_device_manager;
         m_device_manager = nullptr;
@@ -2671,6 +2667,17 @@ int GUI_App::OnExit()
         delete m_agent;
         m_agent = nullptr;
     }
+}
+
+int GUI_App::OnExit()
+{
+    set_closing(true);
+    cleanup_ollama_assistant();
+
+    stop_http_server();
+    stop_sync_user_preset();
+
+    release_network_for_exit();
 
     // Orca: clean up encrypted bbl network log file if plugin is used
     // No point to keep them as they are encrypted and can't be used for debugging
@@ -2797,6 +2804,24 @@ bool GUI_App::on_init_inner()
         }
         for (auto d : dialogStack)
             d->EndModal(wxID_ABORT);
+    });
+
+    // macOS Quit (Cmd+Q, Dock, logout) ends with AppKit calling exit() right after
+    // this event: OnExit() and ~GUI_App() never run. Without this, the Bambu
+    // network plugin's threads were still alive when its static destructors ran,
+    // and every quit ended in std::terminate.
+    wxGetApp().Bind(wxEVT_END_SESSION, [this](wxCloseEvent&) {
+        BOOST_LOG_TRIVIAL(info) << "received wxEVT_END_SESSION, releasing network before exit";
+        set_closing(true);
+        stop_http_server();
+        stop_sync_user_preset();
+        release_network_for_exit();
+        if (!m_bambu_libs_released) {
+            StaticBambuLib::release();
+            BBLNetworkPlugin::shutdown();
+            m_bambu_libs_released = true;
+        }
+        flush_logs();
     });
 
     // Verify resources path

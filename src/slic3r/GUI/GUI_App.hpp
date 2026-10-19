@@ -294,6 +294,8 @@ private:
 
     //BBS
     std::atomic<bool> m_is_closing {false};
+    bool              m_bambu_libs_released {false};
+    void              release_network_for_exit();
     Slic3r::DeviceManager* m_device_manager { nullptr };
     Slic3r::UserManager* m_user_manager { nullptr };
     Slic3r::TaskManager* m_task_manager { nullptr };
