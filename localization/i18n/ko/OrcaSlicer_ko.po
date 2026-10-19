@@ -5970,9 +5970,7 @@ msgid "View"
 msgstr "시점"
 
 msgid "Preset Bundle"
-msgstr ""
-
-msgid "Syncing presets from cloud…"
+msgstr "프리셋 번들"msgid "Syncing presets from cloud…"
 msgstr ""
 
 msgid "Help"
@@ -6015,9 +6013,7 @@ msgid "VFA"
 msgstr "VFA"
 
 msgid "Calibration Guide"
-msgstr ""
-
-msgid "&Open G-code"
+msgstr "캘리브레이션 가이드"msgid "&Open G-code"
 msgstr "Gcode 열기 (&O)"
 
 msgid "Open a G-code file"
@@ -8878,9 +8874,7 @@ msgid "Bundle presets"
 msgstr ""
 
 msgid "System"
-msgstr ""
-
-msgid "Unsupported presets"
+msgstr "시스템"msgid "Unsupported presets"
 msgstr ""
 
 msgid "Unsupported"
@@ -10778,9 +10772,7 @@ msgstr ""
 
 msgctxt "Sync_Nozzle_AMS"
 msgid "Cancel"
-msgstr ""
-
-msgid "Successfully synchronized filament color from printer."
+msgstr "취소"msgid "Successfully synchronized filament color from printer."
 msgstr ""
 
 msgid "Successfully synchronized color and type of filament from printer."
@@ -24726,3 +24718,552 @@ msgstr "신뢰도:"
 msgid "Not now"
 msgstr "나중에"
 
+
+msgid "Bambu Lab printers with the latest firmware only accept print jobs from other slicers through Bambu Connect, Bambu Lab's free helper app. Developer Mode is not needed.\n\nInstall Bambu Connect (macOS 13 or later), sign in with your Bambu Lab account, then press Print again."
+msgstr "최신 펌웨어의 Bambu Lab 프린터는 다른 슬라이서의 출력 작업을 Bambu Lab의 무료 도우미 앱인 Bambu Connect를 통해서만 받습니다. 개발자 모드는 필요 없습니다.\n\nBambu Connect(macOS 13 이상)를 설치하고 Bambu Lab 계정으로 로그인한 뒤 다시 출력을 누르세요."
+
+msgid "Bambu Connect is needed to print"
+msgstr "출력하려면 Bambu Connect가 필요합니다"
+
+msgid "Download Bambu Connect"
+msgstr "Bambu Connect 다운로드"
+
+msgid "Slice the plate first, then press Print again."
+msgstr "먼저 플레이트를 슬라이스한 뒤 다시 출력을 누르세요."
+
+msgid "Print with Bambu Connect"
+msgstr "Bambu Connect로 출력"
+
+msgid "Could not prepare the sliced file for Bambu Connect."
+msgstr "Bambu Connect용 슬라이스 파일을 준비하지 못했습니다."
+
+msgid "Bambu Lab firmware only accepts print jobs and controls (temperature, movement, fans) from other slicers through Bambu Connect. Status shows here as usual. To print, use \"Print with Bambu Connect\"."
+msgstr "Bambu Lab 펌웨어는 다른 슬라이서의 출력 작업과 제어(온도·이동·팬)를 Bambu Connect를 통해서만 받습니다. 상태는 여기에 그대로 표시됩니다. 출력하려면 「Bambu Connect로 출력」을 사용하세요."
+
+msgid "Open Bambu Connect"
+msgstr "Bambu Connect 열기"
+
+msgid "Dismiss"
+msgstr "닫기"
+
+msgid "Analyze current plate"
+msgstr "현재 플레이트 분석"
+
+msgid "Run Smart Print analysis on the current plate"
+msgstr "현재 플레이트에서 Smart Print 분석 실행"
+
+msgid "Analyze all plates"
+msgstr "모든 플레이트 분석"
+
+msgid "Run Smart Print analysis on each plate with models"
+msgstr "모델이 있는 모든 플레이트에서 Smart Print 분석 실행"
+
+msgid "Smart slice"
+msgstr "스마트 슬라이스"
+
+msgid "Apply Smart Print suggestions and slice"
+msgstr "Smart Print 제안을 적용하고 슬라이스"
+
+msgid "Sign in to Bambu Lab…"
+msgstr "Bambu Lab에 로그인…"
+
+msgid "Log in with your Bambu Lab account to sync printers"
+msgstr "프린터를 동기화하려면 Bambu Lab 계정으로 로그인하세요"
+
+msgid "Sign out of Bambu Lab"
+msgstr "Bambu Lab에서 로그아웃"
+
+msgid "Log out of your Bambu Lab account"
+msgstr "Bambu Lab 계정에서 로그아웃"
+
+msgid "Allow AI printer control"
+msgstr "AI 프린터 제어 허용"
+
+msgid "Let the AI assistant set nozzle, bed and chamber temperature and print speed on the connected printer"
+msgstr "AI 도우미가 연결된 프린터의 노즐·베드·챔버 온도와 출력 속도를 바꾸도록 허용합니다"
+
+msgid "View failure history"
+msgstr "실패 기록 보기"
+
+msgid "Browse recorded print failures and feedback"
+msgstr "기록된 출력 실패와 피드백 보기"
+
+msgid "Privacy and data…"
+msgstr "개인정보 및 데이터…"
+
+msgid "Export or delete local Smart Print data"
+msgstr "로컬 Smart Print 데이터를 내보내거나 삭제합니다"
+
+msgid "About Smart Print scope…"
+msgstr "Smart Print 지원 범위…"
+
+msgid "What Smart Print supports (Bambu Lab printers only)"
+msgstr "Smart Print 지원 범위 (Bambu Lab 프린터만)"
+
+msgid "Smart Print does not call cloud AI. Data stays on this PC unless you sign in to Bambu Lab for printer sync."
+msgstr "Smart Print는 클라우드 AI를 호출하지 않습니다. 프린터 동기화를 위해 Bambu Lab에 로그인하지 않는 한 데이터는 이 컴퓨터에만 남습니다."
+
+msgid "Do you want to synchronize your personal data from Cloud?\nIt contains the following information:\n1. The Process presets\n2. The Filament presets\n3. The Printer presets"
+msgstr "클라우드에서 개인 데이터를 동기화할까요?\n다음 정보가 포함됩니다:\n1. 프로세스 프리셋\n2. 필라멘트 프리셋\n3. 프린터 프리셋"
+
+msgid "VerSlicer quit unexpectedly last time. Open a GitHub issue with the crash report? You can review and edit it before submitting; nothing is sent automatically."
+msgstr "VerSlicer가 지난번에 예기치 않게 종료되었습니다. 충돌 보고서로 GitHub 이슈를 열까요? 제출 전에 내용을 확인하고 고칠 수 있으며, 자동으로 전송되는 것은 없습니다."
+
+msgid "Report a crash"
+msgstr "충돌 보고"
+
+msgid "Open issue"
+msgstr "이슈 열기"
+
+msgid "Plate workflow"
+msgstr "플레이트 작업 순서"
+
+msgid "Analyze settings, then slice the plate"
+msgstr "설정을 분석한 뒤 플레이트를 슬라이스합니다"
+
+msgid "Check geometry and settings for this plate"
+msgstr "이 플레이트의 형상과 설정을 점검합니다"
+
+msgid "Apply suggestions and slice the plate"
+msgstr "제안을 적용하고 플레이트를 슬라이스합니다"
+
+msgid "All plates"
+msgstr "모든 플레이트"
+
+msgid "Review settings"
+msgstr "설정 검토"
+
+msgid "Export report"
+msgstr "보고서 내보내기"
+
+msgid "Connection status"
+msgstr "연결 상태"
+
+msgid "Smart Print learning from failures needs a Bambu printer on the network"
+msgstr "Smart Print가 실패에서 배우려면 네트워크에 Bambu 프린터가 있어야 합니다"
+
+msgid "Network plug-in:"
+msgstr "네트워크 플러그인:"
+
+msgid "Printers found:"
+msgstr "찾은 프린터:"
+
+msgid "Bambu account:"
+msgstr "Bambu 계정:"
+
+msgid "Model insights"
+msgstr "모델 분석"
+
+msgid "Current plate"
+msgstr "현재 플레이트"
+
+msgid "No model on plate"
+msgstr "플레이트에 모델이 없습니다"
+
+msgid "Bambu Lab account"
+msgstr "Bambu Lab 계정"
+
+msgid "Required to sync printers"
+msgstr "프린터 동기화에 필요합니다"
+
+msgid "Sign in"
+msgstr "로그인"
+
+msgid "Sign out"
+msgstr "로그아웃"
+
+msgid "Assistant"
+msgstr "도우미"
+
+msgid "Show readiness hints and suggested setting changes for the current plate"
+msgstr "현재 플레이트의 준비 상태 힌트와 설정 변경 제안을 표시합니다"
+
+msgid "When a model is loaded"
+msgstr "모델을 불러왔을 때"
+
+msgid "Do not show automatically"
+msgstr "자동으로 표시하지 않음"
+
+msgid "Brief notification (recommended)"
+msgstr "간단한 알림 (권장)"
+
+msgid "Apply AI recommendations (ChatGPT)"
+msgstr "AI 추천 적용 (ChatGPT)"
+
+msgid "How the assistant responds after you load a model on the plate"
+msgstr "플레이트에 모델을 불러온 뒤 도우미가 반응하는 방식"
+
+msgid "Apply printer learning automatically after failures"
+msgstr "실패 후 프린터 학습 내용을 자동 적용"
+
+msgid "Apply per-printer tuning learned from past failures when a new diagnosis is shown"
+msgstr "새 진단이 나오면 지난 실패에서 배운 프린터별 조정을 적용합니다"
+
+msgid "Safe mode — limit risky temperature/speed changes"
+msgstr "안전 모드 — 위험한 온도·속도 변경 제한"
+
+msgid "Cap aggressive suggestions that could affect print stability"
+msgstr "출력 안정성에 영향을 줄 수 있는 과한 제안을 제한합니다"
+
+msgid "Rollback last apply"
+msgstr "마지막 적용 되돌리기"
+
+msgid "Scan Bambu printers"
+msgstr "Bambu 프린터 검색"
+
+msgid "Load printer profile"
+msgstr "프린터 프로필 불러오기"
+
+msgid "Print history"
+msgstr "출력 기록"
+
+msgid "View history"
+msgstr "기록 보기"
+
+msgid "Privacy & data"
+msgstr "개인정보 및 데이터"
+
+msgid "Printer learning"
+msgstr "프린터 학습"
+
+msgid "Smart Print settings, account and history…"
+msgstr "Smart Print 설정, 계정, 기록…"
+
+msgid "No print history for this printer yet — failures and successes improve future suggestions."
+msgstr "이 프린터의 출력 기록이 아직 없습니다 — 실패와 성공 기록이 쌓이면 제안이 더 정확해집니다."
+
+msgid "%d jobs tracked · %d%% success · %d failures learned from"
+msgstr "작업 %d개 기록 · 성공률 %d%% · 실패에서 학습 %d건"
+
+msgid "\n%d learning suggestion(s) awaiting approval — open Privacy & data or approve below."
+msgstr "\n승인을 기다리는 학습 제안이 %d개 있습니다 — 개인정보 및 데이터를 열거나 아래에서 승인하세요."
+
+msgid "\n%d Smart Print suggestions applied on this printer."
+msgstr "\n이 프린터에 Smart Print 제안 %d개를 적용했습니다."
+
+msgid "Suggested %s - complexity %d/100"
+msgstr "추천 %s - 복잡도 %d/100"
+
+msgid "Active filament (%s) differs from recommendation (%s)."
+msgstr "현재 필라멘트(%s)가 권장 필라멘트(%s)와 다릅니다."
+
+msgid "Print = full one-click flow. Analyze = preview only. Smart slice = apply + slice."
+msgstr "출력 = 원클릭 전체 과정. 분석 = 미리보기만. 스마트 슬라이스 = 적용 + 슬라이스."
+
+msgid "Print on the Prepare bar runs analyze, apply, slice, and send. Analyze previews without slicing."
+msgstr "준비 막대의 출력은 분석, 적용, 슬라이스, 전송을 차례로 실행합니다. 분석은 슬라이스 없이 미리보기만 합니다."
+
+msgid "Sign in to Bambu Lab to sync printers and record failures for learning."
+msgstr "Bambu Lab에 로그인하면 프린터를 동기화하고 학습용 실패 기록을 남깁니다."
+
+msgid "Setup progress (local):"
+msgstr "설정 진행 상황 (로컬):"
+
+msgid "Ready"
+msgstr "준비됨"
+
+msgid "Not installed — use Preferences → Online"
+msgstr "설치되지 않음 — 환경설정 → 온라인을 사용하세요"
+
+msgid "Selected: %s"
+msgstr "선택됨: %s"
+
+msgid "None selected — use Scan Bambu printers"
+msgstr "선택된 프린터 없음 — Bambu 프린터 검색을 사용하세요"
+
+msgid "Device manager unavailable"
+msgstr "장치 관리자를 사용할 수 없습니다"
+
+msgid "Not signed in"
+msgstr "로그인하지 않음"
+
+msgid "See above for the explanation. To apply automatically, try a direct request like “turn on brim”."
+msgstr "위 설명을 참고하세요. 자동으로 적용하려면 “브림 켜줘”처럼 직접 요청해 보세요."
+
+msgid "See above for context. It wasn't applied automatically — select a model on the plate and try again."
+msgstr "위 설명을 참고하세요. 자동으로 적용되지 않았습니다 — 플레이트에서 모델을 선택하고 다시 시도하세요."
+
+msgid "Part of the reply couldn't be processed. Try sending your question again."
+msgstr "답변 일부를 처리하지 못했습니다. 질문을 다시 보내 보세요."
+
+msgid "Couldn't understand the reply. Try a short request like “turn on brim”."
+msgstr "답변을 이해하지 못했습니다. “브림 켜줘”처럼 짧게 요청해 보세요."
+
+msgid "Something went wrong. Try again in a moment."
+msgstr "문제가 생겼습니다. 잠시 후 다시 시도하세요."
+
+msgid "That wasn't applied yet. Put a model on the plate, or try a clearer request like “turn on brim”."
+msgstr "아직 적용되지 않았습니다. 플레이트에 모델을 올리거나 “브림 켜줘”처럼 더 분명하게 요청해 보세요."
+
+msgid "That wasn't applied yet. Say the result you want, like “turn on brim”."
+msgstr "아직 적용되지 않았습니다. “브림 켜줘”처럼 원하는 결과를 말해 보세요."
+
+msgid "Nothing was applied. Put a model on the plate and try again."
+msgstr "적용된 것이 없습니다. 플레이트에 모델을 올리고 다시 시도하세요."
+
+msgid "Nothing was applied. Try a more specific request."
+msgstr "적용된 것이 없습니다. 더 구체적으로 요청해 보세요."
+
+msgid "Cancelled — nothing was changed."
+msgstr "취소했습니다 — 아무것도 바뀌지 않았습니다."
+
+msgid "Preview only — close the compare dialog to finish or cancel."
+msgstr "미리보기만 — 비교 창을 닫아 완료하거나 취소하세요."
+
+msgid "Couldn't apply that automatically. Select a model on the plate, or try a more specific request in Apply mode."
+msgstr "자동으로 적용하지 못했습니다. 플레이트에서 모델을 선택하거나, 적용 모드에서 더 구체적으로 요청해 보세요."
+
+msgid "(Question mode — suggested changes were not applied.)"
+msgstr "(질문 모드라서 제안한 변경은 적용하지 않았습니다.)"
+
+msgid "Settings were already at the requested values — nothing changed."
+msgstr "설정이 이미 요청한 값이라 바뀐 것이 없습니다."
+
+msgid "Nothing was applied. Select a model on the plate and try again."
+msgstr "적용된 것이 없습니다. 플레이트에서 모델을 선택하고 다시 시도하세요."
+
+msgid "Enabled brim — extra plastic around the bottom for better adhesion."
+msgstr "브림을 켰습니다 — 바닥 둘레에 재료를 더해 접착력을 높입니다."
+
+msgid "Enabled tree supports for overhanging parts."
+msgstr "튀어나온 부분에 트리 서포트를 켰습니다."
+
+msgid "Adjusted print speed."
+msgstr "출력 속도를 조정했습니다."
+
+msgid "Adjusted infill and walls to make the part stronger."
+msgstr "더 튼튼하도록 채우기와 벽을 조정했습니다."
+
+msgid "Turned brim off."
+msgstr "브림을 껐습니다."
+
+msgid "Rotated the selected model."
+msgstr "선택한 모델을 회전했습니다."
+
+msgid "Resized the model."
+msgstr "모델 크기를 조정했습니다."
+
+msgid "Re-arranged models on the build plate."
+msgstr "빌드 플레이트의 모델을 다시 배치했습니다."
+
+msgid "Arranged models by object."
+msgstr "객체 단위로 모델을 배치했습니다."
+
+msgid "Split the model into separate objects."
+msgstr "모델을 개별 객체로 나눴습니다."
+
+msgid "Added a new build plate."
+msgstr "새 빌드 플레이트를 추가했습니다."
+
+msgid "Drilled a hole in the model."
+msgstr "모델에 구멍을 뚫었습니다."
+
+msgid "Added a handle to the model."
+msgstr "모델에 손잡이를 추가했습니다."
+
+msgid "Added reinforcement ribs."
+msgstr "보강 리브를 추가했습니다."
+
+msgid "Modified model geometry."
+msgstr "모델 형상을 수정했습니다."
+
+msgid "Repaired the mesh."
+msgstr "메쉬를 수리했습니다."
+
+msgid "Mirrored the model."
+msgstr "모델을 대칭으로 만들었습니다."
+
+msgid "Started slicing the current plate."
+msgstr "현재 플레이트 슬라이스를 시작했습니다."
+
+msgid "Adjusted settings to reduce stringing."
+msgstr "실 생김을 줄이도록 설정을 조정했습니다."
+
+msgid "Adjusted layer height."
+msgstr "레이어 높이를 조정했습니다."
+
+msgid "Adjusted print temperature."
+msgstr "출력 온도를 조정했습니다."
+
+msgid "Moved the model."
+msgstr "모델을 옮겼습니다."
+
+msgid "Deleted the selected model."
+msgstr "선택한 모델을 삭제했습니다."
+
+msgid "Print settings updated."
+msgstr "출력 설정을 바꿨습니다."
+
+msgid "Answer ready"
+msgstr "답변 준비됨"
+
+msgid "No models found"
+msgstr "모델을 찾지 못했습니다"
+
+msgid "MakerWorld: no models found"
+msgstr "MakerWorld: 모델을 찾지 못했습니다"
+
+msgid "Search cancelled"
+msgstr "검색 취소됨"
+
+msgid "Import cancelled"
+msgstr "가져오기 취소됨"
+
+msgid "Cancelled"
+msgstr "취소됨"
+
+msgid "Model loaded"
+msgstr "모델을 불러왔습니다"
+
+msgid "Import failed"
+msgstr "가져오기 실패"
+
+msgid "Found "
+msgstr "찾음: "
+
+msgid "models on MakerWorld"
+msgstr "MakerWorld의 모델"
+
+msgid "MakerWorld search done"
+msgstr "MakerWorld 검색 완료"
+
+msgid "Nothing was applied"
+msgstr "적용된 것이 없습니다"
+
+msgid "wasn't applied"
+msgstr "적용되지 않음"
+
+msgid "Nothing applied"
+msgstr "적용된 것 없음"
+
+msgid "Drilled a hole"
+msgstr "구멍을 뚫었습니다"
+
+msgid "Modified model"
+msgstr "모델을 수정했습니다"
+
+msgid "Repaired the mesh"
+msgstr "메쉬를 수리했습니다"
+
+msgid "Rotated"
+msgstr "회전했습니다"
+
+msgid "Resized the model"
+msgstr "모델 크기를 조정했습니다"
+
+msgid "Model edit done"
+msgstr "모델 편집 완료"
+
+msgid "Enabled brim"
+msgstr "브림을 켰습니다"
+
+msgid "Print settings updated"
+msgstr "출력 설정을 바꿨습니다"
+
+msgid "Settings updated"
+msgstr "설정을 바꿨습니다"
+
+msgid "Resized"
+msgstr "크기를 조정했습니다"
+
+msgid "couldn't understand"
+msgstr "이해하지 못함"
+
+msgid "Try again"
+msgstr "다시 시도"
+
+msgid "build plate"
+msgstr "빌드 플레이트"
+
+msgid "Plate added"
+msgstr "플레이트 추가됨"
+
+msgid "Verify on the plate"
+msgstr "플레이트에서 확인하세요"
+
+msgid "AI Assistant"
+msgstr "AI 도우미"
+
+msgid "Question"
+msgstr "질문"
+
+msgid "New chat"
+msgstr "새 대화"
+
+msgid "Question: explanations only. Apply: the assistant changes the slicer."
+msgstr "질문: 설명만 합니다. 적용: 도우미가 슬라이서 설정을 바꿉니다."
+
+msgid "ChatGPT model"
+msgstr "ChatGPT 모델"
+
+msgid "Mic"
+msgstr "음성"
+
+msgid "Working"
+msgstr "작업 중"
+
+msgid "Apply mode: say what you want — rotate, resize, make it stronger, fix warping, and more."
+msgstr "적용 모드: 원하는 결과를 말하세요 — 회전, 크기 조정, 더 튼튼하게, 들뜸 줄이기 등."
+
+msgid "Question mode: ask anything about printing. Nothing will be changed — you'll get a plain-language explanation."
+msgstr "질문 모드: 출력에 대해 무엇이든 물어보세요. 아무것도 바꾸지 않고 쉬운 말로 설명합니다."
+
+msgid "e.g. rotate 45°, scale to 50%, make it stronger, reduce corner warping"
+msgstr "예: 45도 회전, 50%로 축소, 더 튼튼하게, 모서리 들뜸 줄이기"
+
+msgid "e.g. What is a brim? When do I need supports?"
+msgstr "예: 브림이 뭐예요? 서포트는 언제 필요해?"
+
+msgid "Loading models…"
+msgstr "모델을 불러오는 중…"
+
+msgid "You"
+msgstr "나"
+
+msgid "Importing from MakerWorld…"
+msgstr "MakerWorld에서 가져오는 중…"
+
+msgid "Searching MakerWorld…"
+msgstr "MakerWorld 검색 중…"
+
+msgid "Cancelled."
+msgstr "취소했습니다."
+
+msgid "Listening"
+msgstr "듣는 중"
+
+msgid "Voice input is only available on macOS."
+msgstr "음성 입력은 macOS에서만 사용할 수 있습니다."
+
+msgid "Voice text is in the box. Check it, then send."
+msgstr "음성 내용이 입력창에 들어갔습니다. 확인한 뒤 보내세요."
+
+msgid "Processing voice…"
+msgstr "음성을 처리하는 중…"
+
+msgid "Listening… Tap Mic again when you are done."
+msgstr "듣는 중… 다 말했으면 음성 버튼을 다시 누르세요."
+
+msgid "Couldn't finish that. Try saying what you want a bit more specifically."
+msgstr "완료하지 못했습니다. 원하는 것을 조금 더 구체적으로 말해 보세요."
+
+msgid "OK."
+msgstr "확인했습니다."
+
+msgid "Retrying…"
+msgstr "다시 시도하는 중…"
+
+msgid "Ready — %u model(s)"
+msgstr "준비됨 — 모델 %u개"
+
+msgid "Cloud print is blocked for this slicer (error -26). Enable LAN mode and Developer mode on the printer, then set the printer IP and LAN access code in the Device tab and print again."
+msgstr "이 슬라이서는 클라우드 출력이 차단되었습니다(오류 -26). 프린터에서 LAN 모드와 개발자 모드를 켜고, 장치 탭에서 프린터 IP와 LAN 접근 코드를 입력한 뒤 다시 출력하세요."
+
+msgid "LAN and cloud upload both failed (error -26). Check printer IP, LAN access code, and Developer mode."
+msgstr "LAN과 클라우드 업로드가 모두 실패했습니다(오류 -26). 프린터 IP, LAN 접근 코드, 개발자 모드를 확인하세요."
+
+msgid "Bambu network plug-in is not loaded (error -1). Install it under Preferences → Online, then restart."
+msgstr "Bambu 네트워크 플러그인이 로드되지 않았습니다(오류 -1). 환경설정 → 온라인에서 설치한 뒤 다시 시작하세요."
+
+msgid "Cloud blocked; sending print job over LAN"
+msgstr "클라우드가 차단되어 LAN으로 출력 작업을 보냅니다"
