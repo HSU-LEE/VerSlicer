@@ -13,6 +13,16 @@ namespace Slic3r { namespace GUI {
 namespace {
 constexpr const char* kConsentKey = "privacy_consent";
 std::atomic<bool>     g_consent{false};
+
+// AppConfig writes "1" back to disk as JSON true, so after a restart the value
+// reads as "true". Accept both, or the notice reappears on every launch.
+bool stored_consent(AppConfig* cfg)
+{
+    if (!cfg)
+        return false;
+    const std::string v = cfg->get(kOllamaConfigSection, kConsentKey);
+    return v == kAiPrivacyConsentVersion || v == "true";
+}
 }
 
 bool ai_privacy_consent_given() { return g_consent.load(); }
@@ -20,13 +30,13 @@ bool ai_privacy_consent_given() { return g_consent.load(); }
 void load_ai_privacy_consent()
 {
     AppConfig* cfg = wxGetApp().app_config;
-    g_consent = cfg && cfg->get(kOllamaConfigSection, kConsentKey) == kAiPrivacyConsentVersion;
+    g_consent = stored_consent(cfg);
 }
 
 bool ensure_ai_privacy_consent(wxWindow* parent)
 {
     AppConfig* cfg = wxGetApp().app_config;
-    if (cfg && cfg->get(kOllamaConfigSection, kConsentKey) == kAiPrivacyConsentVersion) {
+    if (stored_consent(cfg)) {
         g_consent = true;
         return true;
     }
