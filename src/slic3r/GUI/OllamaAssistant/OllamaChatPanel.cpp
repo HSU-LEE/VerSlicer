@@ -142,6 +142,27 @@ static wxString format_chat_error(const std::string& raw)
         return ko ? wxString::FromUTF8("이 Mac에 로그인 정보를 저장하지 못했습니다.")
                   : wxString("Could not save the ChatGPT sign-in on this Mac.");
 
+    if (raw.find("HTTP 429") != std::string::npos || raw.find("rate limit") != std::string::npos
+        || raw.find("usage limit") != std::string::npos)
+        return ko ? wxString::FromUTF8("ChatGPT 사용 한도에 도달했습니다. 잠시 후 다시 시도하거나 다른 모델을 골라 주세요.")
+                  : wxString("You've hit your ChatGPT usage limit. Try again later or choose another model.");
+    if (raw.find("HTTP 401") != std::string::npos || raw.find("HTTP 403") != std::string::npos
+        || raw.find("does not match the saved sign-in") != std::string::npos
+        || raw.find("account does not match") != std::string::npos)
+        return ko ? wxString::FromUTF8("ChatGPT 연결이 더 이상 유효하지 않습니다. 「해제」 후 다시 연결해 주세요.")
+                  : wxString("Your ChatGPT connection is no longer valid. Sign out, then connect again.");
+    if (raw.find("HTTP 5") != std::string::npos)
+        return ko ? wxString::FromUTF8("ChatGPT 서버에 일시적인 문제가 있습니다. 잠시 후 다시 시도해 주세요.")
+                  : wxString("ChatGPT is having a temporary problem. Try again in a moment.");
+    if (raw.find("no models for VerSlicer") != std::string::npos)
+        return ko ? wxString::FromUTF8("이 ChatGPT 요금제에서는 VerSlicer가 쓸 수 있는 모델이 없습니다. Plus 또는 Pro 요금제가 필요합니다.")
+                  : wxString("This ChatGPT plan has no models VerSlicer can use. A Plus or Pro plan is required.");
+    if (raw == "Request cancelled")
+        return ko ? wxString::FromUTF8("요청을 취소했습니다.") : wxString("Request cancelled.");
+    if (raw.find("sign-in callback") != std::string::npos || raw.find("start ChatGPT sign-in") != std::string::npos)
+        return ko ? wxString::FromUTF8("로그인 창을 열지 못했습니다. VerSlicer를 다시 시작한 뒤 연결해 주세요.")
+                  : wxString("Couldn't start the sign-in. Restart VerSlicer and connect again.");
+
     if (raw.find("Connection refused") != std::string::npos || raw.find("connection refused") != std::string::npos
         || raw.find("Could not connect") != std::string::npos || raw.find("Failed to connect") != std::string::npos)
         return ko ? wxString::FromUTF8("ChatGPT에 연결할 수 없습니다. 인터넷 연결을 확인해 주세요.")
@@ -697,8 +718,11 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     account_cb.format_error = [](const std::string& raw) { return format_chat_error(raw); };
     account_cb.signed_in    = [this]() {
         const wxString ready = AiLocale::korean()
-            ? wxString::FromUTF8("ChatGPT가 연결되었습니다. 이제 원하는 것을 입력하고 보내세요.")
-            : wxString("ChatGPT is connected. Type what you want and send it.");
+            ? wxString::FromUTF8("ChatGPT가 연결되었습니다. 원하는 결과를 말로 적어 보내세요.\n"
+                                 "예: 「더 튼튼하게 해줘」 · 「45도 돌려줘」 · 「서포트 켜줘」 · 「용 피규어 출력해줘」 · 「출력이 실패했어」")
+            : wxString("ChatGPT is connected. Describe the result you want and send it.\n"
+                       "Try: \"Make this stronger\" · \"Rotate it 45 degrees\" · \"Turn on supports\" · "
+                       "\"Print me a dragon\" · \"My print failed\"");
         append_chat(_L("System"), ready);
         update_system_welcome_in_chat();
         set_status_text(ready);

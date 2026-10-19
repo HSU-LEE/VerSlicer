@@ -1160,7 +1160,8 @@ ChatGptCompletion ChatGptAccount::complete(const std::string& model, const std::
     if (response.status < 200 || response.status >= 300) {
         out.http_status = response.status;
         const std::string message = json_error_message(response.body);
-        out.error = message.empty() ? "ChatGPT HTTP " + std::to_string(response.status) : message;
+        // Keep the status in the text: the chat panel maps 401/403/429/5xx to advice.
+        out.error = "ChatGPT HTTP " + std::to_string(response.status) + (message.empty() ? "" : ": " + message);
         return out;
     }
 
