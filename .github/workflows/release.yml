@@ -71,4 +71,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "VerSlicer $GITHUB_REF_NAME" --notes-file CHANGELOG.md
-          gh release upload "$GITHUB_REF_NAME" build/arm64/dist/*.dmg --clobber
+          # Never replace a DMG that is already published (it may have been verified by hand).
+          for f in build/arm64/dist/*.dmg; do
+            if gh release view "$GITHUB_REF_NAME" --json assets -q '.assets[].name' | grep -qx "$(basename "$f")"; then
+              echo "$(basename "$f") already attached; leaving it"
+            else
+              gh release upload "$GITHUB_REF_NAME" "$f"
+            fi
+          done
