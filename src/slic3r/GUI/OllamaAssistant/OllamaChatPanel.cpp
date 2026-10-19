@@ -49,6 +49,7 @@
 #include <wx/menu.h>
 #include <wx/dcclient.h>
 #include <wx/sizer.h>
+#include <wx/wrapsizer.h>
 #include <wx/textctrl.h>
 #include <wx/stattext.h>
 #include <wx/timer.h>
@@ -136,7 +137,8 @@ static wxString format_chat_error(const std::string& raw)
     if (raw.find("plan use was not granted") != std::string::npos || raw.find("access_denied") != std::string::npos)
         return ko ? wxString::FromUTF8("브라우저에서 ChatGPT 사용 허용을 눌러 주세요. Plus 또는 Pro 계정이어야 합니다.")
                   : wxString("Allow ChatGPT plan use in the browser. A Plus or Pro account is required.");
-    if (raw.find("sign-in timed out") != std::string::npos || raw.find("sign-in has expired") != std::string::npos)
+    if (raw.find("sign-in timed out") != std::string::npos || raw.find("sign-in has expired") != std::string::npos
+        || raw.find("invalid_grant") != std::string::npos || raw.find("refresh_token") != std::string::npos)
         return ko ? wxString::FromUTF8("로그인 시간이 지났거나 만료되었습니다. 「ChatGPT 계정 연결」을 다시 눌러 주세요.")
                   : wxString("ChatGPT sign-in expired. Press Connect again.");
     if (raw.find("Could not store") != std::string::npos)
@@ -760,7 +762,7 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     m_mode_combo->Append(AiLocale::text(_L("Apply"), "적용"));
     SlicePilotUi::sync_combobox_selection(m_mode_combo, 1);
 
-    m_reset_btn = new Button(m_body, AiLocale::text(_L("Reset"), "초기화"));
+    m_reset_btn = new Button(m_body, AiLocale::text(_L("New chat"), "새 대화"));
     SlicePilotUi::style_secondary_button(m_reset_btn);
     m_reset_btn->SetStyle(ButtonStyle::Regular, ButtonType::Compact);
     m_reset_btn->SetFont(Label::Body_13);
@@ -780,19 +782,23 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     const int reset_w = std::max(m_reset_btn->GetMinSize().x, m_reset_btn->GetBestSize().x);
     m_reset_btn->SetMinSize(wxSize(reset_w, row_h));
 
-    model_row->Add(model_key, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(6));
-    model_row->Add(m_model_combo, 1, wxEXPAND | wxALIGN_CENTER_VERTICAL);
-    model_row->AddSpacer(gap);
-    model_row->Add(reset_w, row_h, 0);
-
-    mode_row->Add(m_mode_label, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(6));
-    mode_row->Add(m_mode_combo, 1, wxEXPAND | wxALIGN_CENTER_VERTICAL);
+    // One compact settings row: mode and model side by side, then New chat.
+    // The text labels move into tooltips so the narrow docked panel keeps
+    // its height for the conversation.
+    model_key->Hide();
+    m_mode_label->Hide();
+    m_mode_combo->SetToolTip(AiLocale::text(_L("Question: explanations only. Apply: the assistant changes the slicer."),
+                                            "질문: 설명만 합니다. 적용: 슬라이서 설정을 직접 바꿉니다."));
+    m_model_combo->SetToolTip(AiLocale::text(_L("ChatGPT model"), "ChatGPT 모델"));
+    (void) model_row;
+    mode_row->Add(m_mode_combo, 2, wxEXPAND | wxALIGN_CENTER_VERTICAL);
+    mode_row->AddSpacer(gap);
+    mode_row->Add(m_model_combo, 3, wxEXPAND | wxALIGN_CENTER_VERTICAL);
     mode_row->AddSpacer(gap);
     mode_row->Add(m_reset_btn, 0, wxALIGN_CENTER_VERTICAL);
 
     toolbar->Add(m_account_bar->sizer(), 0, wxEXPAND);
-    toolbar->Add(model_row, 0, wxEXPAND | wxTOP, FromDIP(6));
-    toolbar->Add(mode_row, 0, wxEXPAND | wxTOP, FromDIP(6));
+    toolbar->Add(mode_row, 0, wxEXPAND | wxTOP, FromDIP(8));
     body_sizer->Add(toolbar, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, pad);
 
     auto* toolbar_rule = new wxPanel(m_body, wxID_ANY, wxDefaultPosition, wxSize(-1, std::max(1, FromDIP(1))));
@@ -802,6 +808,18 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     // Chat transcript: bubble list (user right, assistant/system left)
     m_history_list = new OllamaChatMessageList(m_body);
     body_sizer->Add(m_history_list, 1, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(10));
+
+    // Empty-state suggestions: one click sends a ready-made request. Hidden as
+    // soon as the conversation starts; rebuilt on New chat and mode change.
+    m_suggest_panel = new wxPanel(m_body);
+    m_suggest_panel->SetBackgroundColour(SlicePilotUi::Theme::background());
+    // Two even columns: a wrap sizer inside the vertical body sizer does not
+    // grow taller, so later rows were clipped.
+    auto* chip_grid = new wxFlexGridSizer(0, 2, FromDIP(6), FromDIP(6));
+    chip_grid->AddGrowableCol(0, 1);
+    chip_grid->AddGrowableCol(1, 1);
+    m_suggest_panel->SetSizer(chip_grid);
+    body_sizer->Add(m_suggest_panel, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, pad);
 
     // Pipeline progress strip (hidden unless an orchestrator job is active):
     // step label + progress gauge + stop button.
@@ -911,6 +929,7 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
 
     SetSizer(topsizer);
 
+    rebuild_suggestions();
     m_send_btn->Bind(wxEVT_BUTTON, &OllamaChatPanel::on_send, this);
     m_voice_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { toggle_voice(); });
     m_input_ctrl->Bind(wxEVT_TEXT_ENTER, &OllamaChatPanel::on_send, this);
@@ -1235,8 +1254,8 @@ wxString OllamaChatPanel::system_welcome_message() const
     }
     if (m_apply_mode) {
         return AiLocale::korean()
-            ? wxString::FromUTF8("적용 모드입니다. 회전·크기 조정, 구멍 뚫기, 들뜸·수축 줄이기처럼 원하는 결과를 말씀해 주세요.")
-            : _L("Apply mode: say what you want — rotate, resize, drill a hole, fix warping, and more.");
+            ? wxString::FromUTF8("적용 모드입니다. 회전·크기 조정, 더 튼튼하게, 들뜸·수축 줄이기처럼 원하는 결과를 말씀해 주세요.")
+            : _L("Apply mode: say what you want — rotate, resize, make it stronger, fix warping, and more.");
     }
     return AiLocale::korean()
         ? wxString::FromUTF8("질문 모드입니다. 인쇄·설정에 대해 물어보세요. 프로그램 설정은 바꾸지 않습니다.")
@@ -1245,6 +1264,7 @@ wxString OllamaChatPanel::system_welcome_message() const
 
 void OllamaChatPanel::refresh_mode_ui()
 {
+    rebuild_suggestions();
     if (m_mode_combo) {
         const int sel = m_apply_mode ? 1 : 0;
         if (m_mode_combo->GetSelection() != sel)
@@ -1253,8 +1273,8 @@ void OllamaChatPanel::refresh_mode_ui()
     if (m_input_ctrl) {
         if (m_apply_mode) {
             m_input_hint_full = AiLocale::korean()
-                ? wxString::FromUTF8("예: 45도 돌려 줘 · 50%로 줄여 줘 · 중간에 구멍 뚫어 줘 · 코너 들뜸 줄여 줘")
-                : _L("e.g. rotate 45°, scale to 50%, drill a hole in the center, reduce corner warping");
+                ? wxString::FromUTF8("예: 45도 돌려 줘 · 50%로 줄여 줘 · 더 튼튼하게 · 코너 들뜸 줄여 줘")
+                : _L("e.g. rotate 45°, scale to 50%, make it stronger, reduce corner warping");
         } else {
             m_input_hint_full = AiLocale::korean()
                 ? wxString::FromUTF8("예: 브림이 뭐예요? · 서포트는 언제 필요해?")
@@ -1318,8 +1338,61 @@ void OllamaChatPanel::update_system_welcome_in_chat()
     m_history_list->set_first_system_message(system_welcome_message());
 }
 
+void OllamaChatPanel::rebuild_suggestions()
+{
+    if (!m_suggest_panel)
+        return;
+    m_suggest_panel->DestroyChildren();
+    wxSizer* wrap = m_suggest_panel->GetSizer();
+    const bool ko = AiLocale::korean();
+    std::vector<wxString> items;
+    if (m_apply_mode) {
+        if (ko)
+            items = {wxString::FromUTF8("더 튼튼하게 해줘"), wxString::FromUTF8("45도 돌려줘"), wxString::FromUTF8("서포트 켜줘"),
+                     wxString::FromUTF8("용 피규어 출력해줘"), wxString::FromUTF8("출력이 실패했어")};
+        else
+            items = {_L("Make this stronger"), _L("Rotate it 45 degrees"), _L("Turn on supports"), _L("Print me a dragon"),
+                     _L("My print failed")};
+    } else {
+        if (ko)
+            items = {wxString::FromUTF8("브림이 뭐예요?"), wxString::FromUTF8("서포트는 언제 필요해?"),
+                     wxString::FromUTF8("실이 생기는 이유는?"), wxString::FromUTF8("레이어 높이는 어떻게 골라?")};
+        else
+            items = {_L("What is a brim?"), _L("When do I need supports?"), _L("Why is my print stringy?"),
+                     _L("How do I pick a layer height?")};
+    }
+    for (const wxString& text : items) {
+        auto* chip = new Button(m_suggest_panel, text);
+        SlicePilotUi::style_secondary_button(chip);
+        chip->SetStyle(ButtonStyle::Regular, ButtonType::Compact);
+        chip->SetFont(Label::Body_12);
+        chip->SetCornerRadius(FromDIP(12));
+        chip->SetPaddingSize(wxSize(FromDIP(10), FromDIP(4)));
+        chip->Bind(wxEVT_BUTTON, [this, text](wxCommandEvent&) {
+            if (m_busy || !m_input_ctrl)
+                return;
+            m_input_ctrl->SetValue(text);
+            wxCommandEvent ev;
+            on_send(ev);
+        });
+        wrap->Add(chip, 0, wxEXPAND);
+    }
+    show_suggestions(!m_conversation_started);
+}
+
+void OllamaChatPanel::show_suggestions(bool show)
+{
+    if (!m_suggest_panel || m_suggest_panel->IsShown() == show)
+        return;
+    m_suggest_panel->Show(show);
+    if (m_body)
+        m_body->Layout();
+}
+
 void OllamaChatPanel::reset_conversation()
 {
+    m_conversation_started = false;
+    rebuild_suggestions();
     ++m_request_gen;
     if (m_assist_controller && m_assist_controller->is_running())
         m_assist_controller->cancel();
@@ -1933,6 +2006,8 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
     save_settings();
     OllamaClient::cancel_active_requests(OllamaCancelDomain::Chat);
     m_input_ctrl->Clear();
+    m_conversation_started = true;
+    show_suggestions(false);
     append_chat(_L("You"), user_text);
     m_empty_reply_retries = 0;
 
@@ -2053,6 +2128,15 @@ void OllamaChatPanel::retry_last_chat_simple()
 void OllamaChatPanel::on_models_loaded(const std::vector<std::string>& models, const std::string& error)
 {
     if (!error.empty()) {
+        if (!ChatGptAccount::linked()) {
+            // The saved sign-in was rejected and cleared: show Connect again
+            // instead of retrying with a dead token.
+            if (m_account_bar)
+                m_account_bar->refresh();
+            update_system_welcome_in_chat();
+            set_status_text(format_chat_error(error));
+            return;
+        }
         ++m_model_poll_failures;
         set_status_text(format_chat_error(error));
         if (m_model_poll_failures < kMaxModelPollFailures)

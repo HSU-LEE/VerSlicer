@@ -9,6 +9,7 @@
 #include "slic3r/Utils/Http.hpp"
 
 #include <boost/algorithm/string.hpp>
+#include <boost/log/trivial.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/nowide/fstream.hpp>
 
@@ -691,6 +692,18 @@ std::string refresh_locked_account_session()
         + "&refresh_token=" + url_encode(refresh) + "&resource=" + url_encode(kResource);
     const HttpResult response = http_request(
         "POST", kAuthToken, form, {{"Content-Type", "application/x-www-form-urlencoded"}}, 30, nullptr, nullptr);
+    if (response.status == 400 || response.status == 401) {
+        // The refresh token was revoked or expired (e.g. invalid_grant). Keeping it
+        // would show the account as connected while every request fails, so forget
+        // it and let the panel offer Connect again.
+        BOOST_LOG_TRIVIAL(warning) << "ChatGPT refresh rejected (HTTP " << response.status << "): "
+                                   << json_error_message(response.body) << "; clearing saved sign-in";
+        account_session().doc = nlohmann::json::object();
+        keychain_delete();
+        boost::system::error_code ec;
+        boost::filesystem::remove(account_path(), ec);
+        return "ChatGPT sign-in has expired. Connect again.";
+    }
     if (response.status < 200 || response.status >= 300) {
         const std::string message = json_error_message(response.body);
         return message.empty() ? "ChatGPT sign-in could not be renewed." : message;
