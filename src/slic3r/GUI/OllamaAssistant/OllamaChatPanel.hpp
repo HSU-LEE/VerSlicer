@@ -103,8 +103,6 @@ private:
     void update_system_welcome_in_chat();
     bool apply_mode() const { return m_apply_mode; }
     void refresh_mode_ui();
-    void rebuild_suggestions();
-    void show_suggestions(bool show);
     void update_send_button_chrome();
     void cancel_inflight();
     void toggle_voice();
@@ -144,8 +142,6 @@ private:
     Button*       m_voice_btn{nullptr};
     Button*       m_reset_btn{nullptr};
     std::unique_ptr<ChatGptAccountBar> m_account_bar;
-    wxPanel*      m_suggest_panel{nullptr};
-    bool          m_conversation_started{false};
     ComboBox*     m_mode_combo{nullptr};
     wxStaticText* m_mode_label{nullptr};
     ComboBox*     m_model_combo{nullptr};

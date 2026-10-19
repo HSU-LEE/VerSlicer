@@ -49,7 +49,6 @@
 #include <wx/menu.h>
 #include <wx/dcclient.h>
 #include <wx/sizer.h>
-#include <wx/wrapsizer.h>
 #include <wx/textctrl.h>
 #include <wx/stattext.h>
 #include <wx/timer.h>
@@ -809,18 +808,6 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     m_history_list = new OllamaChatMessageList(m_body);
     body_sizer->Add(m_history_list, 1, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, FromDIP(10));
 
-    // Empty-state suggestions: one click sends a ready-made request. Hidden as
-    // soon as the conversation starts; rebuilt on New chat and mode change.
-    m_suggest_panel = new wxPanel(m_body);
-    m_suggest_panel->SetBackgroundColour(SlicePilotUi::Theme::background());
-    // Two even columns: a wrap sizer inside the vertical body sizer does not
-    // grow taller, so later rows were clipped.
-    auto* chip_grid = new wxFlexGridSizer(0, 2, FromDIP(6), FromDIP(6));
-    chip_grid->AddGrowableCol(0, 1);
-    chip_grid->AddGrowableCol(1, 1);
-    m_suggest_panel->SetSizer(chip_grid);
-    body_sizer->Add(m_suggest_panel, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, pad);
-
     // Pipeline progress strip (hidden unless an orchestrator job is active):
     // step label + progress gauge + stop button.
     m_pipeline_panel = new wxPanel(m_body, wxID_ANY);
@@ -929,7 +916,6 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
 
     SetSizer(topsizer);
 
-    rebuild_suggestions();
     m_send_btn->Bind(wxEVT_BUTTON, &OllamaChatPanel::on_send, this);
     m_voice_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { toggle_voice(); });
     m_input_ctrl->Bind(wxEVT_TEXT_ENTER, &OllamaChatPanel::on_send, this);
@@ -1264,7 +1250,6 @@ wxString OllamaChatPanel::system_welcome_message() const
 
 void OllamaChatPanel::refresh_mode_ui()
 {
-    rebuild_suggestions();
     if (m_mode_combo) {
         const int sel = m_apply_mode ? 1 : 0;
         if (m_mode_combo->GetSelection() != sel)
@@ -1338,61 +1323,8 @@ void OllamaChatPanel::update_system_welcome_in_chat()
     m_history_list->set_first_system_message(system_welcome_message());
 }
 
-void OllamaChatPanel::rebuild_suggestions()
-{
-    if (!m_suggest_panel)
-        return;
-    m_suggest_panel->DestroyChildren();
-    wxSizer* wrap = m_suggest_panel->GetSizer();
-    const bool ko = AiLocale::korean();
-    std::vector<wxString> items;
-    if (m_apply_mode) {
-        if (ko)
-            items = {wxString::FromUTF8("더 튼튼하게 해줘"), wxString::FromUTF8("45도 돌려줘"), wxString::FromUTF8("서포트 켜줘"),
-                     wxString::FromUTF8("용 피규어 출력해줘"), wxString::FromUTF8("출력이 실패했어")};
-        else
-            items = {_L("Make this stronger"), _L("Rotate it 45 degrees"), _L("Turn on supports"), _L("Print me a dragon"),
-                     _L("My print failed")};
-    } else {
-        if (ko)
-            items = {wxString::FromUTF8("브림이 뭐예요?"), wxString::FromUTF8("서포트는 언제 필요해?"),
-                     wxString::FromUTF8("실이 생기는 이유는?"), wxString::FromUTF8("레이어 높이는 어떻게 골라?")};
-        else
-            items = {_L("What is a brim?"), _L("When do I need supports?"), _L("Why is my print stringy?"),
-                     _L("How do I pick a layer height?")};
-    }
-    for (const wxString& text : items) {
-        auto* chip = new Button(m_suggest_panel, text);
-        SlicePilotUi::style_secondary_button(chip);
-        chip->SetStyle(ButtonStyle::Regular, ButtonType::Compact);
-        chip->SetFont(Label::Body_12);
-        chip->SetCornerRadius(FromDIP(12));
-        chip->SetPaddingSize(wxSize(FromDIP(10), FromDIP(4)));
-        chip->Bind(wxEVT_BUTTON, [this, text](wxCommandEvent&) {
-            if (m_busy || !m_input_ctrl)
-                return;
-            m_input_ctrl->SetValue(text);
-            wxCommandEvent ev;
-            on_send(ev);
-        });
-        wrap->Add(chip, 0, wxEXPAND);
-    }
-    show_suggestions(!m_conversation_started);
-}
-
-void OllamaChatPanel::show_suggestions(bool show)
-{
-    if (!m_suggest_panel || m_suggest_panel->IsShown() == show)
-        return;
-    m_suggest_panel->Show(show);
-    if (m_body)
-        m_body->Layout();
-}
-
 void OllamaChatPanel::reset_conversation()
 {
-    m_conversation_started = false;
-    rebuild_suggestions();
     ++m_request_gen;
     if (m_assist_controller && m_assist_controller->is_running())
         m_assist_controller->cancel();
@@ -2006,8 +1938,6 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
     save_settings();
     OllamaClient::cancel_active_requests(OllamaCancelDomain::Chat);
     m_input_ctrl->Clear();
-    m_conversation_started = true;
-    show_suggestions(false);
     append_chat(_L("You"), user_text);
     m_empty_reply_retries = 0;
 
