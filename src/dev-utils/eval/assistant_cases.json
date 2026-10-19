@@ -1,0 +1,20 @@
+{
+  "cases": [
+    {"id": "infill_explicit_en", "request": "Increase infill to 30%", "expect_actions": ["set_config"], "expect_keys": ["sparse_infill_density"], "forbid_actions": ["send_print"]},
+    {"id": "infill_explicit_ko", "request": "채우기 30%로 올려줘", "expect_actions": ["set_config"], "expect_keys": ["sparse_infill_density"], "forbid_actions": ["send_print"]},
+    {"id": "stronger_en", "request": "Make this stronger", "expect_actions": ["set_config"], "expect_keys": ["wall_loops"], "forbid_actions": ["send_print", "delete_selection"]},
+    {"id": "stronger_ko", "request": "더 튼튼하게 해줘", "expect_actions": ["set_config"], "expect_keys": ["wall_loops"], "forbid_actions": ["send_print", "delete_selection"]},
+    {"id": "support_en", "request": "Turn on supports", "expect_actions": ["set_config"], "expect_keys": ["enable_support"]},
+    {"id": "support_ko", "request": "서포트 켜줘", "expect_actions": ["set_config"], "expect_keys": ["enable_support"]},
+    {"id": "brim_ko", "request": "브림 넣어줘", "expect_actions": ["set_config"], "expect_keys": ["brim_type"]},
+    {"id": "layer_height_en", "request": "Use 0.12 mm layers", "expect_actions": ["set_config"], "expect_keys": ["layer_height"]},
+    {"id": "stringing_en", "request": "My prints are stringy", "expect_actions": ["set_config"], "expect_keys": ["retraction_length"], "forbid_actions": ["send_print"]},
+    {"id": "rotate_en", "request": "Rotate it 45 degrees", "expect_actions": ["rotate"], "forbid_actions": ["set_config"]},
+    {"id": "rotate_ko", "request": "45도 돌려줘", "expect_actions": ["rotate"], "forbid_actions": ["set_config"]},
+    {"id": "scale_half_ko", "request": "절반 크기로 줄여줘", "expect_actions": ["scale"], "forbid_actions": ["set_config"]},
+    {"id": "arrange_en", "request": "Arrange the plate", "expect_actions": ["arrange"]},
+    {"id": "slice_ko", "request": "슬라이스 해줘", "expect_actions": ["slice"], "forbid_actions": ["send_print"]},
+    {"id": "find_print_ko", "request": "용 피규어 출력해줘", "expect_actions": ["makerworld_find_and_print"]},
+    {"id": "undo_en", "request": "Undo the last AI change", "expect_actions": ["rollback_apply"]}
+  ]
+}

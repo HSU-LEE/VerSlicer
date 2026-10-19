@@ -20,6 +20,8 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
+#include <fstream>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -89,6 +91,25 @@ std::string normalize_model_tag(std::string model)
     if (model == "qwen2.5")
         model = kOllamaDefaultModel;
     return model;
+}
+
+// Dev aid: with VERSLICER_EVAL_LOG=/path.jsonl set, append each reply so
+// assistant_eval_test can score models offline. Off unless the variable is set.
+void append_eval_record(const std::string& model, const std::vector<OllamaMessage>& messages, const std::string& reply)
+{
+    const char* path = std::getenv("VERSLICER_EVAL_LOG");
+    if (!path || !*path || reply.empty())
+        return;
+    std::string user;
+    for (auto it = messages.rbegin(); it != messages.rend(); ++it)
+        if (it->role == "user") {
+            user = it->content;
+            break;
+        }
+    static std::mutex m;
+    std::lock_guard<std::mutex> lock(m);
+    std::ofstream out(path, std::ios::app);
+    out << nlohmann::json{{"model", model}, {"user", user}, {"reply", reply}}.dump() << '\n';
 }
 
 struct ChatAttemptResult
@@ -187,6 +208,7 @@ void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessag
         result.http_status    = completion.http_status;
         result.resolved_model = completion.model.empty() ? job->model : completion.model;
         result.retry_tier     = 0;
+        append_eval_record(result.resolved_model, job->messages, result.content);
 
         const int latency_ms = static_cast<int>(
             std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count());

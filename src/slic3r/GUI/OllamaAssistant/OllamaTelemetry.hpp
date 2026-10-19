@@ -30,10 +30,6 @@ struct OllamaTelemetry
     static void context_cache_invalidate();
     static void slice_feedback_evaluated(bool still_needs_support, int unsupported_islands);
     static void intent_signal_injected(const std::string& signal, const std::string& source);
-
-    static void server_spawn_attempt(int attempt, const std::string& command);
-    static void server_spawn_success(long pid);
-    static void server_spawn_failed(const std::string& reason);
 };
 
 }} // namespace

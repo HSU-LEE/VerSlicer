@@ -43,6 +43,7 @@ TEST_TARGETS=(
     model_search_ranker_test
     mesh_assist_test
     print_planner_test
+    assistant_eval_test
 )
 TEST_REGEX="^($(IFS='|'; echo "${TEST_TARGETS[*]}"))\$"
 
