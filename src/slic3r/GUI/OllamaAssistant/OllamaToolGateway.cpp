@@ -70,7 +70,6 @@ const std::vector<nlohmann::json>& tool_defs()
                             nlohmann::json::array({"op"}))),
         tool_def("slice", "Slice the current plate.", obj_schema({})),
         tool_def("export_gcode", "Export G-code for the sliced plate. Asks the user to confirm.", obj_schema({})),
-        tool_def("send_print", "Send the sliced job to the printer. Asks the user to confirm.", obj_schema({})),
         tool_def("delete_selection", "Delete the selected models. Asks the user to confirm.", obj_schema({})),
     };
     return defs;
@@ -188,7 +187,7 @@ OllamaNormalizedTool OllamaToolGateway::normalize(const std::string& name, const
         if (args.contains("absolute") && args["absolute"].is_boolean())
             out.action["absolute"] = args["absolute"];
     } else if (name == "get_state" || name == "list_objects" || name == "slice" || name == "export_gcode"
-               || name == "send_print" || name == "delete_selection") {
+               || name == "delete_selection") {
         out.action = {{"type", name}};
     } else {
         out.error = "Unknown tool: " + name;

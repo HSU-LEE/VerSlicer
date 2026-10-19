@@ -94,6 +94,10 @@ int main()
         }
     }
 
+    // Removed capabilities must stay removed: the AI cannot send or model.
+    for (const char* gone : {"send_print", "mesh_boolean"})
+        expect_true(!OllamaActionRegistry::is_allowed_type(gone), gone);
+
     // Failure doctor: error codes map to the module that raised them.
     expect_true(OllamaFailureDoctor::area_for_code("0700200000020001").area == "ams_feeding", "doctor AMS HMS code");
     expect_true(OllamaFailureDoctor::area_for_code("0300-8001").area == "motion_first_layer", "doctor MC print_error");

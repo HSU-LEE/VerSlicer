@@ -291,18 +291,4 @@ PrintEstimateSummary PrintJobStepExecutors::collect_estimate(const GeometryAsses
     return PrintEstimateCollector::collect(stats, assessment, config);
 }
 
-PrintJobStepExecutors::SendResult PrintJobStepExecutors::trigger_send()
-{
-    SendResult out;
-    Plater* plater = wxGetApp().plater();
-    if (!plater)
-        return out;
-
-    const OllamaFlowDispatchResult d = OllamaUserFlow::dispatch_coach_action("send_print", plater);
-    out.handled         = d.handled;
-    out.setup_blocked   = d.setup_blocked;
-    out.blocked_message = d.blocked_message;
-    return out;
-}
-
 }}} // namespace Slic3r::GUI::AIPipeline

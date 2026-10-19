@@ -450,7 +450,7 @@ static void augment_geometry_object_targets_impl(nlohmann::json& root, const std
             continue;
         const std::string type = action.value("type", "");
         if (type != "rotate" && type != "translate" && type != "scale" && type != "clone_selection"
-            && type != "delete_selection" && type != "mesh_boolean" && type != "mirror_mesh"
+            && type != "delete_selection" && type != "mirror_mesh"
             && type != "repair_mesh")
             continue;
         if (action_has_object_target(action))
@@ -1622,6 +1622,13 @@ OllamaActionResult apply_menu_item(const nlohmann::json& action)
             return result;
         }
     }
+    // The AI never starts a print: block anything that prints, sends or uploads.
+    for (const char* word : {"print plate", "print all", "send", "upload", "전송", "출력", "보내기"}) {
+        if (contains_ci(item, word)) {
+            result.message = "Blocked: sending to the printer is disabled for AI control";
+            return result;
+        }
+    }
     if (contains_ci(item, "quit") || contains_ci(item, "exit")) {
         result.message = "Blocked: quitting the application is disabled for AI control";
         return result;
@@ -1802,8 +1809,7 @@ const std::unordered_map<std::string, ActionHandler>& action_handlers()
             h[t] = [t](const nlohmann::json& a) { return apply_transform(a, t); };
         h["repair_mesh"]  = OllamaMeshOps::apply_repair_mesh;
         h["mirror_mesh"]  = OllamaMeshOps::apply_mirror_mesh;
-        h["mesh_boolean"] = OllamaMeshOps::apply_mesh_boolean;
-        for (const char* t : {"open_smart_print", "run_smart_print", "open_setup", "send_print", "export_gcode",
+        for (const char* t : {"open_smart_print", "run_smart_print", "open_setup", "export_gcode",
                               "rollback_apply"})
             h[t] = [](const nlohmann::json& a) { return OllamaUserFlow::apply_flow_action(a, wxGetApp().plater()); };
         for (const char* t : {"makerworld_search", "makerworld_find_and_print", "import_makerworld"})
@@ -1857,7 +1863,7 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
         if (!action.is_object() || !action.contains("type"))
             continue;
         const std::string type = action["type"].get<std::string>();
-        if (type == "repair_mesh" || type == "mirror_mesh" || type == "mesh_boolean" || type == "split_object"
+        if (type == "repair_mesh" || type == "mirror_mesh" || type == "split_object"
             || type == "split_mesh")
             has_mesh_mutation = true;
     }
@@ -1888,16 +1894,6 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
 
         if (type == "repair_mesh" || type == "mirror_mesh") {
             if (!mesh_action_fps.insert(type).second) {
-                OllamaActionResult skipped;
-                skipped.success          = true;
-                skipped.effective_change = false;
-                skipped.message          = "Skipped duplicate " + type;
-                results.push_back(std::move(skipped));
-                continue;
-            }
-        } else if (type == "mesh_boolean") {
-            const std::string fp = type + "|" + (action.contains("operation") ? action["operation"].dump() : std::string());
-            if (!mesh_action_fps.insert(fp).second) {
                 OllamaActionResult skipped;
                 skipped.success          = true;
                 skipped.effective_change = false;

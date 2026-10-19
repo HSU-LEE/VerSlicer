@@ -238,14 +238,8 @@ OllamaActionResult OllamaUserFlow::apply_flow_action(const nlohmann::json& actio
 
     if (type == "open_smart_print" || type == "run_smart_print") {
         refresh_smart_print_from_goal_session(plater);
-        if (type == "run_smart_print" && plater && BambuSmartPrintService::is_enabled()
-            && BambuSmartPrintService::is_bbl_printer_active()) {
-            BambuSmartPrintService::instance().run_one_click_print(plater);
-            result.success          = true;
-            result.effective_change = true;
-            result.message          = "Started Smart Print one-click workflow";
-            return result;
-        }
+        // The AI only opens Smart Print; one-click print (which ends in a send)
+        // stays a button the user presses there.
         wxGetApp().open_smart_print();
         result.success          = true;
         result.effective_change = true;
@@ -257,17 +251,6 @@ OllamaActionResult OllamaUserFlow::apply_flow_action(const nlohmann::json& actio
         result.success          = true;
         result.effective_change = true;
         result.message          = "Opened Smart Print setup";
-        return result;
-    }
-    if (type == "send_print") {
-        const OllamaFlowDispatchResult dispatch = send_print_flow(plater);
-        result.success = dispatch.handled;
-        if (dispatch.setup_blocked) {
-            result.message = dispatch.blocked_message;
-            return result;
-        }
-        result.effective_change = true;
-        result.message          = "Sending to printer";
         return result;
     }
     if (type == "export_gcode") {

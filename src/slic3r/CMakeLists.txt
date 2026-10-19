@@ -148,12 +148,6 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaToolResult.hpp
     GUI/OllamaAssistant/OllamaChatDialog.cpp
     GUI/OllamaAssistant/OllamaChatDialog.hpp
-    GUI/AIModelCreate/AIModelCreateDialog.cpp
-    GUI/AIModelCreate/AIModelCreateDialog.hpp
-    GUI/AIModelCreate/AIModelCreateEngine.cpp
-    GUI/AIModelCreate/AIModelCreateEngine.hpp
-    GUI/AIModelCreate/AIModelCreateSketchPanel.cpp
-    GUI/AIModelCreate/AIModelCreateSketchPanel.hpp
     GUI/OllamaAssistant/AiLocale.cpp
     GUI/OllamaAssistant/AiLocale.hpp
     GUI/OllamaAssistant/OllamaChatMessageList.cpp

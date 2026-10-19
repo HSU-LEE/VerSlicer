@@ -199,8 +199,6 @@ bool PrintJobOrchestrator::start(const std::string& user_utterance, wxWindow* pa
     job->apply_mode          = apply_mode;
     job->parent              = parent;
     job->ui                  = std::move(ui);
-    // 3.2 release: stop after slicing; the user sends with Print plate.
-    job->auto_slice_and_send = false;
     m_job                    = job;
     m_last_terminal          = PrintJobState::Idle;
 
@@ -260,13 +258,6 @@ void PrintJobOrchestrator::select_candidate(int index)
     m_job->selected_index     = index;
     m_job->selected_candidate = m_job->candidates[index];
     transition_to(PrintJobState::Importing);
-}
-
-void PrintJobOrchestrator::confirm_print()
-{
-    if (!m_job || m_job->state != PrintJobState::ReadyToPrint)
-        return;
-    transition_to(PrintJobState::Sending);
 }
 
 void PrintJobOrchestrator::cancel()
@@ -343,7 +334,6 @@ void PrintJobOrchestrator::enter_state()
         case PrintJobState::Slicing:          step_slice();           break;
         case PrintJobState::Estimating:       step_estimate();        break;
         case PrintJobState::ReadyToPrint:     step_ready();           break;
-        case PrintJobState::Sending:          step_send();            break;
         case PrintJobState::Idle:
         case PrintJobState::Done:
         case PrintJobState::Failed:
@@ -726,30 +716,10 @@ void PrintJobOrchestrator::step_estimate()
 
 void PrintJobOrchestrator::step_ready()
 {
-    PrintJob& job = *m_job;
-    if (job.auto_slice_and_send) {
-        transition_to(PrintJobState::Sending);
-        return;
-    }
-    // Nothing in the UI calls confirm_print() yet, so finish here and let the
-    // user send with the regular Print plate button.
+    // The AI never sends to the printer: the job ends here and the user
+    // prints with the regular Print plate button.
     chat(AiLocale::text("Sliced and ready. Check the preview, then press Print plate to send it to your printer.",
            "슬라이스가 끝났습니다. 미리보기를 확인한 뒤 「플레이트 출력」을 눌러 프린터로 보내세요."));
-    finish_success();
-}
-
-void PrintJobOrchestrator::step_send()
-{
-    set_busy(true, AiLocale::text("Sending to printer…", "프린터로 전송하는 중…"));
-
-    const PrintJobStepExecutors::SendResult res = PrintJobStepExecutors::trigger_send();
-    if (res.setup_blocked) {
-        chat(res.blocked_message.empty()
-                 ? AiLocale::text("Complete printer setup before sending.", "전송 전에 프린터 설정을 완료하세요.")
-                 : wxString::FromUTF8(res.blocked_message));
-    } else {
-        chat(AiLocale::text("Sending the model to your printer.", "모델을 프린터로 전송합니다."));
-    }
     finish_success();
 }
 

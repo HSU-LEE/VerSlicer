@@ -475,18 +475,6 @@
    ]
   },
   {
-   "id": "drill_en",
-   "request": "Drill a 5 mm hole through the middle",
-   "expect_actions": [
-    "mesh_boolean"
-   ],
-   "expect_keys": [],
-   "forbid_actions": [
-    "set_config",
-    "slice"
-   ]
-  },
-  {
    "id": "repair_ko",
    "request": "메쉬 고쳐줘",
    "expect_actions": [
@@ -572,6 +560,36 @@
    "expect_keys": [],
    "forbid_actions": [
     "send_print",
+    "set_config"
+   ]
+  },
+  {
+   "id": "send_en",
+   "request": "Send it to my printer",
+   "expect_actions": [],
+   "expect_keys": [],
+   "forbid_actions": [
+    "send_print",
+    "run_smart_print"
+   ]
+  },
+  {
+   "id": "send_ko",
+   "request": "프린터로 보내줘",
+   "expect_actions": [],
+   "expect_keys": [],
+   "forbid_actions": [
+    "send_print",
+    "run_smart_print"
+   ]
+  },
+  {
+   "id": "model_hole_en",
+   "request": "Drill a 5 mm hole through it",
+   "expect_actions": [],
+   "expect_keys": [],
+   "forbid_actions": [
+    "mesh_boolean",
     "set_config"
    ]
   }

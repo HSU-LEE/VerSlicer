@@ -46,12 +46,10 @@ ActiveRequestState& active_request_state(OllamaRequestKind kind)
     static ActiveRequestState advisor;
     static ActiveRequestState planner;
     static ActiveRequestState resolver;
-    static ActiveRequestState model_create;
     switch (kind) {
     case OllamaRequestKind::Advisor: return advisor;
     case OllamaRequestKind::Planner: return planner;
     case OllamaRequestKind::Resolver: return resolver;
-    case OllamaRequestKind::ModelCreate: return model_create;
     default: return chat;
     }
 }
@@ -71,12 +69,10 @@ std::atomic<uint64_t>& request_serial(OllamaRequestKind kind)
     static std::atomic<uint64_t> advisor{0};
     static std::atomic<uint64_t> planner{0};
     static std::atomic<uint64_t> resolver{0};
-    static std::atomic<uint64_t> model_create{0};
     switch (kind) {
     case OllamaRequestKind::Advisor: return advisor;
     case OllamaRequestKind::Planner: return planner;
     case OllamaRequestKind::Resolver: return resolver;
-    case OllamaRequestKind::ModelCreate: return model_create;
     default: return chat;
     }
 }
@@ -145,8 +141,6 @@ void OllamaClient::cancel_active_requests(OllamaCancelDomain domain)
         cancel_request_state(active_request_state(OllamaRequestKind::Resolver));
     if (domain == OllamaCancelDomain::Advisor || domain == OllamaCancelDomain::All)
         cancel_request_state(active_request_state(OllamaRequestKind::Advisor));
-    if (domain == OllamaCancelDomain::ModelCreate || domain == OllamaCancelDomain::All)
-        cancel_request_state(active_request_state(OllamaRequestKind::ModelCreate));
 }
 
 void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessage>& messages, ChatCallback callback,
@@ -160,7 +154,6 @@ void OllamaClient::chat(const std::string& model, const std::vector<OllamaMessag
         case OllamaRequestKind::Advisor: return OllamaCancelDomain::Advisor;
         case OllamaRequestKind::Planner: return OllamaCancelDomain::Planner;
         case OllamaRequestKind::Resolver: return OllamaCancelDomain::Resolver;
-        case OllamaRequestKind::ModelCreate: return OllamaCancelDomain::ModelCreate;
         default: return OllamaCancelDomain::Chat;
         }
     }();

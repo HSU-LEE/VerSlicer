@@ -87,9 +87,6 @@ public:
     /** Select a search candidate by index while in CandidateSelect. */
     void select_candidate(int index);
 
-    /** Confirm sending to the printer when ReadyToPrint (manual mode). */
-    void confirm_print();
-
     /** Cancel the active job (idempotent). */
     void cancel();
 
@@ -130,7 +127,6 @@ private:
     void step_slice();
     void step_estimate();
     void step_ready();
-    void step_send();
 
     void on_agent_event(const OllamaAgentEvent& evt);
 

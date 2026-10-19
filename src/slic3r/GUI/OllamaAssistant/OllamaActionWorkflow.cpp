@@ -63,7 +63,7 @@ static bool is_workflow_only_action(const std::string& type)
     return type == "slice" || type == "ui_select_tab" || type == "menu_item" || type == "add_model"
         || type == "makerworld_search" || type == "makerworld_find_and_print" || type == "import_makerworld"
         || type == "open_smart_print" || type == "open_setup"
-        || type == "send_print" || type == "export_gcode" || type == "rollback_apply"
+        || type == "export_gcode" || type == "rollback_apply"
         || type == "get_state" || type == "list_objects" || type == "select_object"
         || type == "add_plate" || type == "delete_plate" || type == "select_plate"
         || type == "open_calibration" || type == "run_smart_print" || type == "select_preset";

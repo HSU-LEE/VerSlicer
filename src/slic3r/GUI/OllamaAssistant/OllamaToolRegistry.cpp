@@ -31,7 +31,6 @@ const OllamaToolSpec kTools[] = {
     {"ui_select_tab", OllamaToolCategory::Mutating, "Switch main tab", "탭 전환"},
     {"open_calibration", OllamaToolCategory::Mutating, "Open calibration tab", "캘리브레이션 탭"},
     {"export_gcode", OllamaToolCategory::Dangerous, "Export G-code", "G-code보내기"},
-    {"send_print", OllamaToolCategory::Dangerous, "Send to printer", "프린터 전송"},
     {"add_plate", OllamaToolCategory::Mutating, "Add a new build plate (palette)", "빌드 플레이트(팔레트) 추가"},
     {"delete_plate", OllamaToolCategory::Dangerous, "Delete current plate", "플레이트 삭제"},
     {"select_plate", OllamaToolCategory::Mutating, "Select plate by index", "플레이트 선택"},
@@ -40,8 +39,8 @@ const OllamaToolSpec kTools[] = {
     {"run_smart_print", OllamaToolCategory::Mutating, "Open Smart Print workflow", "스마트 프린트"},
     {"makerworld_search", OllamaToolCategory::Mutating, "Search MakerWorld", "MakerWorld 검색"},
     {"makerworld_find_and_print", OllamaToolCategory::Mutating,
-     "Search MakerWorld (top 3), offer print with countdown, import+slice+send",
-     "MakerWorld 상위 3개 검색 후 출력 제안(카운트다운) 및 불러오기·슬라이스·출력"},
+     "Search MakerWorld (top 3), let the user pick, then import and slice. Does not send to the printer.",
+     "MakerWorld 상위 3개 검색, 사용자가 고르면 불러오기·슬라이스. 프린터로 보내지 않음"},
     {"rollback_apply", OllamaToolCategory::Mutating, "Undo last AI apply", "AI 되돌리기"},
     {"scale", OllamaToolCategory::Mutating,
      "Resize the selection. factor is a multiplier (half size: 0.5, double: 2). A number above 20 is a percent (50 → 0.5). Not set_config.",
@@ -50,7 +49,6 @@ const OllamaToolSpec kTools[] = {
     {"delete_selection", OllamaToolCategory::Dangerous, "Delete selection (only if user asked)", "삭제"},
     {"repair_mesh", OllamaToolCategory::Mutating, "Repair mesh defects (check mesh_health first)", "메쉬 수리"},
     {"mirror_mesh", OllamaToolCategory::Mutating, "Mirror mesh", "메쉬 대칭"},
-    {"mesh_boolean", OllamaToolCategory::Mutating, "Drill hole (subtract_cylinder) or add handle/rib. NOT set_config or slice.", "구멍 뚫기(subtract_cylinder)·손잡이. set_config/slice 금지"},
 };
 
 } // namespace
@@ -98,10 +96,10 @@ std::string OllamaToolRegistry::agent_tools_schema_block(bool korean)
     }
     out += korean
         ? "\n에이전트 응답 JSON: {\"message\":\"...\", \"done\":false, \"actions\":[{\"type\":\"get_state\"}, ...]}\n"
-          "형상 요청(크기·회전·구멍)은 scale/rotate/mesh_boolean 등만 사용 — set_config·slice 금지(슬라이스 요청 시 제외).\n"
+          "형상 요청(크기·회전)은 scale/rotate 등만 사용. 새 형상을 만들거나 구멍·손잡이를 추가하는 모델링은 하지 않는다 — set_config·slice 금지(슬라이스 요청 시 제외).\n"
           "목표 달성 시 done:true 와 요약 message.\n"
         : "\nAgent reply JSON: {\"message\":\"...\", \"done\":false, \"actions\":[{\"type\":\"get_state\"}, ...]}\n"
-          "Model-shape requests (resize, rotate, hole) use scale/rotate/mesh_boolean only — no set_config or slice unless user asked to slice.\n"
+          "Model-shape requests (resize, rotate) use scale/rotate only. You do not create geometry or add holes or handles — no set_config or slice unless user asked to slice.\n"
           "Set done:true with summary when the goal is complete.\n";
     return out;
 }

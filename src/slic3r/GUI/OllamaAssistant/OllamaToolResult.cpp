@@ -98,15 +98,6 @@ std::string friendly_tool_line(const std::string& tool, const std::string& msg, 
         return korean ? "메쉬를 수리했습니다." : "Repaired the mesh.";
     if (tool == "mirror_mesh" || msg.find("Mirrored mesh") != std::string::npos)
         return korean ? "모델을 대칭으로 만들었습니다." : "Mirrored the model.";
-    if (tool == "mesh_boolean" || msg.find("Applied mesh operation") != std::string::npos) {
-        if (msg.find("subtract") != std::string::npos || msg.find("drill") != std::string::npos)
-            return korean ? "모델에 구멍을 뚫었습니다." : "Drilled a hole in the model.";
-        if (msg.find("add_handle") != std::string::npos || msg.find("handle") != std::string::npos)
-            return korean ? "손잡이를 추가했습니다." : "Added a handle to the model.";
-        if (msg.find("add_rib") != std::string::npos)
-            return korean ? "리브(보강)를 추가했습니다." : "Added reinforcement ribs.";
-        return korean ? "모델 형상을 수정했습니다." : "Modified model geometry.";
-    }
     if (tool == "scale" || msg.find("Scaled") != std::string::npos)
         return korean ? "모델 크기를 조정했습니다." : "Resized the model.";
     if (tool == "rotate" || msg.find("Rotat") != std::string::npos) {
@@ -298,14 +289,6 @@ std::string describe_action_type(const std::string& type, const nlohmann::json& 
         return korean ? "인쇄 설정 변경" : "update print settings";
     if (type == "repair_mesh")
         return korean ? "메쉬 수리" : "repair mesh";
-    if (type == "mesh_boolean") {
-        const std::string op = action.value("operation", "");
-        if (op.find("subtract") != std::string::npos)
-            return korean ? "구멍 뚫기" : "drill hole";
-        if (op.find("handle") != std::string::npos)
-            return korean ? "손잡이 추가" : "add handle";
-        return korean ? "형상 수정" : "edit geometry";
-    }
     if (type == "mirror_mesh")
         return korean ? "대칭 만들기" : "mirror model";
     if (type == "scale")

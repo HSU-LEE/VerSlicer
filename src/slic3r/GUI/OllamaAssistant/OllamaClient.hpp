@@ -19,7 +19,6 @@ enum class OllamaCancelDomain
     Advisor,
     Planner,
     Resolver,
-    ModelCreate,
     All,
 };
 
@@ -29,8 +28,6 @@ enum class OllamaRequestKind
     Advisor,
     Planner,
     Resolver,
-    /** AI Model Create dialog: must not cancel, or be cancelled by, chat requests. */
-    ModelCreate,
 };
 
 class OllamaClient

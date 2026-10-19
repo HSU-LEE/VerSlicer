@@ -1480,7 +1480,7 @@ void OllamaChatPanel::on_pipeline_step(AIPipeline::PrintJobState state, const wx
     using AIPipeline::PrintJobState;
 
     struct StepInfo { int index; const char* en; const char* ko; };
-    // 6 visible pipeline steps: search -> import -> analyze -> configure -> slice -> send.
+    // 6 visible pipeline steps: search -> import -> analyze -> configure -> slice -> ready.
     StepInfo info{0, "", ""};
     switch (state) {
     case PrintJobState::Searching:
@@ -1492,8 +1492,7 @@ void OllamaChatPanel::on_pipeline_step(AIPipeline::PrintJobState state, const wx
     case PrintJobState::AutoConfig:       info = {4, "Configure", "설정"};       break;
     case PrintJobState::Slicing:
     case PrintJobState::Estimating:       info = {5, "Slice",     "슬라이스"};   break;
-    case PrintJobState::ReadyToPrint:
-    case PrintJobState::Sending:          info = {6, "Send",      "전송"};       break;
+    case PrintJobState::ReadyToPrint:     info = {6, "Ready",     "준비 완료"};  break;
     default:
         // Idle / intent / clarify / terminal states: no strip.
         hide_pipeline_progress();

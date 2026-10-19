@@ -21,8 +21,6 @@ std::string OllamaActionPipelineCore::action_fingerprint(const nlohmann::json& a
         return type + "|" + action.dump();
     if (type == "repair_mesh" || type == "mirror_mesh")
         return type;
-    if (type == "mesh_boolean")
-        return type + "|" + action.value("operation", "");
     if (type == "arrange" || type == "arrange_objects" || type == "clone_selection" || type == "delete_selection"
         || type == "split_object")
         return type;

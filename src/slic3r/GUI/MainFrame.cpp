@@ -33,7 +33,6 @@
 #include "BambuSmartPrint/BambuSmartPrintPanel.hpp"
 #include "BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "BambuSmartPrint/SlicePilotSimpleLayout.hpp"
-#include "AIModelCreate/AIModelCreateDialog.hpp"
 
 #include "Tab.hpp"
 #include "Widgets/TextInput.hpp"
@@ -2822,10 +2821,6 @@ void MainFrame::init_menubar_as_editor()
         append_menu_item(import_menu, wxID_ANY, _L("Import Configs") + dots /*+ "\t" + ctrl + "I"*/, _L("Load configs"),
             [this](wxCommandEvent&) { load_config_file(); }, "menu_import", nullptr,
             [this](){return true; }, this);
-        if (kAiModelCreateEnabled)
-            append_menu_item(import_menu, wxID_ANY, _L("Create Model") + dots, _L("Draw and describe a model; AI generates mesh for the plater"),
-                [](wxCommandEvent&) { show_ai_model_create_dialog(); }, "menu_add_part", nullptr,
-                [this]() { return can_add_models(); }, this);
 
         append_submenu(fileMenu, import_menu, wxID_ANY, _L("Import"), "");
 

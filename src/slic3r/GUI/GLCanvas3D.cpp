@@ -1,6 +1,5 @@
 #include "libslic3r/libslic3r.h"
 #include "GLCanvas3D.hpp"
-#include "AIModelCreate/AIModelCreateDialog.hpp"
 #include "OllamaAssistant/OllamaVoiceInput.hpp"
 
 #include <igl/unproject.h>
@@ -8906,15 +8905,6 @@ void GLCanvas3D::_render_canvas_toolbar()
             }
         );
 
-        if (kAiModelCreateEnabled)
-        create_menu_item(_utf8(L("Create Model")),
-            m_canvas_type == ECanvasType::CanvasView3D,
-            true,
-            [this] {
-                if (m_canvas != nullptr && !wxGetApp().is_closing())
-                    m_canvas->CallAfter([]() { show_ai_model_create_dialog(); });
-            }
-        );
 
         create_menu_item( _utf8(L("Zoom button")),
             true, // work on all

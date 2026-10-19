@@ -99,13 +99,6 @@ public:
     static BambuSmartPrint::PrintEstimateSummary collect_estimate(
         const BambuSmartPrint::GeometryAssessment& assessment);
 
-    struct SendResult {
-        bool        handled{ false };
-        bool        setup_blocked{ false };
-        std::string blocked_message;
-    };
-    // Dispatch the "send_print" coach action (OllamaUserFlow).
-    static SendResult trigger_send();
 };
 
 }}} // namespace Slic3r::GUI::AIPipeline
