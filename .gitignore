@@ -4,8 +4,7 @@ deps/
 compile_commands.json
 .DS_Store
 
-# GitHub Actions / Dependabot — not used for this macOS-only fork
-.github/workflows/
+# Dependabot — not used for this macOS-only fork
 .github/dependabot.yml
 
 # Local build logs and scratch helpers

@@ -1,0 +1,46 @@
+name: Headless AI tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: headless-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dev-utils:
+    runs-on: macos-14 # Apple Silicon
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: brew install ninja ccache xz
+
+      # Dependencies take ~1h to build; rebuild only when deps/ changes.
+      - name: Restore dependencies
+        id: deps-cache
+        uses: actions/cache@v4
+        with:
+          path: deps/build/arm64/OrcaSlicer_dep
+          key: deps-macos-arm64-${{ hashFiles('deps/**') }}
+
+      - name: Build dependencies
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: ./build_release_macos.sh -d -x -a arm64
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/ccache
+          key: ccache-macos-arm64-${{ github.sha }}
+          restore-keys: ccache-macos-arm64-
+
+      - name: Configure
+        run: ./build_dev_macos.sh -C -a arm64
+
+      - name: Build and run headless tests
+        run: ./scripts/run_orca_tools_test.sh
