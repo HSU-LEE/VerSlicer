@@ -8,6 +8,7 @@
 #include "../BambuSmartPrint/BambuSmartPrintService.hpp"
 #include "../BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "../BambuSmartPrint/BambuSmartPrintWorkflowDialog.hpp"
+#include "OllamaToolRegistry.hpp"
 #include "../AICoach/AIGuiOrchestrator.hpp"
 #include "../I18N.hpp"
 #include "../GUI_App.hpp"
@@ -347,8 +348,7 @@ static bool is_geometry_or_flow_only(const nlohmann::json& root)
 
 static bool is_dangerous_action(const std::string& type)
 {
-    return type == "delete_selection" || type == "delete_plate" || type == "save_project"
-        || type == "send_print" || type == "export_gcode";
+    return OllamaToolRegistry::category_for(type) == OllamaToolCategory::Dangerous;
 }
 
 static bool is_inline_chat_apply(const nlohmann::json& root)
@@ -421,9 +421,11 @@ OllamaWorkflowRun OllamaActionWorkflow::confirm_and_execute(const nlohmann::json
     if (is_inline_chat_apply(root))
         return execute_inline(root, parent);
 
+    // Without a window to review in, refuse rather than apply unreviewed changes.
     wxWindow* dlg_parent = dialog_parent(parent);
     if (!dlg_parent) {
-        run.results = OllamaActionExecutor::execute(root);
+        run.cancelled = true;
+        OllamaTelemetry::workflow_finished(false, true, false, 0);
         return run;
     }
 

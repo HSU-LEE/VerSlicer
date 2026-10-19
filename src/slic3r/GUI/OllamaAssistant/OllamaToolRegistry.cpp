@@ -30,7 +30,7 @@ const OllamaToolSpec kTools[] = {
     {"export_gcode", OllamaToolCategory::Dangerous, "Export G-code", "G-code보내기"},
     {"send_print", OllamaToolCategory::Dangerous, "Send to printer", "프린터 전송"},
     {"add_plate", OllamaToolCategory::Mutating, "Add a new build plate (palette)", "빌드 플레이트(팔레트) 추가"},
-    {"delete_plate", OllamaToolCategory::Mutating, "Delete current plate", "플레이트 삭제"},
+    {"delete_plate", OllamaToolCategory::Dangerous, "Delete current plate", "플레이트 삭제"},
     {"select_plate", OllamaToolCategory::Mutating, "Select plate by index", "플레이트 선택"},
     {"save_project", OllamaToolCategory::Dangerous, "Save project", "프로젝트 저장"},
     {"select_preset", OllamaToolCategory::Dangerous, "Select print/filament/printer preset", "프리셋 선택"},
