@@ -1,6 +1,9 @@
 build/
 build-tools/
-deps/
+# Dependency build output and download cache; the recipes in deps/ are tracked.
+deps/build/
+deps/DL_CACHE/
+.metadata_never_index
 compile_commands.json
 .DS_Store
 
