@@ -87,7 +87,7 @@ int main()
 
     {
         const auto& scenarios = ollama_benchmark_scenarios();
-        expect_true(scenarios.size() >= 35, "benchmark scenarios wired");
+        expect_true(scenarios.size() >= 25, "benchmark scenarios wired");
         for (const auto& sc : scenarios) {
             if (!sc.check(sc.user_request))
                 std::cerr << "FAIL scenario: " << sc.id << '\n';
@@ -107,14 +107,14 @@ int main()
     }
 
     {
-        const auto keys = OllamaSettingSearch::candidate_keys_for_request("채움 올려", 2, 5);
-        expect_true(!keys.empty(), "ko infill candidate keys");
+        const auto keys = OllamaSettingSearch::candidate_keys_for_request("increase infill", 2, 5);
+        expect_true(!keys.empty(), "infill candidate keys");
     }
 
     {
-        const nlohmann::json hint = OllamaAgentGoalPlanner::build_plan_hint("서포트 켜줘", true);
+        const nlohmann::json hint = OllamaAgentGoalPlanner::build_plan_hint("turn on supports", false);
         expect_true(hint.contains("hint") && !hint.contains("candidate_keys"), "plan hint has no keyword keys");
-        expect_true(!OllamaAgentGoalPlanner::should_auto_finish_after_apply("서포트 켜줘", true, {}),
+        expect_true(!OllamaAgentGoalPlanner::should_auto_finish_after_apply("turn on supports", false, {}),
                     "apply does not end the loop");
     }
 

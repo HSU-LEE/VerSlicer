@@ -55,15 +55,15 @@ int main()
 
     {
         expect_true(OllamaRequestRouter::classify("") == OllamaRequestRoute::Fast, "empty -> fast");
-        expect_true(OllamaRequestRouter::classify("90도 돌려줘") == OllamaRequestRoute::Standard, "one path");
+        expect_true(OllamaRequestRouter::classify("rotate it 90 degrees") == OllamaRequestRoute::Standard, "one path");
         expect_true(OllamaRequestRouter::classify("arrange the plate") == OllamaRequestRoute::Standard, "one path");
-        expect_true(OllamaRequestRouter::classify("서포트 켜줘") == OllamaRequestRoute::Standard, "one path");
-        expect_true(OllamaRequestRouter::classify("고쳐줘") == OllamaRequestRoute::Standard, "one path");
+        expect_true(OllamaRequestRouter::classify("turn on supports") == OllamaRequestRoute::Standard, "one path");
+        expect_true(OllamaRequestRouter::classify("fix it") == OllamaRequestRoute::Standard, "one path");
         expect_true(!OllamaRequestRouter::is_geometry_request("rotate 90"), "no geometry keyword route");
     }
 
     {
-        const auto keys = OllamaSettingSearch::candidate_keys_for_request("베드 온도", 2, 5);
+        const auto keys = OllamaSettingSearch::candidate_keys_for_request("bed temperature", 2, 5);
         expect_true(!keys.empty(), "catalog keys for explicit bed query");
     }
 
@@ -73,7 +73,7 @@ int main()
     }
 
     {
-        const std::string llama_brim = R"({"message":"현재 brim_width_mm은 \u{0022}5\u{0022}입니다.","actions":[{"type":"set_config","preset":"print","values":{"brim_width":10,"brim_type":"outer_only"}}]})";
+        const std::string llama_brim = R"({"message":"Current brim_width_mm is \u{0022}5\u{0022}.","actions":[{"type":"set_config","preset":"print","values":{"brim_width":10,"brim_type":"outer_only"}}]})";
         const nlohmann::json root     = extract_ollama_action_json_with_repair(llama_brim);
         expect_true(root.contains("message") && root["message"].is_string(), "es6 unicode json parses");
         expect_true(root.contains("actions") && root["actions"].is_array() && !root["actions"].empty(),

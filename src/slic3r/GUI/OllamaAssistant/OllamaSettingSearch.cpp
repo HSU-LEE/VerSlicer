@@ -1,7 +1,6 @@
 #include "OllamaSettingSearch.hpp"
 
 #include "OllamaActionJsonExtract.hpp"
-#include "OllamaSettingAliases.hpp"
 #include "OllamaSettingCatalogBuilder.hpp"
 
 #include "libslic3r/PrintConfig.hpp"
@@ -68,24 +67,6 @@ void consider_translated(int& score, const std::string& source, const std::strin
         consider_phrase(score, translated, query);
 }
 
-bool is_off_enum_value(const std::string& value)
-{
-    const std::string lower = boost::algorithm::to_lower_copy(value);
-    return lower == "none" || lower == "off" || lower == "disabled" || lower == "false"
-        || boost::algorithm::starts_with(lower, "no ");
-}
-
-bool goal_wants_on(const std::string& goal)
-{
-    return boost::contains(goal, "켜") || boost::icontains(goal, "enable") || boost::icontains(goal, "turn on");
-}
-
-bool goal_wants_off(const std::string& goal)
-{
-    return boost::contains(goal, "끄") || boost::contains(goal, "꺼") || boost::icontains(goal, "disable")
-        || boost::icontains(goal, "turn off");
-}
-
 int score_spec(const OllamaAutoSettingSpec& sp, const std::string& query)
 {
     int score = 0;
@@ -95,8 +76,6 @@ int score_spec(const OllamaAutoSettingSpec& sp, const std::string& query)
     consider_translated(score, sp.tooltip, query);
     if (sp.key.size() >= 4 && boost::icontains(query, sp.key))
         score = std::max(score, 65);
-    for (const std::string& ko : OllamaSettingAliases::ko_terms_for_key(sp.key))
-        consider_phrase(score, ko, query);
     if (const ConfigOptionDef* def = print_config_def.get(sp.key)) {
         for (const std::string& label : def->enum_labels)
             consider_translated(score, label, query);
@@ -196,67 +175,6 @@ nlohmann::json OllamaSettingSearch::lookup(const std::vector<std::string>& keys,
         arr.push_back(std::move(e));
     }
     return arr;
-}
-
-std::optional<OllamaObviousSettingChange> OllamaSettingSearch::obvious_toggle(const std::string& user_goal)
-{
-    const bool on  = goal_wants_on(user_goal);
-    const bool off = goal_wants_off(user_goal);
-    if (on == off)
-        return std::nullopt;
-
-    const std::vector<OllamaSettingSearchHit> hits = search(user_goal, 2, 8);
-    std::vector<OllamaSettingSearchHit> strong;
-    for (const OllamaSettingSearchHit& hit : hits) {
-        if (hit.score >= 75)
-            strong.push_back(hit);
-    }
-    if (strong.empty())
-        return std::nullopt;
-    const int top = strong.front().score;
-    int       close = 0;
-    for (const OllamaSettingSearchHit& hit : strong) {
-        if (top - hit.score <= 10)
-            ++close;
-    }
-    if (close != 1)
-        return std::nullopt;
-
-    const OllamaAutoSettingSpec* sp = OllamaSettingCatalogBuilder::find(strong.front().key);
-    if (!sp || sp->virtual_key || sp->tier == OllamaSettingTier::Restricted)
-        return std::nullopt;
-
-    OllamaObviousSettingChange change;
-    change.preset = sp->preset_scope.empty() ? "print" : sp->preset_scope;
-    change.key    = sp->key;
-    change.label  = translate_label(sp->label.empty() ? sp->key : sp->label);
-
-    if (sp->value_type == "bool") {
-        change.value = on;
-        return change;
-    }
-
-    const ConfigOptionDef* def = print_config_def.get(sp->key);
-    if (!def || def->enum_values.empty())
-        return std::nullopt;
-
-    if (off) {
-        for (const std::string& value : def->enum_values) {
-            if (is_off_enum_value(value)) {
-                change.value = value;
-                return change;
-            }
-        }
-        return std::nullopt;
-    }
-
-    for (const std::string& value : def->enum_values) {
-        if (!is_off_enum_value(value)) {
-            change.value = value;
-            return change;
-        }
-    }
-    return std::nullopt;
 }
 
 std::vector<std::string> OllamaSettingSearch::keys_from_planner_json(const std::string& planner_text)

@@ -639,37 +639,6 @@ void OllamaAgentController::proceed_after_tool_execution(const nlohmann::json& e
     if (root_is_done(executed_root)) {
         const bool ko = wxGetApp().current_language_code().StartsWith("ko");
         if (!step_has_substantive_change(m_step_tool_results)) {
-            if (!m_obvious_setting_applied) {
-                if (const auto change = OllamaSettingSearch::obvious_toggle(m_user_goal)) {
-                    m_obvious_setting_applied = true;
-                    nlohmann::json apply_root = {
-                        {"message", ""},
-                        {"done", true},
-                        {"actions", nlohmann::json::array({nlohmann::json{
-                             {"type", "set_config"},
-                             {"preset", change->preset},
-                             {"options", {{change->key, change->value}}},
-                         }})},
-                    };
-                    OllamaActionPipeline::process_actions(apply_root, pipeline_options());
-                    emit_thinking_lines(m_callbacks, ko ? change->label + " 값을 바꿉니다."
-                                                        : "Changing " + change->label + ".");
-                    OllamaWorkflowRun applied = OllamaActionWorkflow::execute_inline(apply_root, m_parent);
-                    note_workflow_mutations(applied);
-                    m_step_tool_results.push_back(ollama_tool_results_from_workflow(apply_root, applied));
-                    OllamaAgentRunResult applied_result;
-                    applied_result.completed         = true;
-                    applied_result.steps_taken       = m_step;
-                    applied_result.step_tool_results = m_step_tool_results;
-                    applied_result.final_message     = pick_user_facing_message(m_step_tool_results, "", ko);
-                    if (!step_has_substantive_change(m_step_tool_results)) {
-                        applied_result.final_message = ko ? change->label + "은(는) 이미 그 값입니다."
-                                                          : change->label + " is already set that way.";
-                    }
-                    finish(std::move(applied_result));
-                    return;
-                }
-            }
             if (!m_setting_search_nudged && m_step < m_max_steps) {
                 const std::vector<OllamaSettingSearchHit> hits = OllamaSettingSearch::search(m_user_goal, 2, 5);
                 if (!hits.empty() && hits.front().score >= 60) {

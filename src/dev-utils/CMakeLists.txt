@@ -59,7 +59,6 @@ if (ORCA_TOOLS)
         ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionRegistry.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
@@ -79,7 +78,6 @@ if (ORCA_TOOLS)
         ../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaAgentGoalPlanner.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
@@ -109,7 +107,6 @@ if (ORCA_TOOLS)
         ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
     )
     target_include_directories(ollama_apply_golden_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -125,7 +122,6 @@ if (ORCA_TOOLS)
         ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
     )
     target_include_directories(bambu_wiki_search_test PRIVATE
@@ -142,7 +138,6 @@ if (ORCA_TOOLS)
         ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
     )
@@ -162,7 +157,6 @@ if (ORCA_TOOLS)
         ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionRegistry.cpp
     )

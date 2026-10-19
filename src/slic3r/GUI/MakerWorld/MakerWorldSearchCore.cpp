@@ -224,50 +224,6 @@ bool is_search_stopword(const std::string& tok)
     return false;
 }
 
-void strip_ascii_word_insensitive(std::string& text, const char* word)
-{
-    if (!word || !*word)
-        return;
-    std::string lower = text;
-    boost::algorithm::to_lower(lower);
-    const std::string needle = word;
-    std::string       needle_lower = needle;
-    boost::algorithm::to_lower(needle_lower);
-    for (size_t pos = 0; (pos = lower.find(needle_lower, pos)) != std::string::npos;) {
-        const bool left_ok  = pos == 0 || !is_ascii_word_char(lower[pos - 1]);
-        const bool right_ok = pos + needle.size() >= lower.size()
-            || !is_ascii_word_char(lower[pos + needle.size()]);
-        if (left_ok && right_ok) {
-            text.replace(pos, needle.size(), " ");
-            lower.replace(pos, needle.size(), std::string(needle.size(), ' '));
-        } else {
-            pos += needle.size();
-        }
-    }
-}
-
-// Particles left behind once the word they were attached to is stripped
-// ("MakerWorld에서" -> "에서"). Only whole tokens are dropped.
-std::string drop_orphan_korean_particles(const std::string& text)
-{
-    static const char* kParticles[] = {
-        "에서", "에게", "으로", "로", "에", "의", "을", "를", "이", "가", "은", "는", "와", "과", "도", "랑",
-    };
-    std::vector<std::string> tokens;
-    boost::algorithm::split(tokens, text, boost::algorithm::is_space(), boost::algorithm::token_compress_on);
-    std::string out;
-    for (const std::string& tok : tokens) {
-        if (tok.empty())
-            continue;
-        if (std::any_of(std::begin(kParticles), std::end(kParticles), [&tok](const char* p) { return tok == p; }))
-            continue;
-        if (!out.empty())
-            out += ' ';
-        out += tok;
-    }
-    return out;
-}
-
 std::string extract_quoted_phrase(const std::string& text)
 {
     for (size_t i = 0; i + 1 < text.size(); ++i) {
@@ -300,41 +256,13 @@ std::string extract_quoted_phrase(const std::string& text)
 
 std::string normalize_makerworld_search_query(const std::string& user_text)
 {
+    // The query comes from ChatGPT (makerworld_search / find-and-print), which is
+    // asked for concise English keywords. Keep a quoted phrase if there is one and
+    // clean up characters; no word lists decide what the user meant.
     const std::string quoted = extract_quoted_phrase(user_text);
     std::string       q      = quoted.empty() ? user_text : quoted;
-
-    static const char* kStripKo[] = {
-        "메이커월드", "메이커 월드", "뱀부랩", "뱀부 랩", "뱀부",
-        "찾아주세요", "찾아 줘", "찾아줘", "찾아", "검색해줘", "검색 해줘", "검색해", "검색",
-        "뽑아줘", "뽑아 줘", "뽑고", "뽑아", "뽑", "골라줘", "골라 줘", "골라", "추천해줘", "추천",
-        "가져와줘", "가져와", "불러와줘", "불러와", "다운로드해줘", "다운로드",
-        "해주세요", "해 주세요", "해줘", "해 줘", "주세요", "좀", "제발",
-        "하고 싶어", "하고싶어", "싶어", "싶은", "보고 싶", "보고싶",
-        "모델", "디자인", "작품", "프린트", "출력물", "출력", "인쇄", "만들어",
-    };
-    static const char* kStripEn[] = {
-        "makerworld", "bambu lab", "bambu", "search", "find", "look for", "get me", "show me",
-        "pick", "choose", "recommend", "suggest", "download", "import", "open", "please",
-        "model", "design", "print", "stl", "3mf",
-    };
-
     boost::algorithm::to_lower(q);
-    for (const char* s : kStripKo)
-        boost::algorithm::replace_all(q, s, " ");
-    for (const char* s : kStripEn)
-        strip_ascii_word_insensitive(q, s);
-
-    q = sanitize_search_text(drop_orphan_korean_particles(q));
-    if (!q.empty())
-        return q;
-
-    // Fallback: strip only platform names from original text.
-    std::string fallback = user_text;
-    boost::algorithm::to_lower(fallback);
-    boost::algorithm::replace_all(fallback, "makerworld", " ");
-    boost::algorithm::replace_all(fallback, "메이커월드", " ");
-    boost::algorithm::replace_all(fallback, "메이커 월드", " ");
-    return sanitize_search_text(fallback);
+    return sanitize_search_text(q);
 }
 
 std::string sanitize_search_text(const std::string& query)
@@ -596,7 +524,6 @@ std::vector<std::string> search_query_variants(const std::string& query, const s
     // Narrower variants: drop common size/style qualifiers for broader recall
     static const char* kOptionalQualifiers[] = {
         "mini", "small", "large", "big", "tiny", "cute", "articulated", "flexi", "v2", "v3",
-        "미니", "작은", "큰", "귀여운", "관절",
     };
     for (const char* qual : kOptionalQualifiers) {
         if (lower.find(qual) == std::string::npos)

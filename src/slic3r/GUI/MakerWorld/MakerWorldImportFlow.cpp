@@ -1,6 +1,5 @@
 #include "MakerWorldImportFlow.hpp"
 #include "../UiDispatch.hpp"
-#include "MakerWorldIntent.hpp"
 #include "MakerWorldPickDialog.hpp"
 #include "MakerWorldPrintOfferDialog.hpp"
 #include "MakerWorldSearchService.hpp"
@@ -426,17 +425,6 @@ void MakerWorldImportFlow::run_import_from_user_text(wxWindow* parent, const std
 
     const std::string q = MakerWorldSearchService::normalize_search_query(user_text);
     run_search_from_query(parent, q.empty() ? user_text : q, apply_mode, callbacks);
-}
-
-void MakerWorldImportFlow::run_user_makerworld_request(wxWindow* parent, const std::string& user_text, bool apply_mode,
-                                                      MakerWorldFlowUiCallbacks callbacks)
-{
-    if (MakerWorldIntent::user_wants_makerworld_import(user_text)) {
-        run_import_from_user_text(parent, user_text, apply_mode, std::move(callbacks));
-        return;
-    }
-    const std::string q = MakerWorldSearchService::normalize_search_query(user_text);
-    run_search_from_query(parent, q.empty() ? user_text : q, apply_mode, std::move(callbacks));
 }
 
 void MakerWorldImportFlow::run_search_and_offer_print(wxWindow* parent, const std::string& query, bool apply_mode,

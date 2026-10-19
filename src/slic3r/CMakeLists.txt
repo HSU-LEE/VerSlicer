@@ -108,8 +108,6 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaContextBuilder.hpp
     GUI/OllamaAssistant/OllamaMakerWorldActions.cpp
     GUI/OllamaAssistant/OllamaMakerWorldActions.hpp
-    GUI/OllamaAssistant/OllamaSendRouter.cpp
-    GUI/OllamaAssistant/OllamaSendRouter.hpp
     GUI/OllamaAssistant/OllamaSystemPrompts.cpp
     GUI/OllamaAssistant/OllamaSystemPrompts.hpp
     GUI/OllamaAssistant/OllamaUserFlow.cpp
@@ -192,8 +190,6 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaSettingCatalogBuilder.hpp
     GUI/OllamaAssistant/OllamaSettingSearch.cpp
     GUI/OllamaAssistant/OllamaSettingSearch.hpp
-    GUI/OllamaAssistant/OllamaSettingAliases.cpp
-    GUI/OllamaAssistant/OllamaSettingAliases.hpp
     GUI/OllamaAssistant/BambuLabWikiSearch.cpp
     GUI/OllamaAssistant/BambuLabWikiSearch.hpp
     GUI/OllamaAssistant/BambuLabWikiSearchCore.cpp
@@ -206,8 +202,6 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaVoiceTranscript.hpp
     GUI/MakerWorld/MakerWorldImportFlow.cpp
     GUI/MakerWorld/MakerWorldImportFlow.hpp
-    GUI/MakerWorld/MakerWorldIntent.cpp
-    GUI/MakerWorld/MakerWorldIntent.hpp
     GUI/MakerWorld/MakerWorldPickDialog.cpp
     GUI/MakerWorld/MakerWorldPickDialog.hpp
     GUI/MakerWorld/MakerWorldPrintOfferDialog.cpp

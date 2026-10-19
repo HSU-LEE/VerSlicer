@@ -14,11 +14,9 @@
 #include "OllamaToolResult.hpp"
 #include "OllamaTelemetry.hpp"
 #include "OllamaUserFlow.hpp"
-#include "OllamaVoiceTranscript.hpp"
 #include "OllamaVoiceInput.hpp"
-#include "OllamaSendRouter.hpp"
+#include "OllamaAssistRouter.hpp"
 #include "../MakerWorld/MakerWorldImportFlow.hpp"
-#include "../MakerWorld/MakerWorldIntent.hpp"
 #include "../MakerWorld/MakerWorldTypes.hpp"
 #include "../MakerWorld/MakerWorldUrl.hpp"
 
@@ -1682,60 +1680,6 @@ bool OllamaChatPanel::route_orchestrator_reply(const std::string& user_utf8)
     return false;
 }
 
-bool OllamaChatPanel::route_garbled_input(const std::string& user_utf8)
-{
-    if (!ollama_voice_looks_like_garbled_chat(user_utf8))
-        return false;
-    const wxString msg = AiLocale::text("I couldn't understand that. Try again or type your request.",
-                                        "음성/문장을 이해하지 못했습니다. 다시 말씀하시거나 직접 입력해 주세요.");
-    append_chat(_L("Assistant"), msg);
-    set_status_text(completion_status_for_reply(msg, m_apply_mode));
-    return true;
-}
-
-bool OllamaChatPanel::route_acquisition(const std::string& user_utf8, bool plate_has_model)
-{
-    // Deterministic acquisition-intent gate (pre-router): "get me X and print
-    // it" (e.g. "용 피규어 출력해줘") starts the end-to-end orchestrator job
-    // directly — no LLM, no PrintIntentSession/config-proposal injection this
-    // turn. Runs before the MakerWorld bypass so find-and-print requests reach
-    // the orchestrator; explicit URL/search requests still use the bypass below.
-    if (!OllamaSendRouter::acquisition_gate_open(m_apply_mode, AIPipeline::print_job_orchestrator_enabled(),
-                                                 m_orchestrator && m_orchestrator->is_active()))
-        return false;
-    if (!OllamaSendRouter::is_acquisition_request(user_utf8, plate_has_model))
-        return false;
-    const std::string query = OllamaSendRouter::acquisition_query(user_utf8);
-    if (!start_orchestrator_find_and_print(query))
-        return false;
-    m_messages.push_back({"user", user_utf8});
-    trim_message_history();
-    const wxString stub = !plate_has_model
-        ? AiLocale::text("The plate is empty, so I'll find a model and get the print ready…",
-                         "플레이트가 비어 있어서 모델을 찾아 출력을 준비할게요…")
-        : AiLocale::text("I'll find a model and get the print ready…",
-                         "원하시는 모델을 찾아서 출력을 준비할게요…");
-    append_chat(_L("Assistant"), stub);
-    m_messages.push_back({"assistant", stub.utf8_string()});
-    trim_message_history();
-    return true;
-}
-
-bool OllamaChatPanel::route_makerworld_bypass(const std::string& user_utf8)
-{
-    if (!OllamaSendRouter::should_bypass_to_makerworld(user_utf8))
-        return false;
-    m_messages.push_back({"user", user_utf8});
-    trim_message_history();
-    const bool     is_import = MakerWorldIntent::user_wants_makerworld_import(user_utf8);
-    const wxString stub      = is_import ? _L("Importing from MakerWorld…") : _L("Searching MakerWorld…");
-    append_chat(_L("Assistant"), stub);
-    m_messages.push_back({"assistant", stub.utf8_string()});
-    trim_message_history();
-    MakerWorldImportFlow::run_user_makerworld_request(this, user_utf8, m_apply_mode, makerworld_flow_callbacks());
-    return true;
-}
-
 std::string OllamaChatPanel::build_send_user_message(const wxString& user_text, const std::string& user_utf8)
 {
     size_t user_turns = 0;
@@ -1773,7 +1717,7 @@ std::string OllamaChatPanel::build_send_user_message(const wxString& user_text, 
 
 bool OllamaChatPanel::route_assist_loop(const std::string& user_msg, const std::string& user_utf8, bool plate_has_model)
 {
-    if (!OllamaSendRouter::should_use_assist_loop(user_utf8, m_apply_mode, plate_has_model))
+    if (!OllamaAssistRouter::should_use_assist_loop(user_utf8, m_apply_mode, plate_has_model))
         return false;
     m_messages.push_back({"user", user_msg});
     trim_message_history();
@@ -1948,8 +1892,6 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
     // One loop, same as Orcacode: the model reads state and calls tools.
     // Keyword gates (find-and-print, MakerWorld bypass) do not run first.
     if (route_orchestrator_reply(user_utf8))
-        return;
-    if (route_garbled_input(user_utf8))
         return;
     (void) plate_has_model;
 

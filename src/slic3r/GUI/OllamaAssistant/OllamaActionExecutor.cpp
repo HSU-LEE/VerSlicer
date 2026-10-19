@@ -595,7 +595,7 @@ static void expand_support_options(nlohmann::json& options)
 
     auto is_hybrid_request = [](std::string v) {
         boost::algorithm::to_lower(v);
-        return v.find("hybrid") != std::string::npos || v.find("하이브리드") != std::string::npos;
+        return v.find("hybrid") != std::string::npos;
     };
 
     if (options.contains("support_type") && options["support_type"].is_string()) {
@@ -708,8 +708,7 @@ static bool is_blocked_calibration_menu_item(const std::string& menu, const std:
 {
     if (OllamaContextBuilder::is_calibration_menu_name(menu))
         return true;
-    return boost::icontains(item, "VFA") || item.find("캘리브") != std::string::npos ||
-           boost::icontains(item, "calibration");
+    return boost::icontains(item, "VFA") || AiLocale::label_mentions(item, {"Calibration"});
 }
 
 std::string json_value_to_config_string(const nlohmann::json& v)
@@ -1611,26 +1610,19 @@ OllamaActionResult apply_menu_item(const nlohmann::json& action)
         result.message = "Blocked: Export G-code is disabled for AI control";
         return result;
     }
-    // Block any save/export actions via AI (user request).
-    // We keep this heuristic broad because menu labels differ by locale.
-    auto contains_ci = [](const std::string& hay, const char* needle) {
-        return boost::ifind_first(hay, needle);
-    };
-    const bool is_file_menu = boost::iequals(menu, "File") || boost::iequals(menu, "파일");
-    if (is_file_menu) {
-        if (contains_ci(item, "save") || contains_ci(item, "export") || contains_ci(item, "저장") || contains_ci(item, "내보내")) {
-            result.message = "Blocked: file saving/export is disabled for AI control";
-            return result;
-        }
+    // Block saving/exporting, printing/sending and quitting. Menu labels are
+    // translated, so each word is matched in English and in the UI language.
+    const bool is_file_menu = AiLocale::label_mentions(menu, {"File"});
+    if (is_file_menu && AiLocale::label_mentions(item, {"Save", "Export"})) {
+        result.message = "Blocked: file saving/export is disabled for AI control";
+        return result;
     }
     // The AI never starts a print: block anything that prints, sends or uploads.
-    for (const char* word : {"print plate", "print all", "send", "upload", "전송", "출력", "보내기"}) {
-        if (contains_ci(item, word)) {
-            result.message = "Blocked: sending to the printer is disabled for AI control";
-            return result;
-        }
+    if (AiLocale::label_mentions(item, {"Print plate", "Print all", "Print", "Send", "Upload"})) {
+        result.message = "Blocked: sending to the printer is disabled for AI control";
+        return result;
     }
-    if (contains_ci(item, "quit") || contains_ci(item, "exit")) {
+    if (AiLocale::label_mentions(item, {"Quit", "Exit"})) {
         result.message = "Blocked: quitting the application is disabled for AI control";
         return result;
     }

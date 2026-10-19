@@ -10,8 +10,8 @@ ModelSearchQuery ModelSearchQueryBuilder::build_query(const std::string& user_te
     ModelSearchQuery q;
     q.raw_text = user_text;
 
-    // Strip search boilerplate ("찾아줘", "search for", platform names, ...) and
-    // zero-width chars, matching the MakerWorld search pipeline exactly.
+    // Same cleanup as the MakerWorld search pipeline (quotes, zero-width chars);
+    // the wording itself comes from ChatGPT.
     q.normalized_text = sanitize_search_text(normalize_makerworld_search_query(user_text));
     q.contains_cjk    = search_text_contains_cjk(q.normalized_text);
 

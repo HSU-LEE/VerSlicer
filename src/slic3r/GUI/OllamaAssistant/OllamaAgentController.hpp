@@ -96,7 +96,6 @@ private:
     nlohmann::json                 m_pending_executed_root;
     bool                           m_mutations_applied{false};
     bool                           m_readonly_stall_nudged{false};
-    bool                           m_obvious_setting_applied{false};
     bool                           m_setting_search_nudged{false};
     std::string                    m_applied_action_fingerprint;
 

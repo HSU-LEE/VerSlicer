@@ -265,11 +265,9 @@ static bool try_deliver_recognized_text(const std::shared_ptr<MacVoiceShared>& s
     session->awaiting_final.store(false);
     session->deliver_delay_pending.store(false);
 
-    const bool ko_ui = Slic3r::GUI::wxGetApp().current_language_code().StartsWith("ko");
-    if (!ollama_voice_transcript_acceptable(text, session->locale_id, session->last_confidence)) {
+    if (!ollama_voice_transcript_acceptable(text, session->last_confidence)) {
         finish_session(sh, session, /*cancel_task*/ false);
-        deliver_voice_error(session->on_error,
-                            ollama_voice_transcript_reject_message(session->locale_id, ko_ui));
+        deliver_voice_error(session->on_error, ollama_voice_transcript_reject_message());
         return true;
     }
 
@@ -582,7 +580,6 @@ static void begin_session(const std::shared_ptr<MacVoiceShared>& sh, uint64_t ge
     if (@available(macOS 10.15, *))
         session->request.taskHint = SFSpeechRecognitionTaskHintDictation;
     session->request.contextualStrings = @[
-        @"슬라이스", @"리트랙션", @"실", @"배치", @"회전", @"눕혀", @"서포트", @"베드", @"노즐",
         @"layer", @"slice", @"retraction", @"stringing", @"arrange", @"rotate", @"support", @"brim",
     ];
 

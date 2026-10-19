@@ -3,6 +3,9 @@
 
 #include <wx/string.h>
 
+#include <initializer_list>
+#include <string>
+
 namespace Slic3r { namespace GUI { namespace AiLocale {
 
 /**
@@ -23,6 +26,11 @@ wxString text(const char* en, const char* ko_utf8);
 
 /** Same, for an already-translated English wxString (e.g. _L("...")). */
 wxString text(const wxString& en, const char* ko_utf8);
+
+/** True when a UI label (menu item, preset name) contains one of the English
+ *  words or its translation in the current UI language. Lets safety checks on
+ *  translated labels work in every language without hard-coding any of them. */
+bool label_mentions(const std::string& label, std::initializer_list<const char*> english_words);
 
 }}} // namespace Slic3r::GUI::AiLocale
 

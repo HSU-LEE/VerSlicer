@@ -1,4 +1,5 @@
 #include "OllamaContextBuilder.hpp"
+#include "AiLocale.hpp"
 
 #include "OllamaConfig.hpp"
 #include "OllamaConfigProposalCache.hpp"
@@ -377,8 +378,7 @@ bool OllamaContextBuilder::ui_prefers_korean()
 
 bool OllamaContextBuilder::is_calibration_menu_name(const std::string& name)
 {
-    return boost::icontains(name, "calib") || name.find("캘리브") != std::string::npos ||
-           name.find("보정") != std::string::npos;
+    return boost::icontains(name, "calib") || AiLocale::label_mentions(name, {"Calibration"});
 }
 
 void OllamaContextBuilder::invalidate_context_cache()

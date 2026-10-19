@@ -10,13 +10,6 @@ namespace Slic3r { namespace GUI {
 
 namespace {
 
-static bool user_allows_delete(const std::string& user)
-{
-    return user.find("delete") != std::string::npos || user.find("remove") != std::string::npos
-        || user.find("erase") != std::string::npos || user.find("삭제") != std::string::npos
-        || user.find("지워") != std::string::npos || user.find("지우") != std::string::npos;
-}
-
 static void normalize_set_config_shape(nlohmann::json& action)
 {
     if (!action.is_object() || action.value("type", "") != "set_config")
@@ -56,8 +49,8 @@ static void prune_unsafe_actions(nlohmann::json& root, const std::string& user_r
             continue;
         }
         const std::string type = a.value("type", "");
-        if (type == "delete_selection" && !user_allows_delete(user_req))
-            continue;
+        // delete_selection is not filtered by wording: it is a Dangerous tool and
+        // always goes through the review dialog, where the user confirms it.
         if (type == "menu_item")
             continue;
         if (type == "save_project")

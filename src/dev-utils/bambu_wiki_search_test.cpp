@@ -30,14 +30,14 @@ int main()
     }
 
     {
-        expect_true(BambuLabWikiSearchCore::normalize_search_query("실이 많이 나와", true).find("실이") != std::string::npos,
+        expect_true(BambuLabWikiSearchCore::normalize_search_query("lots of stringing", true).find("stringing") != std::string::npos,
                     "query kept as written");
         expect_true(BambuLabWikiSearchCore::normalize_search_query("  bed adhesion  ", true) == "bed adhesion",
                     "query trimmed");
     }
 
     {
-        expect_true(!OllamaRequestRouter::benefits_from_wiki("고쳐줘"), "wiki is a tool, not a prefetch");
+        expect_true(!OllamaRequestRouter::benefits_from_wiki("fix it"), "wiki is a tool, not a prefetch");
         expect_true(!OllamaRequestRouter::benefits_from_wiki("rotate 90"), "wiki is a tool, not a prefetch");
     }
 

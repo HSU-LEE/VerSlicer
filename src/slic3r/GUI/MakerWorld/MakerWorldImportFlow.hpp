@@ -31,11 +31,8 @@ public:
     static void run_import_from_user_text(wxWindow* parent, const std::string& user_text, bool apply_mode,
                                          MakerWorldFlowUiCallbacks callbacks = {});
 
-    /** Search or import depending on user text (URL/import intent vs keyword search). */
-    static void run_user_makerworld_request(wxWindow* parent, const std::string& user_text, bool apply_mode,
-                                            MakerWorldFlowUiCallbacks callbacks = {});
 
-    /** Search top 3, show numbered picks + countdown, then import, slice, and send to printer. */
+    /** Search top 3, show numbered picks + countdown, then import and slice (the user prints). */
     static void run_search_and_offer_print(wxWindow* parent, const std::string& query, bool apply_mode,
                                            MakerWorldFlowUiCallbacks callbacks = {});
 

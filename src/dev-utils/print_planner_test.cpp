@@ -34,8 +34,8 @@ static PlateContext minimal_plate_context()
 int main()
 {
     {
-        PrintGoal g = PrintGoalParser::parse("야외에서 사용할 부품이라 튼튼하게");
-        expect_true(g.user_text.find("튼튼") != std::string::npos, "parser keeps the user text");
+        PrintGoal g = PrintGoalParser::parse("an outdoor part, make it strong");
+        expect_true(g.user_text.find("strong") != std::string::npos, "parser keeps the user text");
         expect_true(g.intents.empty(), "parser does not assign intents from keywords");
     }
 

@@ -27,7 +27,7 @@ int main()
     setenv("OLLAMA_ADAPTIVE_ROUTING", "1", 1);
 
     const auto& scenarios = ollama_benchmark_scenarios();
-    expect_true(scenarios.size() >= 35, "benchmark scenario count");
+    expect_true(scenarios.size() >= 25, "benchmark scenario count");
     for (const auto& sc : scenarios) {
         if (!sc.check(sc.user_request))
             std::cerr << "FAIL scenario: " << sc.id << " request='" << sc.user_request << "'\n";

@@ -84,7 +84,7 @@ int main()
     const auto merged = merge_candidates(pool, filtered);
     expect_true(merged.size() >= 2, "merge_candidates");
 
-    const auto variants = search_query_variants("키캡", "keycap");
+    const auto variants = search_query_variants("keyboard cap", "keycap");
     expect_true(variants.size() >= 2, "search_query_variants with translation");
     bool has_keycap = false;
     for (const auto& v : variants) {
@@ -116,15 +116,12 @@ int main()
     const auto or_result = filter_by_query_scored(or_pool, "cat phone", 8);
     expect_true(or_result.size() >= 1, "filter_by_query_scored or_fallback");
 
-    expect_eq(normalize_makerworld_search_query("MakerWorld에서 articulated dragon 모델 찾아줘"),
-              "articulated dragon", "normalize strips filler");
+    // The query comes from ChatGPT; normalization only picks a quoted phrase,
+    // lowercases and cleans characters. No word lists rewrite it.
+    expect_eq(normalize_makerworld_search_query("Articulated Dragon"), "articulated dragon", "normalize lowercases");
     expect_eq(normalize_makerworld_search_query("find me a \"keycap cat\""), "keycap cat",
               "normalize quoted phrase");
-    expect_eq(normalize_makerworld_search_query("키캡 검색해줘"), "키캡", "normalize korean filler");
-    expect_eq(normalize_makerworld_search_query("bambu에서 용 피규어 찾아줘"), "용 피규어",
-              "normalize drops orphan particle");
-    expect_eq(normalize_makerworld_search_query("이가 빠진 컵"), "이가 빠진 컵",
-              "normalize keeps particles inside words");
+    expect_eq(normalize_makerworld_search_query("  phone   stand  "), "phone stand", "normalize collapses spaces");
 
     std::vector<MakerWorldCandidate> word_pool;
     MakerWorldCandidate dragonfly;

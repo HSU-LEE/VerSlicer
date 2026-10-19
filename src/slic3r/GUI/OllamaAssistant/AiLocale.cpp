@@ -26,4 +26,18 @@ wxString text(const wxString& en, const char* ko_utf8)
     return en;
 }
 
+bool label_mentions(const std::string& label, std::initializer_list<const char*> english_words)
+{
+    const wxString hay = wxString::FromUTF8(label).Lower();
+    for (const char* word : english_words) {
+        const wxString en = wxString::FromUTF8(word).Lower();
+        if (hay.Contains(en))
+            return true;
+        const wxString translated = wxGetTranslation(wxString::FromUTF8(word)).Lower();
+        if (!translated.empty() && translated != en && hay.Contains(translated))
+            return true;
+    }
+    return false;
+}
+
 }}} // namespace Slic3r::GUI::AiLocale
