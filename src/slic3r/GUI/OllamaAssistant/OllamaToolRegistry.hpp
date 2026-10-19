@@ -17,8 +17,7 @@ struct OllamaToolSpec
 {
     const char*       id;
     OllamaToolCategory category;
-    const char*       desc_en;
-    const char*       desc_ko;
+    const char*       description;
 };
 
 class OllamaToolRegistry

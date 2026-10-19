@@ -274,11 +274,7 @@ bool MakerWorldImportFlow::confirm_and_import(wxWindow* parent, const MakerWorld
     if (!payload.ok) {
         MakerWorldTelemetry::import_finished(false, candidate.design_id, payload.error);
         chat_notify(callbacks, wxString::FromUTF8(payload.error));
-        const bool needs_login = payload.error.find("Sign in") != std::string::npos
-            || payload.error.find("Sign out and sign in") != std::string::npos
-            || payload.error.find("session expired") != std::string::npos
-            || payload.error.find("로그인") != std::string::npos;
-        if (needs_login) {
+        if (payload.needs_login) {
             if (wxMessageBox(_L("Bambu Cloud login is required to download this model. Open login now?"),
                              _L("MakerWorld"), wxYES_NO | wxICON_INFORMATION, safe_parent(parent))
                 == wxYES)

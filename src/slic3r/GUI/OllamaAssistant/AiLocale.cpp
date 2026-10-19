@@ -12,6 +12,11 @@ bool korean()
     return SlicePilotUi::smart_print_locale_korean();
 }
 
+wxString text(const char* en)
+{
+    return wxGetTranslation(wxString::FromUTF8(en));
+}
+
 wxString text(const char* en, const char* ko_utf8)
 {
     if (korean())

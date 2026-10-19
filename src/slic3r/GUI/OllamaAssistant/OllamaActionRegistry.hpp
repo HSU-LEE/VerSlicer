@@ -12,8 +12,7 @@ struct OllamaActionTypeSpec
     bool        allowed_in_apply;
     bool        allowed_in_advisor;
     bool        allowed_in_coach;
-    const char* desc_en;
-    const char* desc_ko;
+    const char* description;
 };
 
 class OllamaActionRegistry

@@ -252,7 +252,7 @@ void PrintJobOrchestrator::select_candidate(int index)
         return;
     if (index < 0 || static_cast<size_t>(index) >= m_job->candidates.size()) {
         finish_error("bad_selection",
-                     AiLocale::text("Invalid model selection.", "잘못된 모델 선택입니다.").utf8_string());
+                     AiLocale::text("Invalid model selection.").utf8_string());
         return;
     }
     m_job->selected_index     = index;
@@ -266,7 +266,7 @@ void PrintJobOrchestrator::cancel()
         return;
     m_job->cancelled.store(true);
     ModelSearchService::instance().cancel_pending();
-    chat(AiLocale::text("Cancelled.", "취소했습니다."));
+    chat(AiLocale::text("Cancelled."));
     finish_cancelled();
 }
 
@@ -279,11 +279,11 @@ void PrintJobOrchestrator::on_plater_import_done(bool ok, const std::string& det
 
     if (!ok) {
         finish_error("import_failed",
-                     detail.empty() ? AiLocale::text("Import failed.", "가져오기에 실패했습니다.").utf8_string()
+                     detail.empty() ? AiLocale::text("Import failed.").utf8_string()
                                     : detail);
         return;
     }
-    chat(AiLocale::text("Model loaded.", "모델을 불러왔습니다."));
+    chat(AiLocale::text("Model loaded."));
     transition_to(PrintJobState::MeshHealth);
 }
 
@@ -343,13 +343,11 @@ void PrintJobOrchestrator::enter_state()
     } catch (const std::exception& ex) {
         BOOST_LOG_TRIVIAL(error) << "PrintJobOrchestrator step failed: " << ex.what();
         finish_error("internal_error",
-                     AiLocale::text("Something went wrong while preparing the print.",
-                                    "출력 준비 중 오류가 발생했습니다.").utf8_string());
+                     AiLocale::text("Something went wrong while preparing the print.").utf8_string());
     } catch (...) {
         BOOST_LOG_TRIVIAL(error) << "PrintJobOrchestrator step failed: unknown error";
         finish_error("internal_error",
-                     AiLocale::text("Something went wrong while preparing the print.",
-                                    "출력 준비 중 오류가 발생했습니다.").utf8_string());
+                     AiLocale::text("Something went wrong while preparing the print.").utf8_string());
     }
 }
 
@@ -382,7 +380,7 @@ void PrintJobOrchestrator::step_clarify()
 {
     // Waiting state: the question was already appended in step_intent. Release the
     // busy state so the user can type a reply (routed via on_user_reply()).
-    set_busy(false, AiLocale::text("Waiting for your answer…", "답변을 기다리는 중…"));
+    set_busy(false, AiLocale::text("Waiting for your answer…"));
 }
 
 void PrintJobOrchestrator::step_search()
@@ -394,11 +392,10 @@ void PrintJobOrchestrator::step_search()
         query = job.user_utterance;
     job.search_query = query;
 
-    set_busy(true, AiLocale::text("Searching for models…", "모델을 검색하는 중…"));
+    set_busy(true, AiLocale::text("Searching for models…"));
 
     arm_watchdog(PrintJobState::Searching, kSearchTimeoutMs, "search_timeout",
-                 AiLocale::text("Model search timed out. Check your network or try again.",
-                                "모델 검색 시간이 초과되었습니다. 네트워크를 확인하거나 다시 시도해 주세요."));
+                 AiLocale::text("Model search timed out. Check your network or try again."));
 
     std::weak_ptr<std::atomic<bool>> weak_alive = m_alive;
     std::weak_ptr<PrintJob>          weak_job   = m_job;
@@ -418,13 +415,12 @@ void PrintJobOrchestrator::step_search()
             if (!result.ok || result.candidates.empty()) {
                 finish_error("search_empty",
                              result.error.empty()
-                                 ? AiLocale::text("No models found. Try different keywords.",
-                                                  "모델을 찾지 못했습니다. 다른 검색어로 시도해 보세요.").utf8_string()
+                                 ? AiLocale::text("No models found. Try different keywords.").utf8_string()
                                  : result.error);
                 return;
             }
             j->candidates = std::move(result.candidates);
-            chat(wxString::Format(AiLocale::text("Found %d models.", "모델 %d개를 찾았습니다."),
+            chat(wxString::Format(AiLocale::text("Found %d models."),
                                   static_cast<int>(j->candidates.size())));
             transition_to(PrintJobState::CandidateSelect);
         });
@@ -435,15 +431,15 @@ void PrintJobOrchestrator::step_candidate_select()
     PrintJob& job = *m_job;
     if (job.candidates.empty()) {
         finish_error("no_candidates",
-                     AiLocale::text("No models to choose from.", "선택할 모델이 없습니다.").utf8_string());
+                     AiLocale::text("No models to choose from.").utf8_string());
         return;
     }
 
     // Modal offer dialog runs its own nested loop on the main thread.
-    set_busy(false, AiLocale::text("Choose a model…", "모델을 선택하세요…"));
+    set_busy(false, AiLocale::text("Choose a model…"));
     const int idx = PrintJobStepExecutors::show_print_offer_dialog(job.parent, job.candidates);
     if (idx < 0) {
-        chat(AiLocale::text("Print cancelled.", "출력을 취소했습니다."));
+        chat(AiLocale::text("Print cancelled."));
         finish_cancelled();
         return;
     }
@@ -455,8 +451,7 @@ void PrintJobOrchestrator::step_import()
     PrintJob& job = *m_job;
 
     if (!job.apply_mode) {
-        chat(AiLocale::text("Switch to Apply mode to import and print.",
-               "가져와서 출력하려면 적용 모드로 전환하세요."));
+        chat(AiLocale::text("Switch to Apply mode to import and print."));
         finish_cancelled();
         return;
     }
@@ -482,7 +477,7 @@ void PrintJobOrchestrator::resolve_import_for_candidate(int candidate_index)
     PrintJob& job = *m_job;
     if (candidate_index < 0 || static_cast<size_t>(candidate_index) >= job.candidates.size()) {
         finish_error("import_failed",
-                     AiLocale::text("Invalid model selection.", "잘못된 모델 선택입니다.").utf8_string());
+                     AiLocale::text("Invalid model selection.").utf8_string());
         return;
     }
 
@@ -490,13 +485,12 @@ void PrintJobOrchestrator::resolve_import_for_candidate(int candidate_index)
     job.selected_index     = candidate_index;
     job.selected_candidate = job.candidates[candidate_index];
 
-    set_busy(true, AiLocale::text("Preparing download…", "다운로드를 준비하는 중…"));
+    set_busy(true, AiLocale::text("Preparing download…"));
 
     // The watchdog stays armed across the async resolve AND the subsequent
     // Plater download, so a stalled network call can never hang the job.
     arm_watchdog(PrintJobState::Importing, kImportTimeoutMs, "import_timeout",
-                 AiLocale::text("The model download timed out. Please try again.",
-                   "모델 다운로드가 시간 내에 완료되지 않았습니다. 다시 시도해 주세요."));
+                 AiLocale::text("The model download timed out. Please try again."));
 
     std::weak_ptr<std::atomic<bool>> weak_alive = m_alive;
     std::weak_ptr<PrintJob>          weak_job   = m_job;
@@ -526,8 +520,7 @@ void PrintJobOrchestrator::on_import_resolved(const PrintJobStepExecutors::Impor
         if (res.needs_login) {
             finish_error("import_needs_login",
                          res.error.empty()
-                             ? AiLocale::text("Sign in to Bambu Cloud to download this model.",
-                                              "이 모델을 내려받으려면 Bambu Cloud에 로그인하세요.").utf8_string()
+                             ? AiLocale::text("Sign in to Bambu Cloud to download this model.").utf8_string()
                              : res.error);
             return;
         }
@@ -536,8 +529,7 @@ void PrintJobOrchestrator::on_import_resolved(const PrintJobStepExecutors::Impor
         const int next = next_import_fallback_index();
         if (next >= 0) {
             chat(wxString::Format(
-                AiLocale::text("Model %d can't be downloaded — trying model %d instead.",
-                               "%d번 모델은 받을 수 없어 %d번 모델로 진행합니다."),
+                AiLocale::text("Model %d can't be downloaded — trying model %d instead."),
                 job.selected_index + 1, next + 1));
             resolve_import_for_candidate(next);
             return;
@@ -545,16 +537,16 @@ void PrintJobOrchestrator::on_import_resolved(const PrintJobStepExecutors::Impor
 
         finish_error("import_failed",
                      res.error.empty()
-                         ? AiLocale::text("Import failed.", "가져오기에 실패했습니다.").utf8_string()
+                         ? AiLocale::text("Import failed.").utf8_string()
                          : res.error);
         return;
     }
 
     // Resolved: hand the payload to Plater and wait for the import-done hook.
     register_import_owner(); // must be set before request_model_download so the done hook routes here
-    set_busy(true, AiLocale::text("Downloading model…", "모델을 내려받는 중…"));
+    set_busy(true, AiLocale::text("Downloading model…"));
     PrintJobStepExecutors::begin_download(res.download_info);
-    chat(wxString::Format(AiLocale::text("Downloading \"%s\"…", "\"%s\" 내려받는 중…"),
+    chat(wxString::Format(AiLocale::text("Downloading \"%s\"…"),
                           wxString::FromUTF8(job.selected_candidate.title.empty()
                                                  ? job.selected_candidate.id
                                                  : job.selected_candidate.title)));
@@ -563,7 +555,7 @@ void PrintJobOrchestrator::on_import_resolved(const PrintJobStepExecutors::Impor
 void PrintJobOrchestrator::step_mesh_health()
 {
     PrintJob& job = *m_job;
-    set_busy(true, AiLocale::text("Checking mesh health…", "메시 상태를 확인하는 중…"));
+    set_busy(true, AiLocale::text("Checking mesh health…"));
 
     const PrintJobStepExecutors::MeshHealthResult res = PrintJobStepExecutors::assess_mesh_health();
     if (res.valid) {
@@ -580,14 +572,14 @@ void PrintJobOrchestrator::step_mesh_health()
 void PrintJobOrchestrator::step_repair()
 {
     PrintJob& job = *m_job;
-    set_busy(true, AiLocale::text("Repairing mesh…", "메시를 복구하는 중…"));
+    set_busy(true, AiLocale::text("Repairing mesh…"));
     ++job.repair_attempts;
 
     const int repaired = PrintJobStepExecutors::attempt_repair(job.mesh_health);
     if (repaired > 0)
-        chat(wxString::Format(AiLocale::text("Repaired %d mesh volume(s).", "메시 볼륨 %d개를 복구했습니다."), repaired));
+        chat(wxString::Format(AiLocale::text("Repaired %d mesh volume(s)."), repaired));
     else
-        chat(AiLocale::text("No automatic mesh repair was applied.", "자동 메시 복구를 적용하지 않았습니다."));
+        chat(AiLocale::text("No automatic mesh repair was applied."));
 
     // Re-assess once so downstream steps see the post-repair state.
     const PrintJobStepExecutors::MeshHealthResult res = PrintJobStepExecutors::assess_mesh_health();
@@ -601,13 +593,12 @@ void PrintJobOrchestrator::step_repair()
 void PrintJobOrchestrator::step_geometry()
 {
     PrintJob& job = *m_job;
-    set_busy(true, AiLocale::text("Analyzing geometry…", "형상을 분석하는 중…"));
+    set_busy(true, AiLocale::text("Analyzing geometry…"));
 
     const PrintJobStepExecutors::GeometryResult res = PrintJobStepExecutors::build_geometry_context();
     if (!res.ok) {
         finish_error("geometry_failed",
-                     AiLocale::text("Could not analyze the model geometry.",
-                                    "모델 형상을 분석하지 못했습니다.").utf8_string());
+                     AiLocale::text("Could not analyze the model geometry.").utf8_string());
         return;
     }
     job.plate_context = res.ctx;
@@ -618,19 +609,19 @@ void PrintJobOrchestrator::step_geometry()
 void PrintJobOrchestrator::step_autoconfig()
 {
     PrintJob& job = *m_job;
-    set_busy(true, AiLocale::text("Preparing print settings…", "출력 설정을 준비하는 중…"));
+    set_busy(true, AiLocale::text("Preparing print settings…"));
 
     job.proposal = PrintJobStepExecutors::build_and_cache_proposal(job.plate_context, job.intent, korean());
     const int changed = PrintJobStepExecutors::apply_config_proposal(job.proposal);
     if (changed > 0)
-        chat(wxString::Format(AiLocale::text("Applied %d setting change(s).", "설정 %d개를 적용했습니다."), changed));
+        chat(wxString::Format(AiLocale::text("Applied %d setting change(s)."), changed));
 
     transition_to(PrintJobState::Slicing);
 }
 
 void PrintJobOrchestrator::step_slice()
 {
-    set_busy(true, AiLocale::text("Slicing…", "슬라이싱 중…"));
+    set_busy(true, AiLocale::text("Slicing…"));
     set_slicing_job();
 
     // Job-scoped one-shot SliceDone subscription. The permanent
@@ -669,15 +660,13 @@ void PrintJobOrchestrator::step_slice()
 
     if (!PrintJobStepExecutors::trigger_slice()) {
         finish_error("slice_failed",
-                     AiLocale::text("The slicer is not ready to slice.",
-                                    "슬라이서가 아직 준비되지 않았습니다.").utf8_string());
+                     AiLocale::text("The slicer is not ready to slice.").utf8_string());
         return;
     }
     // Wait for SliceDone -> on_agent_event(), with a deadline in case the
     // background slice never reports back.
     arm_watchdog(PrintJobState::Slicing, kSliceTimeoutMs, "slice_timeout",
-                 AiLocale::text("Slicing did not finish in time. Please try again.",
-                   "슬라이싱이 시간 내에 완료되지 않았습니다. 다시 시도해 주세요."));
+                 AiLocale::text("Slicing did not finish in time. Please try again."));
 }
 
 void PrintJobOrchestrator::on_agent_event(const OllamaAgentEvent& evt)
@@ -695,8 +684,7 @@ void PrintJobOrchestrator::on_agent_event(const OllamaAgentEvent& evt)
     m_job->slice_succeeded = success;
     if (!success) {
         finish_error("slice_failed",
-                     AiLocale::text("Slicing failed. Adjust the model or settings and try again.",
-                                    "슬라이싱에 실패했습니다. 모델이나 설정을 조정한 뒤 다시 시도해 주세요.").utf8_string());
+                     AiLocale::text("Slicing failed. Adjust the model or settings and try again.").utf8_string());
         return;
     }
     transition_to(PrintJobState::Estimating);
@@ -705,7 +693,7 @@ void PrintJobOrchestrator::on_agent_event(const OllamaAgentEvent& evt)
 void PrintJobOrchestrator::step_estimate()
 {
     PrintJob& job = *m_job;
-    set_busy(true, AiLocale::text("Estimating print…", "출력 예측 중…"));
+    set_busy(true, AiLocale::text("Estimating print…"));
 
     job.estimate = PrintJobStepExecutors::collect_estimate(job.assessment);
     if (job.estimate.valid)
@@ -718,8 +706,7 @@ void PrintJobOrchestrator::step_ready()
 {
     // The AI never sends to the printer: the job ends here and the user
     // prints with the regular Print plate button.
-    chat(AiLocale::text("Sliced and ready. Check the preview, then press Print plate to send it to your printer.",
-           "슬라이스가 끝났습니다. 미리보기를 확인한 뒤 「플레이트 출력」을 눌러 프린터로 보내세요."));
+    chat(AiLocale::text("Sliced and ready. Check the preview, then press Print plate to send it to your printer."));
     finish_success();
 }
 

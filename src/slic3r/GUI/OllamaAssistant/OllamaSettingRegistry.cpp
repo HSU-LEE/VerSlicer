@@ -7,6 +7,7 @@
 #ifndef OLLAMA_HEADLESS_TEST
 #include "../GUI_App.hpp"
 #include <wx/app.h>
+#include <wx/intl.h>
 #endif
 
 #include "libslic3r/PrintConfig.hpp"
@@ -24,69 +25,80 @@ namespace Slic3r { namespace GUI {
 
 namespace {
 
+std::string localized_description(const char* english, bool korean_ui)
+{
+#ifndef OLLAMA_HEADLESS_TEST
+    if (korean_ui)
+        return wxGetTranslation(wxString::FromUTF8(english)).utf8_string();
+#else
+    (void) korean_ui;
+#endif
+    return english;
+}
+
 const OllamaSettingSpec kSpecs[] = {
     {"layer_height", "mm", "mm", 0.04, 0.6,
-     "Height of each printed layer", "한 층의 높이", "number without unit, e.g. 0.2", "layer, layer height, 층"},
+     "Height of each printed layer", "number without unit, e.g. 0.2", "layer, layer height"},
     {"initial_layer_print_height", "mm", "mm", 0.04, 0.6,
-     "First layer height", "첫 층 높이", "number without unit", "first layer, 첫층"},
+     "First layer height", "number without unit", "first layer"},
     {"line_width", "mm", "mm", 0.1, 2.0,
-     "Extrusion line width", "라인 너비", "number without unit", "line width, 라인"},
+     "Extrusion line width", "number without unit", "line width"},
     {"sparse_infill_density", "percent", "%", 0, 100,
-     "How solid the inside is", "안쪽 채움 밀도", "string with %, e.g. \"20%\"", "infill, density, 채움, infill"},
+     "How solid the inside is", "string with %, e.g. \"20%\"", "infill, density"},
     {"sparse_infill_pattern", "enum", "", 0, 0,
-     "Infill pattern name", "채움 패턴", "string: grid, cubic, gyroid, etc.", "infill pattern"},
+     "Infill pattern name", "string: grid, cubic, gyroid, etc.", "infill pattern"},
     {"wall_loops", "count", "loops", 1, 20,
-     "Number of perimeter shells", "겉벽 겹 수", "integer", "walls, wall, 벽"},
+     "Number of perimeter shells", "integer", "walls, wall"},
     {"top_shell_layers", "count", "layers", 1, 20,
-     "Solid top layers", "윗면 껍질 층", "integer", "top layers"},
+     "Solid top layers", "integer", "top layers"},
     {"bottom_shell_layers", "count", "layers", 1, 20,
-     "Solid bottom layers", "아랫면 껍질 층", "integer", "bottom layers"},
+     "Solid bottom layers", "integer", "bottom layers"},
     {"enable_support", "bool", "", 0, 1,
-     "Build supports for overhangs", "서포트(받침) 사용", "true/false", "support, overhang, 서포트"},
+     "Build supports for overhangs", "true/false", "support, overhang"},
     {"brim_width", "mm", "mm", 0, 25,
-     "Brim width; 0=off", "브림 너비; 0=끔", "number mm; 0 off, 3-8 typical", "brim, 브림"},
+     "Brim width; 0=off", "number mm; 0 off, 3-8 typical", "brim"},
     {"brim_type", "enum", "", 0, 0,
-     "Brim style", "브림 종류", "outer_only, etc.", "brim type"},
+     "Brim style", "outer_only, etc.", "brim type"},
     {"enable_brim", "bool", "", 0, 1,
-     "Brim on/off alias", "브림 켜기", "true/false", "brim enable"},
+     "Brim on/off alias", "true/false", "brim enable"},
     {"outer_wall_speed", "speed", "mm/s", 5, 500,
-     "Outer wall print speed", "외벽 속도", "number", "outer wall speed"},
+     "Outer wall print speed", "number", "outer wall speed"},
     {"sparse_infill_speed", "speed", "mm/s", 5, 500,
-     "Infill print speed", "채움 속도", "number", "infill speed"},
+     "Infill print speed", "number", "infill speed"},
     {"infill_anchor", "mm", "mm", 0, 20,
-     "Infill anchor length", "채움 앵커", "number", "infill anchor"},
+     "Infill anchor length", "number", "infill anchor"},
     {"infill_anchor_max", "mm", "mm", 0, 50,
-     "Max infill anchor", "채움 앵커 최대", "number", "infill anchor max"},
+     "Max infill anchor", "number", "infill anchor max"},
     {"seam_position", "enum", "", 0, 0,
-     "Seam placement", "솔기 위치", "string", "seam"},
+     "Seam placement", "string", "seam"},
     {"ironing_type", "enum", "", 0, 0,
-     "Ironing mode", "아이어링", "string", "ironing"},
+     "Ironing mode", "string", "ironing"},
     {"ironing_flow", "percent", "%", 0, 100,
-     "Ironing flow", "아이어링 유량", "number", "ironing flow"},
+     "Ironing flow", "number", "ironing flow"},
     {"ironing_spacing", "mm", "mm", 0, 1,
-     "Ironing spacing", "아이어링 간격", "number", "ironing spacing"},
+     "Ironing spacing", "number", "ironing spacing"},
     {"elefant_foot_compensation", "mm", "mm", 0, 1,
-     "Elephant foot compensation", "코끼리발 보정", "number", "elephant foot"},
+     "Elephant foot compensation", "number", "elephant foot"},
     {"raft_layers", "count", "layers", 0, 20,
-     "Raft layer count", "뗏목 층 수", "integer", "raft"},
+     "Raft layer count", "integer", "raft"},
     {"support_type", "enum", "", 0, 0,
-     "Support style", "서포트 종류", "string", "support type"},
+     "Support style", "string", "support type"},
     {"support_on_build_plate_only", "bool", "", 0, 1,
-     "Supports only from bed", "베드에서만 서포트", "true/false", "support on plate"},
+     "Supports only from bed", "true/false", "support on plate"},
     {"support_critical_regions_only", "bool", "", 0, 1,
-     "Critical supports only", "필요 구역만 서포트", "true/false", "support critical"},
+     "Critical supports only", "true/false", "support critical"},
     {"support_top_z_distance", "mm", "mm", 0, 5,
-     "Support top gap", "서포트 상단 간격", "number", "support top distance"},
+     "Support top gap", "number", "support top distance"},
     {"support_bottom_z_distance", "mm", "mm", 0, 5,
-     "Support bottom gap", "서포트 하단 간격", "number", "support bottom distance"},
+     "Support bottom gap", "number", "support bottom distance"},
     {"retraction_length", "mm", "mm", 0, 10,
-     "Filament retraction distance", "리트랙션 길이", "number mm", "retraction, stringing, 실",
+     "Filament retraction distance", "number mm", "retraction, stringing",
      "filament"},
     {"retraction_speed", "speed", "mm/s", 1, 100,
-     "Filament retraction speed", "리트랙션 속도", "number", "retraction speed",
+     "Filament retraction speed", "number", "retraction speed",
      "filament"},
     {"nozzle_temperature", "temp", "C", 150, 300,
-     "Nozzle temperature", "노즐 온도", "integer C", "temperature, temp, 온도",
+     "Nozzle temperature", "integer C", "temperature, temp",
      "filament"},
 };
 
@@ -274,7 +286,7 @@ nlohmann::json OllamaSettingRegistry::build_catalog(const DynamicPrintConfig* cf
         e["unit"]        = sp.unit;
         e["min"]         = sp.min_v;
         e["max"]         = sp.max_v;
-        e["description"] = ko_ui ? sp.desc_ko : sp.desc_en;
+        e["description"] = localized_description(sp.desc_en, ko_ui);
         e["format"]      = sp.format;
         e["aliases"]     = sp.aliases;
         e["preset_scope"] = sp.preset_scope;
@@ -345,7 +357,7 @@ nlohmann::json OllamaSettingRegistry::build_priority_catalog(const DynamicPrintC
         e["unit"]        = sp->unit;
         e["min"]         = sp->min_v;
         e["max"]         = sp->max_v;
-        e["description"] = ko_ui ? sp->desc_ko : sp->desc_en;
+        e["description"] = localized_description(sp->desc_en, ko_ui);
         e["format"]      = sp->format;
         e["aliases"]     = sp->aliases;
         if (cfg && cfg->has(sp->key))
@@ -394,7 +406,7 @@ nlohmann::json OllamaSettingRegistry::lookup_catalog_keys(const DynamicPrintConf
         e["unit"]        = sp->unit;
         e["min"]         = sp->min_v;
         e["max"]         = sp->max_v;
-        e["description"] = ko_ui ? sp->desc_ko : sp->desc_en;
+        e["description"] = localized_description(sp->desc_en, ko_ui);
         e["format"]      = sp->format;
         e["preset_scope"] = sp->preset_scope;
         if (cfg && cfg->has(sp->key))

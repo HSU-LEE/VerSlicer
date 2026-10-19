@@ -93,13 +93,9 @@ int main()
     }
     expect_true(has_keycap, "search_query_variants translated english");
 
-    const auto stripped = search_query_variants("articulated dragon mini");
-    bool has_broader = false;
-    for (const auto& v : stripped) {
-        if (v.find("dragon") != std::string::npos && v.find("mini") == std::string::npos)
-            has_broader = true;
-    }
-    expect_true(has_broader, "search_query_variants qualifier strip");
+    const auto preserved = search_query_variants("articulated dragon mini");
+    expect_true(preserved.size() == 1 && preserved.front() == "articulated dragon mini",
+                "search_query_variants preserves model-selected qualifiers");
 
     const std::string sanitized = sanitize_search_text("dragon\u200B\u200C");
     expect_eq(sanitized, "dragon", "sanitize_search_text zero_width");

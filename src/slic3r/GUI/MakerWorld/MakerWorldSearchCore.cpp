@@ -505,34 +505,6 @@ std::vector<std::string> search_query_variants(const std::string& query, const s
             push_unique(lower + " " + en_lower);
     }
 
-    std::string lower = query;
-    boost::algorithm::to_lower(lower);
-
-    // Heuristic: insert spaces before common English subwords in glued Korean+Latin queries
-    if (lower.find(' ') == std::string::npos && lower.size() > 4) {
-        static const char* kSplitHints[] = {"dragon", "keycap", "vase", "robot", "miniature", "articulated",
-                                              "gundam", "lithophane", "christmas", "dinosaur"};
-        for (const char* hint : kSplitHints) {
-            const auto pos = lower.find(hint);
-            if (pos != std::string::npos && pos > 0) {
-                push_unique(lower.substr(0, pos) + " " + lower.substr(pos));
-                break;
-            }
-        }
-    }
-
-    // Narrower variants: drop common size/style qualifiers for broader recall
-    static const char* kOptionalQualifiers[] = {
-        "mini", "small", "large", "big", "tiny", "cute", "articulated", "flexi", "v2", "v3",
-    };
-    for (const char* qual : kOptionalQualifiers) {
-        if (lower.find(qual) == std::string::npos)
-            continue;
-        std::string stripped = lower;
-        boost::algorithm::replace_all(stripped, qual, " ");
-        push_unique(stripped);
-    }
-
     return variants;
 }
 

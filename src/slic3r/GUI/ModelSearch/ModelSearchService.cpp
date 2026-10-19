@@ -178,8 +178,7 @@ ModelSearchAggregateResult ModelSearchService::search_sync(const ModelSearchQuer
 
     ModelSearchAggregateResult agg;
     if (query.empty()) {
-        agg.error = AiLocale::text("Enter a search term or paste a model link.",
-                                   "검색어를 입력하거나 모델 링크를 붙여넣어 주세요.").utf8_string();
+        agg.error = AiLocale::text("Enter a search term or paste a model link.").utf8_string();
         return agg;
     }
 
@@ -213,8 +212,7 @@ ModelSearchAggregateResult ModelSearchService::search_sync(const ModelSearchQuer
             }
         }
         if (agg.error.empty())
-            agg.error = AiLocale::text("No models found. Try different keywords or paste a model link.",
-                                       "모델을 찾지 못했습니다. 다른 검색어로 시도하거나 모델 링크를 붙여넣어 주세요.").utf8_string();
+            agg.error = AiLocale::text("No models found. Try different keywords or paste a model link.").utf8_string();
     }
 
     const auto t1 = std::chrono::steady_clock::now();
@@ -259,8 +257,7 @@ ModelImportPayload ModelSearchService::resolve_import(const ModelCandidate& cand
 
     ModelImportPayload out;
     out.provider_id = candidate.provider_id;
-    out.error       = AiLocale::text("No provider is available to import this model.",
-                                     "이 모델을 가져올 수 있는 제공자가 없습니다.").utf8_string();
+    out.error       = AiLocale::text("No provider is available to import this model.").utf8_string();
     return out;
 }
 
@@ -278,8 +275,7 @@ ModelImportPayload ModelSearchService::resolve_import_from_url(const std::string
         return mw->resolve_import_from_url(url);
 
     ModelImportPayload out;
-    out.error = AiLocale::text("This link is not from a supported model provider.",
-                               "지원하지 않는 모델 제공자의 링크입니다.").utf8_string();
+    out.error = AiLocale::text("This link is not from a supported model provider.").utf8_string();
     return out;
 }
 

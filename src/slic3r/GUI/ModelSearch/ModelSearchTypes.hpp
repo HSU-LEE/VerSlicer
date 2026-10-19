@@ -157,6 +157,8 @@ struct ModelImportPayload
 {
     ModelProviderId provider_id{ModelProviderId::Unknown};
     bool            ok{false};
+    bool            needs_login{false};
+    bool            no_download_link{false};
     std::string     error;
     std::string     download_info;  // url&name= for Plater::request_model_download
     std::string     detail_page_url;

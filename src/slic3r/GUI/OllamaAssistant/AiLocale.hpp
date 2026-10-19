@@ -20,6 +20,9 @@ namespace Slic3r { namespace GUI { namespace AiLocale {
  */
 bool korean();
 
+/** Translate an English source string through the active locale catalog. */
+wxString text(const char* en);
+
 /** Bilingual pick: Korean UTF-8 literal when the UI is Korean, else the
  *  (gettext-translated) English string. */
 wxString text(const char* en, const char* ko_utf8);

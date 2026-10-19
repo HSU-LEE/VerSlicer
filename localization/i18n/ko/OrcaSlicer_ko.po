@@ -25277,3 +25277,213 @@ msgstr "Bambu 네트워크 플러그인이 로드되지 않았습니다(오류 -
 
 msgid "Cloud blocked; sending print job over LAN"
 msgstr "클라우드가 차단되어 LAN으로 출력 작업을 보냅니다"
+
+msgid "Height of each printed layer"
+msgstr "한 층의 높이"
+
+msgid "Extrusion line width"
+msgstr "라인 너비"
+
+msgid "How solid the inside is"
+msgstr "안쪽 채움 밀도"
+
+msgid "Infill pattern name"
+msgstr "채움 패턴"
+
+msgid "Number of perimeter shells"
+msgstr "겉벽 겹 수"
+
+msgid "Solid top layers"
+msgstr "윗면 껍질 층"
+
+msgid "Solid bottom layers"
+msgstr "아랫면 껍질 층"
+
+msgid "Build supports for overhangs"
+msgstr "서포트(받침) 사용"
+
+msgid "Brim width; 0=off"
+msgstr "브림 너비; 0=끔"
+
+msgid "Brim style"
+msgstr "브림 종류"
+
+msgid "Brim on/off alias"
+msgstr "브림 켜기"
+
+msgid "Outer wall print speed"
+msgstr "외벽 속도"
+
+msgid "Infill print speed"
+msgstr "채움 속도"
+
+msgid "Infill anchor length"
+msgstr "채움 앵커"
+
+msgid "Max infill anchor"
+msgstr "채움 앵커 최대"
+
+msgid "Seam placement"
+msgstr "솔기 위치"
+
+msgid "Ironing mode"
+msgstr "아이어링"
+
+msgid "Ironing spacing"
+msgstr "아이어링 간격"
+
+msgid "Raft layer count"
+msgstr "뗏목 층 수"
+
+msgid "Support style"
+msgstr "서포트 종류"
+
+msgid "Supports only from bed"
+msgstr "베드에서만 서포트"
+
+msgid "Critical supports only"
+msgstr "필요 구역만 서포트"
+
+msgid "Support top gap"
+msgstr "서포트 상단 간격"
+
+msgid "Support bottom gap"
+msgstr "서포트 하단 간격"
+
+msgid "Filament retraction distance"
+msgstr "리트랙션 길이"
+
+msgid "Filament retraction speed"
+msgstr "리트랙션 속도"
+
+msgid "Invalid model selection."
+msgstr "잘못된 모델 선택입니다."
+
+msgid "No download link was returned for this model."
+msgstr "이 모델의 다운로드 링크를 받지 못했습니다."
+
+msgid "Could not resolve the model download."
+msgstr "모델 다운로드 정보를 가져오지 못했습니다."
+
+msgid "Import failed."
+msgstr "가져오기에 실패했습니다."
+
+msgid "Model loaded."
+msgstr "모델을 불러왔습니다."
+
+msgid "Something went wrong while preparing the print."
+msgstr "출력 준비 중 오류가 발생했습니다."
+
+msgid "Waiting for your answer…"
+msgstr "답변을 기다리는 중…"
+
+msgid "Searching for models…"
+msgstr "모델을 검색하는 중…"
+
+msgid "Model search timed out. Check your network or try again."
+msgstr "모델 검색 시간이 초과되었습니다. 네트워크를 확인하거나 다시 시도해 주세요."
+
+msgid "No models found. Try different keywords."
+msgstr "모델을 찾지 못했습니다. 다른 검색어로 시도해 보세요."
+
+msgid "Found %d models."
+msgstr "모델 %d개를 찾았습니다."
+
+msgid "No models to choose from."
+msgstr "선택할 모델이 없습니다."
+
+msgid "Choose a model…"
+msgstr "모델을 선택하세요…"
+
+msgid "Print cancelled."
+msgstr "출력을 취소했습니다."
+
+msgid "Switch to Apply mode to import and print."
+msgstr "가져와서 출력하려면 적용 모드로 전환하세요."
+
+msgid "Preparing download…"
+msgstr "다운로드를 준비하는 중…"
+
+msgid "The model download timed out. Please try again."
+msgstr "모델 다운로드가 시간 내에 완료되지 않았습니다. 다시 시도해 주세요."
+
+msgid "Sign in to Bambu Cloud to download this model."
+msgstr "이 모델을 내려받으려면 Bambu Cloud에 로그인하세요."
+
+msgid "Model %d can't be downloaded — trying model %d instead."
+msgstr "%d번 모델은 받을 수 없어 %d번 모델로 진행합니다."
+
+msgid "Downloading model…"
+msgstr "모델을 내려받는 중…"
+
+msgid "Downloading \"%s\"…"
+msgstr "\"%s\" 내려받는 중…"
+
+msgid "Checking mesh health…"
+msgstr "메시 상태를 확인하는 중…"
+
+msgid "Repairing mesh…"
+msgstr "메시를 복구하는 중…"
+
+msgid "Repaired %d mesh volume(s)."
+msgstr "메시 볼륨 %d개를 복구했습니다."
+
+msgid "No automatic mesh repair was applied."
+msgstr "자동 메시 복구를 적용하지 않았습니다."
+
+msgid "Analyzing geometry…"
+msgstr "형상을 분석하는 중…"
+
+msgid "Could not analyze the model geometry."
+msgstr "모델 형상을 분석하지 못했습니다."
+
+msgid "Preparing print settings…"
+msgstr "출력 설정을 준비하는 중…"
+
+msgid "Applied %d setting change(s)."
+msgstr "설정 %d개를 적용했습니다."
+
+msgid "Slicing…"
+msgstr "슬라이싱 중…"
+
+msgid "The slicer is not ready to slice."
+msgstr "슬라이서가 아직 준비되지 않았습니다."
+
+msgid "Slicing did not finish in time. Please try again."
+msgstr "슬라이싱이 시간 내에 완료되지 않았습니다. 다시 시도해 주세요."
+
+msgid "Slicing failed. Adjust the model or settings and try again."
+msgstr "슬라이싱에 실패했습니다. 모델이나 설정을 조정한 뒤 다시 시도해 주세요."
+
+msgid "Estimating print…"
+msgstr "출력 예측 중…"
+
+msgid "Sliced and ready. Check the preview, then press Print plate to send it to your printer."
+msgstr "슬라이스가 끝났습니다. 미리보기를 확인한 뒤 「플레이트 출력」을 눌러 프린터로 보내세요."
+
+msgid "Bambu Cloud session expired. Sign out and sign in again to download this model."
+msgstr "Bambu Cloud 세션이 만료되었습니다. 로그아웃 후 다시 로그인하면 내려받을 수 있습니다."
+
+msgid "Sign in to Bambu Cloud (Settings → Online) to download. If already signed in, sign out and sign in again."
+msgstr "내려받으려면 Bambu Cloud에 로그인하세요 (설정 → 온라인). 이미 로그인했다면 로그아웃 후 다시 로그인해 주세요."
+
+msgid "Could not get a download link. Open the model on MakerWorld and use Download, or paste the file link."
+msgstr "다운로드 링크를 받지 못했습니다. MakerWorld에서 모델을 열어 내려받거나 파일 링크를 붙여넣어 주세요."
+
+msgid "Download URL is not allowed."
+msgstr "허용되지 않는 다운로드 URL입니다."
+
+msgid "Could not read a model ID from that MakerWorld link."
+msgstr "MakerWorld 링크에서 모델 ID를 읽지 못했습니다."
+
+msgid "Enter a search term or paste a model link."
+msgstr "검색어를 입력하거나 모델 링크를 붙여넣어 주세요."
+
+msgid "No models found. Try different keywords or paste a model link."
+msgstr "모델을 찾지 못했습니다. 다른 검색어로 시도하거나 모델 링크를 붙여넣어 주세요."
+
+msgid "No provider is available to import this model."
+msgstr "이 모델을 가져올 수 있는 제공자가 없습니다."
+
+msgid "This link is not from a supported model provider."
+msgstr "지원하지 않는 모델 제공자의 링크입니다."

@@ -1330,9 +1330,7 @@ Button* find_primary_footer_button(wxWindow* root)
             if (!fallback)
                 fallback = btn;
             if (btn->GetLabel().Contains(_L("Apply")) || btn->GetLabel().Contains(_L("Approve"))
-                || btn->GetLabel().Contains(_L("Got it")) || btn->GetLabel().Contains(_L("OK"))
-                || btn->GetLabel().Contains(wxString::FromUTF8("알겠습니다"))
-                || btn->GetLabel().Contains(wxString::FromUTF8("적용")))
+                || btn->GetLabel().Contains(_L("Got it")) || btn->GetLabel().Contains(_L("OK")))
                 return btn;
         }
         const wxWindowList& kids = w->GetChildren();

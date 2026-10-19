@@ -1,6 +1,7 @@
 #include "OllamaSettingDescriptions.hpp"
 
 #include "OllamaSettingRegistry.hpp"
+#include "../I18N.hpp"
 
 #include <boost/algorithm/string.hpp>
 
@@ -72,39 +73,6 @@ std::string format_brim_type(const std::string& raw, bool ko)
     return raw;
 }
 
-bool message_mentions_adhesion(const std::string& msg)
-{
-    return msg.find("붙") != std::string::npos || msg.find("브림") != std::string::npos
-        || msg.find("베드") != std::string::npos || msg.find("들") != std::string::npos
-        || boost::icontains(msg, "adhesion") || boost::icontains(msg, "brim") || boost::icontains(msg, "stick");
-}
-
-bool message_mentions_speed(const std::string& msg)
-{
-    return msg.find("오래") != std::string::npos || msg.find("가속") != std::string::npos
-        || msg.find("빠르") != std::string::npos || msg.find("속도") != std::string::npos
-        || boost::icontains(msg, "speed") || boost::icontains(msg, "faster") || boost::icontains(msg, "acceler");
-}
-
-bool message_mentions_strength(const std::string& msg)
-{
-    return msg.find("단단") != std::string::npos || msg.find("강") != std::string::npos
-        || msg.find("부서") != std::string::npos || boost::icontains(msg, "strong") || boost::icontains(msg, "strength");
-}
-
-bool message_mentions_support(const std::string& msg)
-{
-    return msg.find("서포트") != std::string::npos || msg.find("공중") != std::string::npos
-        || boost::icontains(msg, "support") || boost::icontains(msg, "overhang");
-}
-
-bool contains_raw_config_jargon(const std::string& msg)
-{
-    return msg.find("brim_width") != std::string::npos || msg.find("sparse_infill") != std::string::npos
-        || msg.find("wall_loops") != std::string::npos || msg.find("enable_support") != std::string::npos
-        || msg.find("brim_type") != std::string::npos || msg.find("layer_height") != std::string::npos;
-}
-
 bool change_is_adhesion(const std::string& key)
 {
     return key.find("brim") != std::string::npos || key.find("bed") != std::string::npos
@@ -125,33 +93,6 @@ bool change_is_strength(const std::string& key)
 bool change_is_support(const std::string& key)
 {
     return key.find("support") != std::string::npos;
-}
-
-bool assistant_message_mismatch(const std::string& msg, const std::vector<BambuSmartPrint::SettingChange>& changes)
-{
-    if (msg.empty() || changes.empty())
-        return false;
-
-    bool adhesion = false;
-    bool speed    = false;
-    bool strength = false;
-    bool support  = false;
-    for (const auto& ch : changes) {
-        adhesion |= change_is_adhesion(ch.key);
-        speed |= change_is_speed(ch.key);
-        strength |= change_is_strength(ch.key);
-        support |= change_is_support(ch.key);
-    }
-
-    if (adhesion && message_mentions_speed(msg) && !message_mentions_adhesion(msg))
-        return true;
-    if (speed && !adhesion && message_mentions_adhesion(msg) && !message_mentions_speed(msg))
-        return true;
-    if (strength && message_mentions_speed(msg) && !message_mentions_strength(msg))
-        return true;
-    if (support && !message_mentions_support(msg) && message_mentions_speed(msg))
-        return true;
-    return false;
 }
 
 std::string reason_for_brim_width(const BambuSmartPrint::SettingChange& ch, bool ko)
@@ -256,7 +197,7 @@ std::string reason_for_retraction(const BambuSmartPrint::SettingChange& ch, bool
 std::string OllamaSettingDescriptions::setting_label(const std::string& key, bool korean)
 {
     if (const OllamaSettingSpec* sp = OllamaSettingRegistry::find_spec(key))
-        return korean ? sp->desc_ko : sp->desc_en;
+        return korean ? _u8L(sp->desc_en) : sp->desc_en;
     return key;
 }
 
@@ -347,11 +288,7 @@ std::string OllamaSettingDescriptions::build_summary(const std::vector<BambuSmar
     }
     const std::string synthesized = oss.str();
 
-    if (assistant_message.empty() || contains_raw_config_jargon(assistant_message)
-        || assistant_message_mismatch(assistant_message, changes))
-        return synthesized;
-
-    return assistant_message;
+    return assistant_message.empty() ? synthesized : assistant_message;
 }
 
 std::vector<std::string> OllamaSettingDescriptions::expected_effects(

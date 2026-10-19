@@ -18,7 +18,6 @@ struct OllamaSettingSpec
     double      min_v;
     double      max_v;
     const char* desc_en;
-    const char* desc_ko;
     const char* format;
     const char* aliases;
     const char* preset_scope{"print"};

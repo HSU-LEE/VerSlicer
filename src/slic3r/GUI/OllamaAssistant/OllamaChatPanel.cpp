@@ -100,21 +100,6 @@ std::string last_user_request_text(const std::vector<OllamaMessage>& messages)
     return {};
 }
 
-static bool message_looks_like_manual_instruction(const std::string& msg)
-{
-    static const char* needles[] = {
-        "단축키", "shortcut", "use the", "use '", "설정하세요", "사용하세요", "사용하여",
-        "brim_width", "enable_brim", "set_config", "objetos", "press ", "click ",
-        "키를", "manual", "직접", "설정하려면", "pressure", "프레셔", "어드밴", "어드밋",
-        "input_shap", "input_shell", "사용하여", "사용하세요",
-    };
-    for (const char* n : needles) {
-        if (msg.find(n) != std::string::npos)
-            return true;
-    }
-    return false;
-}
-
 static bool looks_like_json_parse_error(const std::string& what)
 {
     return what.find("parse") != std::string::npos || what.find("JSON") != std::string::npos
@@ -201,84 +186,56 @@ static wxString format_assistant_failure(const std::string& what, const std::str
             display = display.Left(600) + "\n…";
         if (parse_error) {
             display += "\n\n"
-                + (AiLocale::korean()
-                       ? wxString::FromUTF8("설명은 위와 같습니다. 자동 적용은 되지 않았어요 — '브림 켜 줘'처럼 다시 요청해 보세요.")
-                       : _L("See above for the explanation. To apply automatically, try a direct request like “turn on brim”."));
+                + (_L("See above for the explanation. To apply automatically, try a direct request like “turn on brim”."));
         } else if (apply_mode) {
             display += "\n\n"
-                + (AiLocale::korean()
-                       ? wxString::FromUTF8("위 내용은 참고용입니다. 자동 적용이 되지 않았어요 — 플레이트에서 모델을 선택한 뒤 다시 시도해 주세요.")
-                       : _L("See above for context. It wasn't applied automatically — select a model on the plate and try again."));
+                + (_L("See above for context. It wasn't applied automatically — select a model on the plate and try again."));
         } else {
             display += "\n\n"
-                + (AiLocale::korean()
-                       ? wxString::FromUTF8("답변 중 일부를 처리하지 못했습니다. 질문을 다시 보내 보세요.")
-                       : _L("Part of the reply couldn't be processed. Try sending your question again."));
+                + (_L("Part of the reply couldn't be processed. Try sending your question again."));
         }
         return display;
     }
 
     if (parse_error)
-        return AiLocale::korean()
-            ? wxString::FromUTF8("응답을 이해하지 못했습니다. '브림 켜 줘'처럼 짧게 다시 보내 보세요.")
-            : _L("Couldn't understand the reply. Try a short request like “turn on brim”.");
+        return _L("Couldn't understand the reply. Try a short request like “turn on brim”.");
 
     const wxString mapped = format_chat_error(what);
     if (mapped != wxString::FromUTF8(what))
         return mapped;
 
-    return AiLocale::korean() ? wxString::FromUTF8("문제가 발생했습니다. 잠시 후 다시 시도해 주세요.")
-                          : _L("Something went wrong. Try again in a moment.");
+    return _L("Something went wrong. Try again in a moment.");
 }
 
 static wxString change_not_applied_msg(bool plate_has_model)
 {
     if (!plate_has_model) {
-        return AiLocale::korean()
-            ? wxString::FromUTF8("아직 적용되지 않았습니다. 플레이트에 모델을 올리거나, '브림 켜 줘'처럼 구체적으로 말씀해 주세요.")
-            : _L("That wasn't applied yet. Put a model on the plate, or try a clearer request like “turn on brim”.");
+        return _L("That wasn't applied yet. Put a model on the plate, or try a clearer request like “turn on brim”.");
     }
-    return AiLocale::korean()
-        ? wxString::FromUTF8("아직 적용되지 않았습니다. '브림 켜 줘'처럼 바꿀 결과를 구체적으로 말씀해 주세요.")
-        : _L("That wasn't applied yet. Say the result you want, like “turn on brim”.");
+    return _L("That wasn't applied yet. Say the result you want, like “turn on brim”.");
 }
 
 static wxString nothing_applied_msg(bool plate_has_model)
 {
     if (!plate_has_model) {
-        return AiLocale::korean()
-            ? wxString::FromUTF8("적용된 변경이 없습니다. 플레이트에 모델을 올린 뒤 다시 시도해 주세요.")
-            : _L("Nothing was applied. Put a model on the plate and try again.");
+        return _L("Nothing was applied. Put a model on the plate and try again.");
     }
-    return AiLocale::korean()
-        ? wxString::FromUTF8("적용된 변경이 없습니다. 요청을 조금 더 구체적으로 다시 보내 주세요.")
-        : _L("Nothing was applied. Try a more specific request.");
+    return _L("Nothing was applied. Try a more specific request.");
 }
 
 static wxString cancelled_no_changes_msg()
 {
-    return AiLocale::korean() ? wxString::FromUTF8("취소되었습니다 — 변경 사항은 없습니다.")
-                          : _L("Cancelled — nothing was changed.");
+    return _L("Cancelled — nothing was changed.");
 }
 
 static wxString preview_only_msg()
 {
-    return AiLocale::korean()
-        ? wxString::FromUTF8("미리보기만 표시되었습니다. 비교 창을 닫은 뒤 적용 여부를 확인해 주세요.")
-        : _L("Preview only — close the compare dialog to finish or cancel.");
-}
-
-static wxString manual_instruction_msg()
-{
-    return AiLocale::korean()
-        ? wxString::FromUTF8("자동으로 적용하지 못했습니다. 플레이트에서 모델을 선택하거나, 적용 모드에서 더 구체적으로 요청해 주세요.")
-        : _L("Couldn't apply that automatically. Select a model on the plate, or try a more specific request in Apply mode.");
+    return _L("Preview only — close the compare dialog to finish or cancel.");
 }
 
 static wxString question_mode_actions_skipped_msg()
 {
-    return AiLocale::korean() ? wxString::FromUTF8("(질문 모드 — 제안된 변경은 적용하지 않았습니다.)")
-                          : _L("(Question mode — suggested changes were not applied.)");
+    return _L("(Question mode — suggested changes were not applied.)");
 }
 
 static bool result_message_looks_jargon(const std::string& m)
@@ -346,10 +303,8 @@ static wxString summarize_applied_changes(const std::string& /*user_req*/,
     const bool ko = AiLocale::korean();
     if (!had_effective_change()) {
         if (had_noop_only())
-            return ko ? wxString::FromUTF8("요청하신 값과 동일해서 변경하지 않았습니다.")
-                      : _L("Settings were already at the requested values — nothing changed.");
-        return ko ? wxString::FromUTF8("적용되지 않았습니다. 플레이트에서 모델을 선택한 뒤 다시 시도해 주세요.")
-                  : _L("Nothing was applied. Select a model on the plate and try again.");
+            return _L("Settings were already at the requested values — nothing changed.");
+        return _L("Nothing was applied. Select a model on the plate and try again.");
     }
 
     std::vector<wxString> lines;
@@ -365,69 +320,63 @@ static wxString summarize_applied_changes(const std::string& /*user_req*/,
             continue;
         const std::string& m = r.message;
         if (m.find("brim") != std::string::npos || m.find("Brim") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("브림을 켰습니다 — 바닥 접착을 돕습니다.")
-                        : _L("Enabled brim — extra plastic around the bottom for better adhesion."));
+            add_once(_L("Enabled brim — extra plastic around the bottom for better adhesion."));
         else if (m.find("enable_support") != std::string::npos || m.find("Supports") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("트리 서포트를 켰습니다.")
-                        : _L("Enabled tree supports for overhanging parts."));
+            add_once(_L("Enabled tree supports for overhanging parts."));
         else if (m.find("outer_wall_speed") != std::string::npos || m.find("sparse_infill_speed") != std::string::npos
                  || m.find("speed") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("인쇄 속도를 조정했습니다.") : _L("Adjusted print speed."));
+            add_once(_L("Adjusted print speed."));
         else if (m.find("sparse_infill") != std::string::npos || m.find("wall_loops") != std::string::npos
                  || m.find("Infill") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("채움과 벽을 조정해 더 단단하게 만들었습니다.")
-                        : _L("Adjusted infill and walls to make the part stronger."));
+            add_once(_L("Adjusted infill and walls to make the part stronger."));
         else if (m.find("brim_width=0") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("브림을 껐습니다.") : _L("Turned brim off."));
+            add_once(_L("Turned brim off."));
         else if (m.find("Rotated") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("선택한 모델을 회전했습니다.") : _L("Rotated the selected model."));
+            add_once(_L("Rotated the selected model."));
         else if (m.find("Scaled selection") != std::string::npos || m.find("Scaled") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("모델 크기를 조정했습니다.") : _L("Resized the model."));
+            add_once(_L("Resized the model."));
         else if (m.find("Auto-arrange") != std::string::npos || m.find("Arranged models") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("빌드 플레이트에서 모델을 재배치했습니다.")
-                        : _L("Re-arranged models on the build plate."));
+            add_once(_L("Re-arranged models on the build plate."));
         else if (m.find("by-object") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("객체 단위로 재배치했습니다.") : _L("Arranged models by object."));
+            add_once(_L("Arranged models by object."));
         else if (m.find("Split model") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("모델을 개별 객체로 분할했습니다.") : _L("Split the model into separate objects."));
+            add_once(_L("Split the model into separate objects."));
         else if (m.find("Added plate") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("새 빌드 플레이트를 추가했습니다.") : _L("Added a new build plate."));
+            add_once(_L("Added a new build plate."));
         else if (m.find("Applied mesh operation") != std::string::npos
                  || m.find("subtract_cylinder") != std::string::npos) {
             if (m.find("subtract") != std::string::npos || m.find("drill") != std::string::npos)
-                add_once(ko ? wxString::FromUTF8("모델에 구멍을 뚫었습니다.") : _L("Drilled a hole in the model."));
+                add_once(_L("Drilled a hole in the model."));
             else if (m.find("add_handle") != std::string::npos || m.find("handle") != std::string::npos)
-                add_once(ko ? wxString::FromUTF8("손잡이를 추가했습니다.") : _L("Added a handle to the model."));
+                add_once(_L("Added a handle to the model."));
             else if (m.find("add_rib") != std::string::npos || m.find("rib") != std::string::npos)
-                add_once(ko ? wxString::FromUTF8("리브(보강)를 추가했습니다.") : _L("Added reinforcement ribs."));
+                add_once(_L("Added reinforcement ribs."));
             else
-                add_once(ko ? wxString::FromUTF8("모델 형상을 수정했습니다.") : _L("Modified model geometry."));
+                add_once(_L("Modified model geometry."));
         } else if (m.find("Repaired mesh") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("메쉬를 수리했습니다.") : _L("Repaired the mesh."));
+            add_once(_L("Repaired the mesh."));
         else if (m.find("Mirrored mesh") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("모델을 대칭으로 만들었습니다.") : _L("Mirrored the model."));
+            add_once(_L("Mirrored the model."));
         else if (m.find("slicing") != std::string::npos || m.find("Slicing") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("현재 플레이트 슬라이싱을 시작했습니다.")
-                        : _L("Started slicing the current plate."));
+            add_once(_L("Started slicing the current plate."));
         else if (m.find("retraction") != std::string::npos || m.find("stringing") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("실처럼 늘어지는 현상을 줄였습니다.")
-                        : _L("Adjusted settings to reduce stringing."));
+            add_once(_L("Adjusted settings to reduce stringing."));
         else if (m.find("layer_height") != std::string::npos || m.find("layer height") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("층 두께를 조정했습니다.") : _L("Adjusted layer height."));
+            add_once(_L("Adjusted layer height."));
         else if (m.find("temperature") != std::string::npos || m.find("Temperature") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("노즐·베드 온도를 조정했습니다.") : _L("Adjusted print temperature."));
+            add_once(_L("Adjusted print temperature."));
         else if (m.find("Translated") != std::string::npos || m.find("translate") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("모델 위치를 옮겼습니다.") : _L("Moved the model."));
+            add_once(_L("Moved the model."));
         else if (m.find("Deleted") != std::string::npos || m.find("delete") != std::string::npos)
-            add_once(ko ? wxString::FromUTF8("선택한 모델을 삭제했습니다.") : _L("Deleted the selected model."));
+            add_once(_L("Deleted the selected model."));
         else if (!m.empty() && !result_message_looks_jargon(m))
             add_once(strip_leading_list_numbering(wxString::FromUTF8(m)));
         else if (!m.empty())
-            add_once(ko ? wxString::FromUTF8("인쇄 설정을 업데이트했습니다.") : _L("Print settings updated."));
+            add_once(_L("Print settings updated."));
     }
 
     if (lines.empty())
-        add_once(ko ? wxString::FromUTF8("인쇄 설정을 업데이트했습니다.") : _L("Print settings updated."));
+        add_once(_L("Print settings updated."));
 
     return format_numbered_summary_lines(lines);
 }
@@ -469,67 +418,9 @@ static void drop_last_assistant_message(std::vector<OllamaMessage>& messages)
     }
 }
 
-static wxString completion_status_for_reply(const wxString& reply, bool apply_mode)
+static wxString completion_status_for_reply(const wxString& /*reply*/, bool apply_mode)
 {
-    if (!apply_mode)
-        return AiLocale::korean() ? wxString::FromUTF8("답변 완료") : _L("Answer ready");
-
-    if (reply.IsEmpty())
-        return AiLocale::korean() ? wxString::FromUTF8("완료") : _L("Done");
-
-    if (reply.Contains(_L("No models found")) || reply.Contains(wxString::FromUTF8("모델을 찾지 못")))
-        return AiLocale::korean() ? wxString::FromUTF8("MakerWorld 검색 완료 — 결과 없음")
-                              : _L("MakerWorld: no models found");
-
-    if (reply.Contains(_L("Search cancelled")) || reply.Contains(_L("Import cancelled")))
-        return AiLocale::korean() ? wxString::FromUTF8("취소됨") : _L("Cancelled");
-
-    if (reply.Contains(_L("Model loaded")) || reply.Contains(wxString::FromUTF8("불러왔")))
-        return AiLocale::korean() ? wxString::FromUTF8("모델 불러오기 완료") : _L("Model loaded");
-
-    if (reply.Contains(_L("Import failed")) || reply.Contains(wxString::FromUTF8("가져오기 실패")))
-        return AiLocale::korean() ? wxString::FromUTF8("가져오기 실패") : _L("Import failed");
-
-    if (reply.Contains(_L("Found ")) && reply.Contains(_L("models on MakerWorld")))
-        return AiLocale::korean() ? wxString::FromUTF8("MakerWorld 검색 완료") : _L("MakerWorld search done");
-
-    if (reply.Contains(_L("Cancelled")) || reply.Contains(wxString::FromUTF8("취소")))
-        return AiLocale::korean() ? wxString::FromUTF8("취소됨") : _L("Cancelled");
-
-    if (reply.Contains(_L("Nothing was applied")) || reply.Contains(_L("wasn't applied"))
-        || reply.Contains(wxString::FromUTF8("적용되지 않")) || reply.Contains(wxString::FromUTF8("아직 적용")))
-        return AiLocale::korean() ? wxString::FromUTF8("적용된 변경 없음") : _L("Nothing applied");
-
-    if (reply.Contains(wxString::FromUTF8("분할")) || reply.Contains(_L("Split"))
-        || reply.Contains(wxString::FromUTF8("구멍")) || reply.Contains(_L("Drilled a hole"))
-        || reply.Contains(wxString::FromUTF8("형상")) || reply.Contains(_L("Modified model"))
-        || reply.Contains(wxString::FromUTF8("메쉬")) || reply.Contains(_L("Repaired the mesh"))
-        || reply.Contains(wxString::FromUTF8("회전")) || reply.Contains(_L("Rotated"))
-        || reply.Contains(wxString::FromUTF8("크기를 조정")) || reply.Contains(_L("Resized the model")))
-        return AiLocale::korean() ? wxString::FromUTF8("모델 수정 완료") : _L("Model edit done");
-
-    if (reply.Contains(wxString::FromUTF8("브림")) || reply.Contains(wxString::FromUTF8("서포트"))
-        || reply.Contains(wxString::FromUTF8("속도")) || reply.Contains(wxString::FromUTF8("켰"))
-        || reply.Contains(wxString::FromUTF8("업데이트")) || reply.Contains(_L("Enabled brim"))
-        || reply.Contains(_L("Print settings updated")))
-        return AiLocale::korean() ? wxString::FromUTF8("설정 반영 완료") : _L("Settings updated");
-
-    if (reply.Contains(wxString::FromUTF8("크기")) || reply.Contains(_L("Resized")))
-        return AiLocale::korean() ? wxString::FromUTF8("모델 수정 완료") : _L("Model edit done");
-
-    if (reply.Contains(_L("couldn't understand")) || reply.Contains(wxString::FromUTF8("이해하지 못했")))
-        return AiLocale::korean() ? wxString::FromUTF8("다시 입력해 주세요") : _L("Try again");
-
-    if (reply.Contains(wxString::FromUTF8("플레이트")) || reply.Contains(_L("build plate")))
-        return AiLocale::korean() ? wxString::FromUTF8("플레이트 추가 완료") : _L("Plate added");
-
-    // LLM-only "I'll print/slice…" without orchestrator progress evidence — do not
-    // read as a successful print job.
-    if (reply.Contains(wxString::FromUTF8("출력을 시작")) || reply.Contains(wxString::FromUTF8("슬라이스를 생성"))
-        || reply.Contains(wxString::FromUTF8("묶어서 실행")))
-        return AiLocale::korean() ? wxString::FromUTF8("확인 필요 — 플레이트를 확인하세요") : _L("Verify on the plate");
-
-    return AiLocale::korean() ? wxString::FromUTF8("완료") : _L("Done");
+    return apply_mode ? _L("Done") : _L("Answer ready");
 }
 
 // Strip a trailing incomplete UTF-8 sequence so a partial stream buffer can be
@@ -673,8 +564,7 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
         auto* header_sizer = new wxBoxSizer(wxHORIZONTAL);
         m_collapse_btn     = new wxButton(m_header, wxID_ANY, "–", wxDefaultPosition, wxSize(FromDIP(26), FromDIP(22)));
         m_title            = new wxStaticText(m_header, wxID_ANY,
-            AiLocale::korean() ? wxString::FromUTF8("AI 도우미")
-                                                                : _L("AI Assistant"));
+            _L("AI Assistant"));
         m_title->SetForegroundColour(SlicePilotUi::Theme::text());
         header_sizer->Add(m_collapse_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(6));
         header_sizer->Add(m_title, 1, wxALIGN_CENTER_VERTICAL);
@@ -899,7 +789,7 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     m_status_host->SetBackgroundColour(SlicePilotUi::Theme::background());
     auto* status_row = new wxBoxSizer(wxHORIZONTAL);
     m_status = new wxStaticText(m_status_host, wxID_ANY,
-                                AiLocale::korean() ? wxString::FromUTF8("준비됨") : _L("Ready"),
+                                _L("Ready"),
                                 wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
     m_status->SetForegroundColour(SlicePilotUi::Theme::text_muted());
     m_status->SetFont(Label::Body_13);
@@ -1022,7 +912,7 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     update_send_button_chrome();
     refresh_voice_button();
     reset_conversation();
-    set_status_text(AiLocale::korean() ? wxString::FromUTF8("준비됨") : _L("Ready"));
+    set_status_text(_L("Ready"));
 
     m_poll_timer = new wxTimer(this);
     m_poll_timer->Bind(wxEVT_TIMER, [this](wxTimerEvent&) {
@@ -1087,7 +977,7 @@ void OllamaChatPanel::trim_message_history()
 
 wxString OllamaChatPanel::thinking_role_label() const
 {
-    return AiLocale::korean() ? wxString::FromUTF8("처리 중") : _L("Working");
+    return _L("Working");
 }
 
 void OllamaChatPanel::begin_thinking_block()
@@ -1237,13 +1127,9 @@ wxString OllamaChatPanel::system_welcome_message() const
             : wxString("Connect a ChatGPT account to start. Press Connect ChatGPT, sign in in the browser, then allow access.");
     }
     if (m_apply_mode) {
-        return AiLocale::korean()
-            ? wxString::FromUTF8("적용 모드입니다. 회전·크기 조정, 더 튼튼하게, 들뜸·수축 줄이기처럼 원하는 결과를 말씀해 주세요.")
-            : _L("Apply mode: say what you want — rotate, resize, make it stronger, fix warping, and more.");
+        return _L("Apply mode: say what you want — rotate, resize, make it stronger, fix warping, and more.");
     }
-    return AiLocale::korean()
-        ? wxString::FromUTF8("질문 모드입니다. 인쇄·설정에 대해 물어보세요. 프로그램 설정은 바꾸지 않습니다.")
-        : _L("Question mode: ask anything about printing. Nothing will be changed — you'll get a plain-language explanation.");
+    return _L("Question mode: ask anything about printing. Nothing will be changed — you'll get a plain-language explanation.");
 }
 
 void OllamaChatPanel::refresh_mode_ui()
@@ -1255,13 +1141,9 @@ void OllamaChatPanel::refresh_mode_ui()
     }
     if (m_input_ctrl) {
         if (m_apply_mode) {
-            m_input_hint_full = AiLocale::korean()
-                ? wxString::FromUTF8("예: 45도 돌려 줘 · 50%로 줄여 줘 · 더 튼튼하게 · 코너 들뜸 줄여 줘")
-                : _L("e.g. rotate 45°, scale to 50%, make it stronger, reduce corner warping");
+            m_input_hint_full = _L("e.g. rotate 45°, scale to 50%, make it stronger, reduce corner warping");
         } else {
-            m_input_hint_full = AiLocale::korean()
-                ? wxString::FromUTF8("예: 브림이 뭐예요? · 서포트는 언제 필요해?")
-                : _L("e.g. What is a brim? When do I need supports?");
+            m_input_hint_full = _L("e.g. What is a brim? When do I need supports?");
         }
         update_input_hint();
     }
@@ -1338,7 +1220,7 @@ void OllamaChatPanel::reset_conversation()
         set_status_text(AiLocale::korean() ? wxString::FromUTF8("ChatGPT 계정을 연결하세요.")
                                            : wxString("Connect a ChatGPT account."));
     else
-        set_status_text(AiLocale::korean() ? wxString::FromUTF8("준비됨") : _L("Ready"));
+        set_status_text(_L("Ready"));
 }
 
 void OllamaChatPanel::ensure_assistant_ready()
@@ -1358,7 +1240,7 @@ void OllamaChatPanel::refresh_models()
     if (m_model_poll_failures >= kMaxModelPollFailures)
         return;
     if (m_status)
-        set_status_text(AiLocale::korean() ? wxString::FromUTF8("모델 불러오는 중…") : _L("Loading models…"));
+        set_status_text(_L("Loading models…"));
     m_client.set_base_url(ollama_host_from_config());
     const auto alive = m_alive;
     wxWeakRef<wxWindow> weak(this);
@@ -1785,7 +1667,7 @@ void OllamaChatPanel::cancel_inflight()
     hide_pipeline_progress();
     append_thinking_line(AiLocale::korean() ? wxString::FromUTF8("여기서 멈췄습니다.") : wxString("Stopped here."));
     set_busy(false);
-    set_status_text(AiLocale::korean() ? wxString::FromUTF8("취소됨") : _L("Cancelled."));
+    set_status_text(_L("Cancelled."));
 }
 
 void OllamaChatPanel::refresh_voice_button()
@@ -1812,8 +1694,7 @@ void OllamaChatPanel::toggle_voice()
     if (!app.ollama_voice_input)
         app.ollama_voice_input = create_ollama_voice_input();
     if (!app.ollama_voice_input) {
-        set_status_text(AiLocale::korean() ? wxString::FromUTF8("음성 입력은 macOS에서만 사용할 수 있습니다.")
-                                           : _L("Voice input is only available on macOS."));
+        set_status_text(_L("Voice input is only available on macOS."));
         return;
     }
 
@@ -1841,19 +1722,17 @@ void OllamaChatPanel::toggle_voice()
                 return;
             panel->refresh_voice_button();
             panel->set_input_text(wxString::FromUTF8(text));
-            panel->set_status_text(AiLocale::korean() ? wxString::FromUTF8("음성을 입력란에 넣었습니다. 확인 후 보내세요.")
-                                                      : _L("Voice text is in the box. Check it, then send."));
+            panel->set_status_text(_L("Voice text is in the box. Check it, then send."));
             panel->focus_input();
         });
     });
 
     if (app.ollama_voice_input->is_listening()) {
         app.ollama_voice_input->stop();
-        set_status_text(AiLocale::korean() ? wxString::FromUTF8("음성을 정리하는 중…") : _L("Processing voice…"));
+        set_status_text(_L("Processing voice…"));
     } else {
         app.ollama_voice_input->start();
-        set_status_text(AiLocale::korean() ? wxString::FromUTF8("듣는 중… 끝나면 음성 버튼을 다시 누르세요.")
-                                           : _L("Listening… Tap Mic again when you are done."));
+        set_status_text(_L("Listening… Tap Mic again when you are done."));
     }
     refresh_voice_button();
 }
@@ -1947,10 +1826,9 @@ void OllamaChatPanel::on_assist_loop_finished(const OllamaAgentRunResult& result
     if (!visible.empty())
         display = wxString::FromUTF8(visible);
     else if (display.empty() && result.cancelled)
-        display = ko ? wxString::FromUTF8("작업이 취소되었습니다.") : _L("Cancelled.");
+        display = _L("Cancelled.");
     else if (display.empty() && result.blocked)
-        display = ko ? wxString::FromUTF8("여기서 더 진행하지 못했습니다. 요청을 조금 더 구체적으로 말해 주세요.")
-                     : _L("Couldn't finish that. Try saying what you want a bit more specifically.");
+        display = _L("Couldn't finish that. Try saying what you want a bit more specifically.");
     else if (display.empty())
         display = _L("OK.");
 
@@ -1978,8 +1856,8 @@ void OllamaChatPanel::retry_last_chat_simple()
     }
 
     set_busy(true);
-    set_status_text(AiLocale::korean() ? wxString::FromUTF8("다시 시도 중…") : _L("Retrying…"));
-    append_thinking_line(AiLocale::korean() ? wxString::FromUTF8("다시 시도 중…") : _L("Retrying…"));
+    set_status_text(_L("Retrying…"));
+    append_thinking_line(_L("Retrying…"));
 
     const std::string model = m_model.empty() ? std::string(kOllamaDefaultModel) : normalize_ollama_model_tag(m_model);
     const auto alive        = m_alive;
@@ -2191,8 +2069,6 @@ void OllamaChatPanel::on_chat_response_impl(const std::string& assistant_text, c
             } else if (exec_root.contains("actions") && exec_root["actions"].is_array()
                        && !exec_root["actions"].empty()) {
                 display = nothing_applied_msg(current_plate_has_model());
-            } else if (message_looks_like_manual_instruction(into_u8(display))) {
-                display = manual_instruction_msg();
             } else if (sanitized.blocked_count > 0) {
                 display = change_not_applied_msg(current_plate_has_model());
             }

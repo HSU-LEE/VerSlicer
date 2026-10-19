@@ -108,7 +108,7 @@ PrintJobStepExecutors::ImportResult PrintJobStepExecutors::resolve_import_blocki
     ImportResult out;
 
     if (candidate.id.empty() && candidate.download_url.empty()) {
-        out.error = AiLocale::text("Invalid model selection.", "잘못된 모델 선택입니다.").utf8_string();
+        out.error = AiLocale::text("Invalid model selection.").utf8_string();
         return out;
     }
 
@@ -116,18 +116,13 @@ PrintJobStepExecutors::ImportResult PrintJobStepExecutors::resolve_import_blocki
     out.detail_page_url = payload.detail_page_url;
     if (!payload.ok) {
         out.error = payload.error;
-        out.needs_login = payload.error.find("Sign in") != std::string::npos
-                       || payload.error.find("session expired") != std::string::npos
-                       || payload.error.find("로그인") != std::string::npos;
-        out.no_download_link = !out.needs_login
-                            && (payload.error.find("download link") != std::string::npos
-                                || payload.error.find("다운로드 링크") != std::string::npos);
+        out.needs_login = payload.needs_login;
+        out.no_download_link = payload.no_download_link;
         return out;
     }
     if (payload.download_info.empty()) {
         out.no_download_link = true;
-        out.error = AiLocale::text("No download link was returned for this model.",
-                                   "이 모델의 다운로드 링크를 받지 못했습니다.").utf8_string();
+        out.error = AiLocale::text("No download link was returned for this model.").utf8_string();
         return out;
     }
 
@@ -149,12 +144,10 @@ void PrintJobStepExecutors::resolve_import_async(const ModelCandidate& candidate
             res = resolve_import_blocking(candidate);
         } catch (const std::exception& ex) {
             BOOST_LOG_TRIVIAL(error) << "AIPipeline: resolve_import threw: " << ex.what();
-            res.error = AiLocale::text("Could not resolve the model download.",
-                                       "모델 다운로드 정보를 가져오지 못했습니다.").utf8_string();
+            res.error = AiLocale::text("Could not resolve the model download.").utf8_string();
         } catch (...) {
             BOOST_LOG_TRIVIAL(error) << "AIPipeline: resolve_import threw: unknown error";
-            res.error = AiLocale::text("Could not resolve the model download.",
-                                       "모델 다운로드 정보를 가져오지 못했습니다.").utf8_string();
+            res.error = AiLocale::text("Could not resolve the model download.").utf8_string();
         }
         post_to_ui([cb, res]() {
             if (wxGetApp().is_closing())

@@ -1078,8 +1078,8 @@ MakerWorldImportPayload MakerWorldSearchService::resolve_import(const MakerWorld
     const bool                    has_auth = makerworld_download_auth_available(ctx);
 
     if (candidate.login_required && !has_auth) {
-        out.error = AiLocale::text("Sign in to Bambu Cloud to download this model.",
-                                   "이 모델을 내려받으려면 Bambu Cloud에 로그인하세요.").utf8_string();
+        out.needs_login = true;
+        out.error = AiLocale::text("Sign in to Bambu Cloud to download this model.").utf8_string();
         return out;
     }
 
@@ -1115,11 +1115,10 @@ MakerWorldImportPayload MakerWorldSearchService::resolve_import(const MakerWorld
             bool     login_required = false;
             url = fetch_download_via_iot_profile(profile_id, model_id, ctx, filename, http_status, login_required);
             if (url.empty() && login_required) {
+                out.needs_login = true;
                 out.error = has_auth
-                    ? AiLocale::text("Bambu Cloud session expired. Sign out and sign in again to download this model.",
-                                     "Bambu Cloud 세션이 만료되었습니다. 로그아웃 후 다시 로그인하면 내려받을 수 있습니다.").utf8_string()
-                    : AiLocale::text("Sign in to Bambu Cloud to download this model.",
-                                     "이 모델을 내려받으려면 Bambu Cloud에 로그인하세요.").utf8_string();
+                    ? AiLocale::text("Bambu Cloud session expired. Sign out and sign in again to download this model.").utf8_string()
+                    : AiLocale::text("Sign in to Bambu Cloud to download this model.").utf8_string();
                 return out;
             }
         }
@@ -1131,14 +1130,13 @@ MakerWorldImportPayload MakerWorldSearchService::resolve_import(const MakerWorld
                                    << " profile_id=" << profile_id
                                    << " plugin_dl=" << (ctx.plugin_download_available ? 1 : 0)
                                    << " has_token=" << (resolve_cloud_access_token().empty() ? 0 : 1);
-        if (resolve_cloud_access_token().empty())
-            out.error = AiLocale::text(
-                "Sign in to Bambu Cloud (Settings → Online) to download. If already signed in, sign out and sign in again.",
-                "내려받으려면 Bambu Cloud에 로그인하세요 (설정 → 온라인). 이미 로그인했다면 로그아웃 후 다시 로그인해 주세요.").utf8_string();
-        else
-            out.error = AiLocale::text(
-                "Could not get a download link. Open the model on MakerWorld and use Download, or paste the file link.",
-                "다운로드 링크를 받지 못했습니다. MakerWorld에서 모델을 열어 내려받거나 파일 링크를 붙여넣어 주세요.").utf8_string();
+        if (resolve_cloud_access_token().empty()) {
+            out.needs_login = true;
+            out.error = AiLocale::text("Sign in to Bambu Cloud (Settings → Online) to download. If already signed in, sign out and sign in again.").utf8_string();
+        } else {
+            out.no_download_link = true;
+            out.error = AiLocale::text("Could not get a download link. Open the model on MakerWorld and use Download, or paste the file link.").utf8_string();
+        }
         return out;
     }
 
@@ -1148,8 +1146,7 @@ MakerWorldImportPayload MakerWorldSearchService::resolve_import(const MakerWorld
     if (!is_allowed_makerworld_download_url(url) && url.find(".3mf") == std::string::npos) {
         // Allow CDN hosts returned by API even if not makerworld.com
         if (url.find("https://") != 0 && url.find("http://") != 0) {
-            out.error = AiLocale::text("Download URL is not allowed.",
-                                       "허용되지 않는 다운로드 URL입니다.").utf8_string();
+            out.error = AiLocale::text("Download URL is not allowed.").utf8_string();
             return out;
         }
     }
@@ -1187,8 +1184,7 @@ MakerWorldImportPayload MakerWorldSearchService::resolve_import_from_url(const s
         return resolve_import(c);
     }
 
-    out.error = AiLocale::text("Could not read a model ID from that MakerWorld link.",
-                               "MakerWorld 링크에서 모델 ID를 읽지 못했습니다.").utf8_string();
+    out.error = AiLocale::text("Could not read a model ID from that MakerWorld link.").utf8_string();
     return out;
 }
 

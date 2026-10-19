@@ -152,6 +152,8 @@ ModelImportPayload MakerWorldProvider::resolve_import(const ModelCandidate& cand
     ModelImportPayload out;
     out.provider_id     = ModelProviderId::MakerWorld;
     out.ok              = payload.ok;
+    out.needs_login     = payload.needs_login;
+    out.no_download_link = payload.no_download_link;
     out.error           = payload.error;
     out.download_info   = payload.download_info;
     out.detail_page_url = payload.detail_page_url;
@@ -165,6 +167,8 @@ ModelImportPayload MakerWorldProvider::resolve_import_from_url(const std::string
     ModelImportPayload out;
     out.provider_id     = ModelProviderId::MakerWorld;
     out.ok              = payload.ok;
+    out.needs_login     = payload.needs_login;
+    out.no_download_link = payload.no_download_link;
     out.error           = payload.error;
     out.download_info   = payload.download_info;
     out.detail_page_url = payload.detail_page_url;

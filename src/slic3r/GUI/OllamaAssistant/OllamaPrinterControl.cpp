@@ -68,13 +68,13 @@ std::optional<int> speed_level(const nlohmann::json& v)
     if (!v.is_string())
         return std::nullopt;
     std::string s = boost::algorithm::to_lower_copy(boost::algorithm::trim_copy(v.get<std::string>()));
-    if (s == "1" || s == "silent" || s == "quiet" || s == "저소음" || s == "조용히")
+    if (s == "1" || s == "silent")
         return 1;
-    if (s == "2" || s == "standard" || s == "normal" || s == "표준" || s == "보통")
+    if (s == "2" || s == "standard")
         return 2;
-    if (s == "3" || s == "sport" || s == "fast" || s == "스포츠" || s == "빠르게")
+    if (s == "3" || s == "sport")
         return 3;
-    if (s == "4" || s == "ludicrous" || s == "rampage" || s == "루디크러스" || s == "최고속")
+    if (s == "4" || s == "ludicrous")
         return 4;
     return std::nullopt;
 }
