@@ -19,6 +19,9 @@
 
 #include <wx/utils.h>
 
+#include <CoreFoundation/CoreFoundation.h>
+#include <Security/Security.h>
+
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -75,6 +78,67 @@ std::string account_path()
 std::string host_id_path()
 {
     return (boost::filesystem::path(data_dir()) / "chatgpt_host_id").string();
+}
+
+// Tokens live in the login Keychain; chatgpt_account.json is only read once
+// to migrate sessions saved by older builds.
+constexpr const char* kKeychainService = "com.verslicer.chatgpt";
+constexpr const char* kKeychainAccount = "session";
+
+CFMutableDictionaryRef keychain_query()
+{
+    CFMutableDictionaryRef q = CFDictionaryCreateMutable(nullptr, 0, &kCFTypeDictionaryKeyCallBacks,
+                                                         &kCFTypeDictionaryValueCallBacks);
+    CFStringRef service = CFStringCreateWithCString(nullptr, kKeychainService, kCFStringEncodingUTF8);
+    CFStringRef account = CFStringCreateWithCString(nullptr, kKeychainAccount, kCFStringEncodingUTF8);
+    CFDictionarySetValue(q, kSecClass, kSecClassGenericPassword);
+    CFDictionarySetValue(q, kSecAttrService, service);
+    CFDictionarySetValue(q, kSecAttrAccount, account);
+    CFRelease(service);
+    CFRelease(account);
+    return q;
+}
+
+std::string keychain_read()
+{
+    CFMutableDictionaryRef q = keychain_query();
+    CFDictionarySetValue(q, kSecReturnData, kCFBooleanTrue);
+    CFDictionarySetValue(q, kSecMatchLimit, kSecMatchLimitOne);
+    CFTypeRef   data = nullptr;
+    std::string out;
+    if (SecItemCopyMatching(q, &data) == errSecSuccess && data) {
+        CFDataRef bytes = static_cast<CFDataRef>(data);
+        out.assign(reinterpret_cast<const char*>(CFDataGetBytePtr(bytes)), static_cast<size_t>(CFDataGetLength(bytes)));
+        CFRelease(data);
+    }
+    CFRelease(q);
+    return out;
+}
+
+bool keychain_write(const std::string& body)
+{
+    CFDataRef              data = CFDataCreate(nullptr, reinterpret_cast<const UInt8*>(body.data()), static_cast<CFIndex>(body.size()));
+    CFMutableDictionaryRef q    = keychain_query();
+    CFMutableDictionaryRef upd  = CFDictionaryCreateMutable(nullptr, 0, &kCFTypeDictionaryKeyCallBacks,
+                                                            &kCFTypeDictionaryValueCallBacks);
+    CFDictionarySetValue(upd, kSecValueData, data);
+    OSStatus st = SecItemUpdate(q, upd);
+    if (st == errSecItemNotFound) {
+        CFDictionarySetValue(q, kSecValueData, data);
+        CFDictionarySetValue(q, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly);
+        st = SecItemAdd(q, nullptr);
+    }
+    CFRelease(upd);
+    CFRelease(q);
+    CFRelease(data);
+    return st == errSecSuccess;
+}
+
+void keychain_delete()
+{
+    CFMutableDictionaryRef q = keychain_query();
+    SecItemDelete(q);
+    CFRelease(q);
 }
 
 std::string url_encode(const std::string& value)
@@ -228,7 +292,12 @@ void load_session_locked()
         return;
     s.loaded = true;
     s.doc    = nlohmann::json::object();
-    const std::string raw = read_file(account_path());
+    std::string raw = keychain_read();
+    bool        migrate = false;
+    if (raw.empty()) {
+        raw     = read_file(account_path());
+        migrate = !raw.empty();
+    }
     if (raw.empty())
         return;
     try {
@@ -237,10 +306,17 @@ void load_session_locked()
             s.doc = std::move(parsed);
     } catch (...) {
     }
+    if (migrate && keychain_write(raw)) {
+        boost::system::error_code ec;
+        boost::filesystem::remove(account_path(), ec);
+    }
 }
 
 bool save_session_locked()
 {
+    if (keychain_write(account_session().doc.dump()))
+        return true;
+    // No usable Keychain (rare, e.g. a locked headless session): keep the owner-only file.
     return write_private_file(account_path(), account_session().doc.dump(2));
 }
 
@@ -849,6 +925,7 @@ void ChatGptAccount::sign_out()
     std::lock_guard<std::mutex> lock(session_mutex());
     account_session().loaded = true;
     account_session().doc    = nlohmann::json::object();
+    keychain_delete();
     boost::system::error_code ec;
     boost::filesystem::remove(account_path(), ec);
 }
