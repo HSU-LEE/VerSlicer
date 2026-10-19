@@ -6,6 +6,7 @@
 // reported, not failed, unless ASSISTANT_EVAL_MIN_PASS (0-100) is set.
 
 #include "../slic3r/GUI/OllamaAssistant/OllamaEvalGrader.hpp"
+#include "../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaFailureDoctor.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaActionRegistry.hpp"
 #include "../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.hpp"
@@ -82,6 +83,16 @@ int main()
     });
     expect_true(scores.at("gpt-a").total == 2 && scores.at("gpt-a").passed == 1, "score_log gpt-a");
     expect_true(scores.at("gpt-b").total == 1 && scores.at("gpt-b").passed == 0, "score_log gpt-b");
+
+    // Salvaging prose must not throw on number-like junk ("-", huge integers).
+    for (const char* prose : {"layer_height: -\n", "wall_loops: 99999999999999\n", "layer_height = .\n"}) {
+        try {
+            (void) try_salvage_ollama_action_json(prose);
+        } catch (const std::exception& e) {
+            std::cerr << "FAIL: salvage threw on '" << prose << "': " << e.what() << '\n';
+            ++g_failures;
+        }
+    }
 
     // Failure doctor: error codes map to the module that raised them.
     expect_true(OllamaFailureDoctor::area_for_code("0700200000020001").area == "ams_feeding", "doctor AMS HMS code");
