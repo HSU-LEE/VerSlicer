@@ -5520,7 +5520,9 @@ void GUI_App::check_new_version_sf(bool show_tips, int by_user)
         detect_updater_os_info()
     };
 
-    const std::string query_string = build_updater_query(query);
+    // GitHub's releases API needs no install id or signature; send them only to an Orca-style server.
+    const bool        github_api   = version_check_url.find("api.github.com") != std::string::npos;
+    const std::string query_string = github_api ? std::string() : build_updater_query(query);
     if (!query_string.empty()) {
         const bool has_query = version_check_url.find('?') != std::string::npos;
         if (!has_query)
