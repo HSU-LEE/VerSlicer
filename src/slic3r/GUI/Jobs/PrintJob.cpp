@@ -61,11 +61,10 @@ static auto file_over_size_str = _u8L("The print file exceeds the maximum allowa
 static auto print_canceled_str    = _u8L("Task canceled.");
 static auto send_print_failed_str = _u8L("Failed to send the print job. Please try again.");
 static auto cloud_signed_error_str = _u8L(
-    "This printer only accepts print jobs from other slicers through Bambu Connect (error -26). "
-    "Choose \"Print with Bambu Connect\" from the print button menu and print again; Developer Mode is not needed.");
+    "Cloud print is blocked for this slicer (error -26). Enable LAN mode and Developer mode on the printer, "
+    "then set the printer IP and LAN access code in the Device tab and print again.");
 static auto lan_then_cloud_failed_str = _u8L(
-    "The printer refused the job (error -26). Use \"Print with Bambu Connect\" from the print button menu, "
-    "or check the printer IP, LAN access code and Developer Mode if you print over LAN.");
+    "LAN and cloud upload both failed (error -26). Check printer IP, LAN access code, and Developer mode.");
 static auto upload_ftp_failed_str = _u8L("Failed to upload file to ftp. Please try again.");
 
 static auto     desc_network_error          = _u8L("Check the current status of the bambu server by clicking on the link above.");

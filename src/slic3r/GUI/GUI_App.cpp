@@ -1,4 +1,3 @@
-#include "BambuConnect.hpp"
 #include "ExportPresetBundleDialog.hpp"
 #include "OrcaCloudServiceAgent.hpp"
 #include "libslic3r/Technologies.hpp"
@@ -5758,23 +5757,16 @@ bool GUI_App::process_network_msg(std::string dev_id, std::string msg)
             static bool unsigned_studio_shown = false;
             if (!unsigned_studio_shown) {
                 unsigned_studio_shown = true;
-                // Bambu's supported path for other slicers is Bambu Connect, which
-                // works over the cloud without Developer Mode. Point there first.
-                const bool have_connect = BambuConnect::installed();
-                wxMessageDialog msg_dlg(nullptr,
-                    wxString::Format(_L("Bambu Lab printers only take print jobs and controls from slicers other than "
-                       "Bambu Studio through Bambu Connect, Bambu Lab's free helper app. Developer Mode is not needed.\n\n"
-                       "• Printing: slice, then press \"Print with Bambu Connect\". %s hands the sliced file to Bambu Connect, "
-                       "where you pick the printer and start the print.\n"
-                       "• Printer status keeps showing in the Device tab.\n\n"
-                       "Optional: to control the printer directly from %s instead, turn on LAN mode and Developer Mode "
-                       "on the printer and enter its IP and access code in the Device tab."),
-                       SLIC3R_APP_FULL_NAME, SLIC3R_APP_FULL_NAME),
-                    _L("Printing with Bambu Lab printers"), wxYES_NO | wxYES_DEFAULT | wxICON_INFORMATION);
-                msg_dlg.SetYesNoLabels(have_connect ? _L("Open Bambu Connect") : _L("Get Bambu Connect"), _L("OK"));
+                MessageDialog msg_dlg(nullptr,
+                    wxString::Format(_L("To use %s with Bambu Lab printers, enable LAN mode and Developer mode on the printer.\n\n"
+                       "1. Printer settings → turn on LAN mode\n"
+                       "2. Enable Developer mode (required for third-party slicers)\n"
+                       "3. In Verslicer Device tab, set the printer IP and LAN access code\n\n"
+                       "Cloud print from non-Bambu Studio builds is blocked (error -26); LAN is required."),
+                       SLIC3R_APP_FULL_NAME),
+                    _L("Network Plug-in Restriction"), wxAPPLY | wxOK);
                 m_show_error_msgdlg = true;
-                if (msg_dlg.ShowModal() == wxID_YES)
-                    BambuConnect::open_app();
+                msg_dlg.ShowModal();
                 m_show_error_msgdlg = false;
             }
             if (m_agent) {
@@ -5784,6 +5776,9 @@ bool GUI_App::process_network_msg(std::string dev_id, std::string msg)
                 if (obj)
                     m_agent->install_device_cert(obj->get_dev_id(), obj->is_lan_mode_printer());
             }
+            CallAfter([this]() {
+                show_ip_address_enter_dialog(_L("LAN + Developer mode required — enter IP and access code"));
+            });
             return true;
         }
     }
