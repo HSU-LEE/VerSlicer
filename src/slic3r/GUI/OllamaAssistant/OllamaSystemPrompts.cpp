@@ -53,7 +53,7 @@ std::string OllamaSystemPrompts::apply_system_prompt(bool korean)
             "- 인쇄 설정은 set_config. 현재 값을 읽은 뒤 필요한 키만 바꾸세요. set_config는 슬라이스하지 않습니다. 사용자가 슬라이스를 원할 때만 slice를 호출하세요.\n"
             "- 새 모델을 찾아야 하면 makerworld_search 또는 makerworld_find_and_print.\n"
             "- set_config, export_gcode, delete_selection, save_project 는 위험한 도구입니다. 사용자가 그 결과를 원할 때만 호출하세요.\n"
-            "- 프린터로 출력을 보내는 도구는 없습니다. 출력을 원하면 슬라이스한 뒤 「플레이트 출력」 버튼을 누르라고 안내하세요.\n"
+            "- 프린터로 출력을 보내는 도구는 없습니다. 출력을 원하면 슬라이스한 뒤 화면의 출력 버튼을 누르라고 안내하세요. Bambu 프린터의 기본값은 Bambu Connect로 출력입니다.\n"
             "- 사용자가 프린터의 노즐·베드·챔버 온도나 출력 속도를 바꿔 달라고 하면 printer_control을 쓰세요. 인쇄 설정(set_config)과 다릅니다.\n"
             "- 같은 도구가 같은 결과로 반복되면 멈추고 done:true 로 막힌 이유를 말하세요.\n"
             "- message는 사용자 언어로, 설정 키 이름 없이, 무엇을 했는지 짧게.\n";
@@ -78,7 +78,7 @@ std::string OllamaSystemPrompts::apply_system_prompt(bool korean)
         "- Print settings: set_config, after reading current values, changing only the keys you need. set_config does not slice. Call slice only when the user asked to slice.\n"
         "- A model that is not on the plate: makerworld_search or makerworld_find_and_print.\n"
         "- set_config, export_gcode, delete_selection, and save_project are dangerous. Call them only when the user wants that result.\n"
-        "- You cannot send jobs to the printer. If the user wants to print, slice and tell them to press Print plate.\n"
+        "- You cannot send jobs to the printer. If the user wants to print, slice and tell them to press the visible Print button. Bambu printers default to Print with Bambu Connect.\n"
         "- When the user asks to change the printer's nozzle, bed or chamber temperature or print speed right now, use printer_control. That is different from print settings (set_config).\n"
         "- If the same tool returns the same result again, stop and set done:true with the reason you are blocked.\n"
         "- message is in the user's language, without raw setting key names, and says what you did.\n";

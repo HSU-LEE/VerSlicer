@@ -146,8 +146,8 @@ void schedule_slice(MakerWorldFlowUiCallbacks cb)
                 return;
             }
 
-            // The AI never sends to the printer; the user does, with Print plate.
-            chat_notify(cb, _L("Slicing finished. Check the preview, then press Print plate to send it to your printer."));
+            // The AI never sends to the printer; the user chooses the visible print action.
+            chat_notify(cb, _L("Slicing finished. Check the preview, then press the Print button to send it to your printer."));
             finish_flow(cb);
         });
     });

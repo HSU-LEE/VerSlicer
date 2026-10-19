@@ -5970,7 +5970,9 @@ msgid "View"
 msgstr "시점"
 
 msgid "Preset Bundle"
-msgstr "프리셋 번들"msgid "Syncing presets from cloud…"
+msgstr "프리셋 번들"
+
+msgid "Syncing presets from cloud…"
 msgstr ""
 
 msgid "Help"
@@ -6013,7 +6015,9 @@ msgid "VFA"
 msgstr "VFA"
 
 msgid "Calibration Guide"
-msgstr "캘리브레이션 가이드"msgid "&Open G-code"
+msgstr "캘리브레이션 가이드"
+
+msgid "&Open G-code"
 msgstr "Gcode 열기 (&O)"
 
 msgid "Open a G-code file"
@@ -8874,7 +8878,9 @@ msgid "Bundle presets"
 msgstr ""
 
 msgid "System"
-msgstr "시스템"msgid "Unsupported presets"
+msgstr "시스템"
+
+msgid "Unsupported presets"
 msgstr ""
 
 msgid "Unsupported"
@@ -10772,7 +10778,9 @@ msgstr ""
 
 msgctxt "Sync_Nozzle_AMS"
 msgid "Cancel"
-msgstr "취소"msgid "Successfully synchronized filament color from printer."
+msgstr "취소"
+
+msgid "Successfully synchronized filament color from printer."
 msgstr ""
 
 msgid "Successfully synchronized color and type of filament from printer."
@@ -24718,6 +24726,8 @@ msgstr "신뢰도:"
 msgid "Not now"
 msgstr "나중에"
 
+msgid "Slicing finished. Check the preview, then press the Print button to send it to your printer."
+msgstr "슬라이스가 끝났습니다. 미리보기를 확인한 뒤 화면의 출력 버튼을 눌러 프린터로 보내세요."
 
 msgid "Bambu Lab printers with the latest firmware only accept print jobs from other slicers through Bambu Connect, Bambu Lab's free helper app. Developer Mode is not needed.\n\nInstall Bambu Connect (macOS 13 or later), sign in with your Bambu Lab account, then press Print again."
 msgstr "최신 펌웨어의 Bambu Lab 프린터는 다른 슬라이서의 출력 작업을 Bambu Lab의 무료 도우미 앱인 Bambu Connect를 통해서만 받습니다. 개발자 모드는 필요 없습니다.\n\nBambu Connect(macOS 13 이상)를 설치하고 Bambu Lab 계정으로 로그인한 뒤 다시 출력을 누르세요."

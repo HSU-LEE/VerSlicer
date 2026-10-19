@@ -11,6 +11,7 @@
 - An expired ChatGPT sign-in ("invalid_grant") no longer leaves the panel looking connected with a raw error code; it asks you to connect again.
 - Mode, model and **New chat** share one row, leaving more room for the conversation.
 - On cloud-connected printers, AI printer control says the printer may ignore the command instead of claiming success.
+- Request routing and MakerWorld search now rely on ChatGPT's intent and query instead of local keyword lists.
 
 ### Smart Print
 - The docked panel focuses on the plate: readiness, workflow, insights. Account, assistant options, history and printer learning moved to **Preferences → Smart Print**, opened from the link at the bottom.

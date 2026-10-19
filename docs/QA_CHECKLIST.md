@@ -29,9 +29,9 @@ Run on a **Release** build installed from the DMG, on a Mac that has not run Ver
 - [ ] "Make this stronger" → review dialog lists the setting changes; **Cancel** leaves settings unchanged; **Apply** changes them.
 - [ ] "Undo the last AI change" → settings return.
 - [ ] "Slice it" → slices; nothing is sent to the printer.
-- [ ] "Send it to my printer" → the AI says to press Print plate; no send dialog opens on its own.
+- [ ] "Send it to my printer" → the AI says to press the visible Print button; no send dialog opens on its own.
 - [ ] File → Import has no "Create Model"; the 3D view's options menu (next to 3D Navigator) has no "Create Model".
-- [ ] Empty plate: "용 피규어 출력해줘" → MakerWorld pick dialog → import → slice → "press Print plate" message (no automatic send).
+- [ ] Empty plate: "용 피규어 출력해줘" → MakerWorld pick dialog → import → slice → "press the Print button" message (no automatic send).
 - [ ] With a Bambu printer connected and an active HMS alert: "My print failed" → the reply names the error code and suggests settings.
 - [ ] Without a printer: "My print failed" → asks you to connect one or describe the failure.
 - [ ] Question mode: "Make this stronger" → explanation only, no dialog, no change.
