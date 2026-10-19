@@ -1,9 +1,16 @@
 build/
 build-tools/
-deps/
+# Dependency build output and download cache; the recipes in deps/ are tracked.
+deps/build/
+deps/DL_CACHE/
+.metadata_never_index
 compile_commands.json
 .DS_Store
 
-# GitHub Actions / Dependabot — not used for this macOS-only fork
-.github/workflows/
+# Dependabot — not used for this macOS-only fork
 .github/dependabot.yml
+
+# Local build logs and scratch helpers
+*.log
+__pycache__/
+.detached_build.py

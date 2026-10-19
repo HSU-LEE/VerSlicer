@@ -4,7 +4,8 @@
 #include "GUI_App.hpp"
 #include "OllamaAssistant/OllamaVoiceInput.hpp"
 #include "OllamaAssistant/OllamaClient.hpp"
-#include "OllamaAssistant/OllamaServerManager.hpp"
+#include "CrashReporter.hpp"
+#include "OllamaAssistant/AiPrivacyConsent.hpp"
 #include "OllamaAssistant/OllamaMcpServer.hpp"
 #include "GUI_Init.hpp"
 #include "GUI_ObjectList.hpp"
@@ -756,6 +757,8 @@ void GUI_App::post_init()
     if (! this->initialized())
         throw Slic3r::RuntimeError("Calling post_init() while not yet initialized");
 
+    load_ai_privacy_consent();
+    CallAfter([this] { CrashReporter::offer_report_from_last_run(mainframe); });
     OllamaMcpServer::start();
 
     m_open_method = "double_click";
@@ -1070,7 +1073,6 @@ void GUI_App::cleanup_ollama_assistant()
     }
 
     OllamaMcpServer::stop();
-    OllamaServerManager::shutdown_if_started();
 
     OllamaChatDialog* dlg = ollama_chat_dialog;
     ollama_chat_dialog    = nullptr;
@@ -2307,8 +2309,10 @@ GUI_App::~GUI_App()
         delete preset_updater;
     }
 
-    StaticBambuLib::release();
-    BBLNetworkPlugin::shutdown();
+    if (!m_bambu_libs_released) {
+        StaticBambuLib::release();
+        BBLNetworkPlugin::shutdown();
+    }
 
 
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< boost::format(": exit");
@@ -2486,6 +2490,8 @@ void GUI_App::init_app_config()
         m_datadir_redefined = true;
     }
 
+    CrashReporter::install();
+
     // start log here
     std::time_t       t        = std::time(0);
     std::tm *         now_time = std::localtime(&t);
@@ -2636,14 +2642,8 @@ bool GUI_App::OnInit()
     }
 }
 
-int GUI_App::OnExit()
+void GUI_App::release_network_for_exit()
 {
-    set_closing(true);
-    cleanup_ollama_assistant();
-
-    stop_http_server();
-    stop_sync_user_preset();
-
     if (m_device_manager) {
         delete m_device_manager;
         m_device_manager = nullptr;
@@ -2667,6 +2667,17 @@ int GUI_App::OnExit()
         delete m_agent;
         m_agent = nullptr;
     }
+}
+
+int GUI_App::OnExit()
+{
+    set_closing(true);
+    cleanup_ollama_assistant();
+
+    stop_http_server();
+    stop_sync_user_preset();
+
+    release_network_for_exit();
 
     // Orca: clean up encrypted bbl network log file if plugin is used
     // No point to keep them as they are encrypted and can't be used for debugging
@@ -2793,6 +2804,24 @@ bool GUI_App::on_init_inner()
         }
         for (auto d : dialogStack)
             d->EndModal(wxID_ABORT);
+    });
+
+    // macOS Quit (Cmd+Q, Dock, logout) ends with AppKit calling exit() right after
+    // this event: OnExit() and ~GUI_App() never run. Without this, the Bambu
+    // network plugin's threads were still alive when its static destructors ran,
+    // and every quit ended in std::terminate.
+    wxGetApp().Bind(wxEVT_END_SESSION, [this](wxCloseEvent&) {
+        BOOST_LOG_TRIVIAL(info) << "received wxEVT_END_SESSION, releasing network before exit";
+        set_closing(true);
+        stop_http_server();
+        stop_sync_user_preset();
+        release_network_for_exit();
+        if (!m_bambu_libs_released) {
+            StaticBambuLib::release();
+            BBLNetworkPlugin::shutdown();
+            m_bambu_libs_released = true;
+        }
+        flush_logs();
     });
 
     // Verify resources path
@@ -5520,7 +5549,9 @@ void GUI_App::check_new_version_sf(bool show_tips, int by_user)
         detect_updater_os_info()
     };
 
-    const std::string query_string = build_updater_query(query);
+    // GitHub's releases API needs no install id or signature; send them only to an Orca-style server.
+    const bool        github_api   = version_check_url.find("api.github.com") != std::string::npos;
+    const std::string query_string = github_api ? std::string() : build_updater_query(query);
     if (!query_string.empty()) {
         const bool has_query = version_check_url.find('?') != std::string::npos;
         if (!has_query)

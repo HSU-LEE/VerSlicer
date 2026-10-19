@@ -1,4 +1,5 @@
 #include "OllamaToolResult.hpp"
+#include "OllamaToolRegistry.hpp"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/format.hpp>
@@ -97,15 +98,6 @@ std::string friendly_tool_line(const std::string& tool, const std::string& msg, 
         return korean ? "메쉬를 수리했습니다." : "Repaired the mesh.";
     if (tool == "mirror_mesh" || msg.find("Mirrored mesh") != std::string::npos)
         return korean ? "모델을 대칭으로 만들었습니다." : "Mirrored the model.";
-    if (tool == "mesh_boolean" || msg.find("Applied mesh operation") != std::string::npos) {
-        if (msg.find("subtract") != std::string::npos || msg.find("drill") != std::string::npos)
-            return korean ? "모델에 구멍을 뚫었습니다." : "Drilled a hole in the model.";
-        if (msg.find("add_handle") != std::string::npos || msg.find("handle") != std::string::npos)
-            return korean ? "손잡이를 추가했습니다." : "Added a handle to the model.";
-        if (msg.find("add_rib") != std::string::npos)
-            return korean ? "리브(보강)를 추가했습니다." : "Added reinforcement ribs.";
-        return korean ? "모델 형상을 수정했습니다." : "Modified model geometry.";
-    }
     if (tool == "scale" || msg.find("Scaled") != std::string::npos)
         return korean ? "모델 크기를 조정했습니다." : "Resized the model.";
     if (tool == "rotate" || msg.find("Rotat") != std::string::npos) {
@@ -219,8 +211,7 @@ std::string ollama_verified_user_message(const std::vector<nlohmann::json>& step
                 continue;
             saw_tool = true;
             const std::string tool = r.value("tool", "");
-            const bool readonly = tool == "get_state" || tool == "list_objects" || tool == "select_object"
-                                  || tool == "wiki_search" || tool == "find_setting" || tool == "verify_config";
+            const bool readonly = OllamaToolRegistry::is_observation(tool) || tool == "verify_config";
             if (!readonly)
                 saw_mutating = true;
             if (!r.value("ok", true)) {
@@ -298,14 +289,6 @@ std::string describe_action_type(const std::string& type, const nlohmann::json& 
         return korean ? "인쇄 설정 변경" : "update print settings";
     if (type == "repair_mesh")
         return korean ? "메쉬 수리" : "repair mesh";
-    if (type == "mesh_boolean") {
-        const std::string op = action.value("operation", "");
-        if (op.find("subtract") != std::string::npos)
-            return korean ? "구멍 뚫기" : "drill hole";
-        if (op.find("handle") != std::string::npos)
-            return korean ? "손잡이 추가" : "add handle";
-        return korean ? "형상 수정" : "edit geometry";
-    }
     if (type == "mirror_mesh")
         return korean ? "대칭 만들기" : "mirror model";
     if (type == "scale")
@@ -393,6 +376,8 @@ std::string activity_line_for_action(const nlohmann::json& action, bool korean)
         return korean ? "설정에서 \"" + query + "\"을(를) 찾습니다."
                       : "Looking up the setting \"" + query + "\".";
     }
+    if (type == "printer_diagnostics")
+        return korean ? "프린터 오류 기록을 확인합니다." : "Checking the printer's error state.";
     if (type == "wiki_search") {
         const std::string query = action.value("query", "");
         if (query.empty())
@@ -465,8 +450,7 @@ std::string ollama_thinking_after_tools(const nlohmann::json& tool_results, bool
         if (!r.is_object())
             continue;
         const std::string tool = r.value("tool", "");
-        if (tool == "get_state" || tool == "list_objects" || tool == "select_object" || tool == "wiki_search"
-            || tool == "find_setting")
+        if (OllamaToolRegistry::is_observation(tool))
             continue;
         if (!r.value("ok", false)) {
             add(korean ? "이 단계는 적용되지 않았습니다. 다른 방법을 시도합니다."

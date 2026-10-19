@@ -1,5 +1,6 @@
 #include "OllamaModelLoadAdvisor.hpp"
 
+#include "../UiDispatch.hpp"
 #include "OllamaActionExecutor.hpp"
 #include "OllamaActionPipeline.hpp"
 #include "OllamaActionRegistry.hpp"
@@ -7,7 +8,6 @@
 #include "OllamaConfig.hpp"
 #include "OllamaProcessingNotice.hpp"
 #include "OllamaClient.hpp"
-#include "OllamaServerManager.hpp"
 #include "OllamaSettingRegistry.hpp"
 #include "OllamaTelemetry.hpp"
 
@@ -179,7 +179,7 @@ void run_model_load_chat(Plater* plater)
     client.chat(
         ollama_model_from_config(), messages,
         [alive, plater](const std::string& text, const std::string& error) {
-            wxGetApp().CallAfter([alive, plater, text, error]() {
+            post_to_ui([alive, plater, text, error]() {
                 if (!alive->load() || wxGetApp().is_closing()) {
                     finish_schedule();
                     return;
@@ -274,7 +274,7 @@ void ensure_ollama_then_run(Plater* plater)
     const auto alive = s_alive;
     OllamaClient client(ollama_host_from_config());
     client.list_models([alive, plater](const std::vector<std::string>&, const std::string& error) {
-        wxGetApp().CallAfter([alive, plater, error]() {
+        post_to_ui([alive, plater, error]() {
             if (!alive->load() || wxGetApp().is_closing()) {
                 finish_schedule();
                 return;
@@ -292,31 +292,8 @@ void ensure_ollama_then_run(Plater* plater)
                 return;
             }
 
-            const wxString cmd = OllamaServerManager::resolve_ollama_command();
-            OllamaServerManager::note_serve_spawn_attempt();
-            OllamaTelemetry::server_spawn_attempt(OllamaServerManager::serve_spawn_attempt_count(),
-                                                    cmd.utf8_string());
-            const long     pid = wxExecute(cmd + " serve", wxEXEC_ASYNC);
-            if (pid > 0) {
-                OllamaServerManager::mark_started(pid);
-                OllamaTelemetry::server_spawn_success(pid);
-            } else {
-                OllamaTelemetry::server_spawn_failed("wxExecute failed");
-            }
-
-            OllamaProcessingNotice::show(p, _u8L("Starting Ollama for AI recommendations…"));
-
-            auto* timer = new wxTimer(p);
-            timer->Bind(wxEVT_TIMER, [timer, alive, p](wxTimerEvent&) {
-                timer->Stop();
-                delete timer;
-                if (!alive->load() || wxGetApp().is_closing()) {
-                    finish_schedule();
-                    return;
-                }
-                run_model_load_chat(p);
-            });
-            timer->StartOnce(1500);
+            // ChatGPT is not linked or unreachable: skip the post-load advice quietly.
+            finish_schedule();
         });
     });
 }
@@ -331,7 +308,7 @@ void OllamaModelLoadAdvisor::schedule_after_model_load(Plater* plater)
         return;
 
     const auto alive = s_alive;
-    wxGetApp().CallAfter([alive, plater]() {
+    post_to_ui([alive, plater]() {
         if (!alive->load() || wxGetApp().is_closing())
             return;
         Plater* p = wxGetApp().plater();

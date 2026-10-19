@@ -8,6 +8,7 @@
 #include "../BambuSmartPrint/BambuSmartPrintService.hpp"
 #include "../BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "../BambuSmartPrint/BambuSmartPrintWorkflowDialog.hpp"
+#include "OllamaToolRegistry.hpp"
 #include "../AICoach/AIGuiOrchestrator.hpp"
 #include "../I18N.hpp"
 #include "../GUI_App.hpp"
@@ -54,7 +55,7 @@ static bool ui_prefers_korean()
 
 static bool is_readonly_action(const std::string& type)
 {
-    return type == "get_state" || type == "list_objects" || type == "wiki_search" || type == "find_setting";
+    return OllamaToolRegistry::category_for(type) == OllamaToolCategory::Readonly;
 }
 
 static bool is_workflow_only_action(const std::string& type)
@@ -62,10 +63,12 @@ static bool is_workflow_only_action(const std::string& type)
     return type == "slice" || type == "ui_select_tab" || type == "menu_item" || type == "add_model"
         || type == "makerworld_search" || type == "makerworld_find_and_print" || type == "import_makerworld"
         || type == "open_smart_print" || type == "open_setup"
-        || type == "send_print" || type == "export_gcode" || type == "rollback_apply"
+        || type == "export_gcode" || type == "rollback_apply"
         || type == "get_state" || type == "list_objects" || type == "select_object"
         || type == "add_plate" || type == "delete_plate" || type == "select_plate"
-        || type == "open_calibration" || type == "run_smart_print" || type == "select_preset";
+        || type == "open_calibration" || type == "run_smart_print" || type == "select_preset"
+        // Gated by the user's one-time printer-control consent instead of a review dialog.
+        || type == "printer_control";
 }
 
 static bool is_geometry_action(const std::string& type)
@@ -347,8 +350,7 @@ static bool is_geometry_or_flow_only(const nlohmann::json& root)
 
 static bool is_dangerous_action(const std::string& type)
 {
-    return type == "delete_selection" || type == "delete_plate" || type == "save_project"
-        || type == "send_print" || type == "export_gcode";
+    return OllamaToolRegistry::category_for(type) == OllamaToolCategory::Dangerous;
 }
 
 static bool is_inline_chat_apply(const nlohmann::json& root)
@@ -421,9 +423,11 @@ OllamaWorkflowRun OllamaActionWorkflow::confirm_and_execute(const nlohmann::json
     if (is_inline_chat_apply(root))
         return execute_inline(root, parent);
 
+    // Without a window to review in, refuse rather than apply unreviewed changes.
     wxWindow* dlg_parent = dialog_parent(parent);
     if (!dlg_parent) {
-        run.results = OllamaActionExecutor::execute(root);
+        run.cancelled = true;
+        OllamaTelemetry::workflow_finished(false, true, false, 0);
         return run;
     }
 

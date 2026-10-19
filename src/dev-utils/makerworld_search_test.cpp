@@ -121,6 +121,10 @@ int main()
     expect_eq(normalize_makerworld_search_query("find me a \"keycap cat\""), "keycap cat",
               "normalize quoted phrase");
     expect_eq(normalize_makerworld_search_query("키캡 검색해줘"), "키캡", "normalize korean filler");
+    expect_eq(normalize_makerworld_search_query("bambu에서 용 피규어 찾아줘"), "용 피규어",
+              "normalize drops orphan particle");
+    expect_eq(normalize_makerworld_search_query("이가 빠진 컵"), "이가 빠진 컵",
+              "normalize keeps particles inside words");
 
     std::vector<MakerWorldCandidate> word_pool;
     MakerWorldCandidate dragonfly;

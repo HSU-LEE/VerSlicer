@@ -92,7 +92,6 @@ struct PrintJob
     std::vector<int>                     import_tried;
 
     // --- Import / slice-send behavior ---
-    bool              auto_slice_and_send{ false }; // find_and_print path
     int               plate_index{ 0 };
 
     // --- Mesh health / repair (Foundation B) ---

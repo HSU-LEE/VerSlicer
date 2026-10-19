@@ -1,5 +1,6 @@
 #include "SlicePilotSimpleLayout.hpp"
 
+#include "../UiDispatch.hpp"
 #include "../GUI_App.hpp"
 #include "../MainFrame.hpp"
 #include "../Notebook.hpp"
@@ -90,7 +91,7 @@ void SlicePilotSimpleLayout::apply(MainFrame* frame)
     frame->m_tabpanel->Refresh();
     frame->Layout();
 
-    wxGetApp().CallAfter([simple]() {
+    post_to_ui([simple]() {
         if (!wxGetApp().mainframe || !wxGetApp().plater())
             return;
         wxGetApp().save_mode(simple ? comSimple : comAdvanced);

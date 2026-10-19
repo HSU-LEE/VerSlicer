@@ -1,9 +1,10 @@
 #include "OllamaChatPanel.hpp"
+#include "../UiDispatch.hpp"
+#include "AiPrivacyConsent.hpp"
 #include "OllamaActionExecutor.hpp"
 #include "OllamaActionPipeline.hpp"
 #include "OllamaIntentContext.hpp"
 #include "OllamaModelPick.hpp"
-#include "OllamaServerManager.hpp"
 #include "OllamaActionWorkflow.hpp"
 #include "OllamaAgentGoalPlanner.hpp"
 #include "OllamaAgentStateService.hpp"
@@ -126,6 +127,9 @@ static bool looks_like_json_parse_error(const std::string& what)
 static wxString format_chat_error(const std::string& raw)
 {
     const bool ko = AiLocale::korean();
+    if (raw.find("privacy notice not accepted") != std::string::npos)
+        return ko ? wxString::FromUTF8("AI 도우미 개인정보 안내에 동의해야 사용할 수 있습니다. 메시지를 다시 보내면 안내가 열립니다.")
+                  : wxString("Agree to the AI assistant data notice first. Send your message again to see it.");
     if (raw.find("Connect a ChatGPT account") != std::string::npos)
         return ko ? wxString::FromUTF8("먼저 위의 「ChatGPT 계정 연결」을 눌러 주세요.")
                   : wxString("Connect ChatGPT with the button above.");
@@ -138,6 +142,27 @@ static wxString format_chat_error(const std::string& raw)
     if (raw.find("Could not store") != std::string::npos)
         return ko ? wxString::FromUTF8("이 Mac에 로그인 정보를 저장하지 못했습니다.")
                   : wxString("Could not save the ChatGPT sign-in on this Mac.");
+
+    if (raw.find("HTTP 429") != std::string::npos || raw.find("rate limit") != std::string::npos
+        || raw.find("usage limit") != std::string::npos)
+        return ko ? wxString::FromUTF8("ChatGPT 사용 한도에 도달했습니다. 잠시 후 다시 시도하거나 다른 모델을 골라 주세요.")
+                  : wxString("You've hit your ChatGPT usage limit. Try again later or choose another model.");
+    if (raw.find("HTTP 401") != std::string::npos || raw.find("HTTP 403") != std::string::npos
+        || raw.find("does not match the saved sign-in") != std::string::npos
+        || raw.find("account does not match") != std::string::npos)
+        return ko ? wxString::FromUTF8("ChatGPT 연결이 더 이상 유효하지 않습니다. 「해제」 후 다시 연결해 주세요.")
+                  : wxString("Your ChatGPT connection is no longer valid. Sign out, then connect again.");
+    if (raw.find("HTTP 5") != std::string::npos)
+        return ko ? wxString::FromUTF8("ChatGPT 서버에 일시적인 문제가 있습니다. 잠시 후 다시 시도해 주세요.")
+                  : wxString("ChatGPT is having a temporary problem. Try again in a moment.");
+    if (raw.find("no models for VerSlicer") != std::string::npos)
+        return ko ? wxString::FromUTF8("이 ChatGPT 요금제에서는 VerSlicer가 쓸 수 있는 모델이 없습니다. Plus 또는 Pro 요금제가 필요합니다.")
+                  : wxString("This ChatGPT plan has no models VerSlicer can use. A Plus or Pro plan is required.");
+    if (raw == "Request cancelled")
+        return ko ? wxString::FromUTF8("요청을 취소했습니다.") : wxString("Request cancelled.");
+    if (raw.find("sign-in callback") != std::string::npos || raw.find("start ChatGPT sign-in") != std::string::npos)
+        return ko ? wxString::FromUTF8("로그인 창을 열지 못했습니다. VerSlicer를 다시 시작한 뒤 연결해 주세요.")
+                  : wxString("Couldn't start the sign-in. Restart VerSlicer and connect again.");
 
     if (raw.find("Connection refused") != std::string::npos || raw.find("connection refused") != std::string::npos
         || raw.find("Could not connect") != std::string::npos || raw.find("Failed to connect") != std::string::npos)
@@ -686,19 +711,39 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     m_model_combo->Append("ChatGPT");
     SlicePilotUi::sync_combobox_selection(m_model_combo, 0);
 
-    m_account_label = new wxStaticText(m_body, wxID_ANY, wxEmptyString);
-    m_account_label->SetForegroundColour(SlicePilotUi::Theme::text());
-    m_account_label->SetFont(Label::Body_13);
-    m_account_label->Hide();
-    m_account_btn = new Button(m_body, AiLocale::korean() ? wxString::FromUTF8("ChatGPT 계정 연결")
-                                                          : wxString("Connect ChatGPT"));
-    SlicePilotUi::style_primary_button(m_account_btn);
-    m_account_btn->SetStyle(ButtonStyle::Confirm, ButtonType::Choice);
-    m_account_btn->SetFont(Label::Body_14);
-    m_account_btn->SetMinSize(wxSize(FromDIP(160), row_h));
-    m_account_row = new wxBoxSizer(wxHORIZONTAL);
-    m_account_row->Add(m_account_label, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, FromDIP(6));
-    m_account_row->Add(m_account_btn, 1, wxEXPAND);
+    ChatGptAccountBar::Callbacks account_cb;
+    account_cb.notify = [this](const wxString& text) {
+        append_chat(_L("System"), text);
+        set_status_text(text);
+    };
+    account_cb.format_error = [](const std::string& raw) { return format_chat_error(raw); };
+    account_cb.signed_in    = [this]() {
+        const wxString ready = AiLocale::korean()
+            ? wxString::FromUTF8("ChatGPT가 연결되었습니다. 원하는 결과를 말로 적어 보내세요.\n"
+                                 "예: 「더 튼튼하게 해줘」 · 「45도 돌려줘」 · 「서포트 켜줘」 · 「용 피규어 출력해줘」 · 「출력이 실패했어」")
+            : wxString("ChatGPT is connected. Describe the result you want and send it.\n"
+                       "Try: \"Make this stronger\" · \"Rotate it 45 degrees\" · \"Turn on supports\" · "
+                       "\"Print me a dragon\" · \"My print failed\"");
+        append_chat(_L("System"), ready);
+        update_system_welcome_in_chat();
+        set_status_text(ready);
+        m_model_poll_failures = 0;
+        refresh_models();
+        focus_input();
+    };
+    account_cb.signed_out = [this]() {
+        m_available_models.clear();
+        m_model.clear();
+        update_model_label_ui();
+        update_system_welcome_in_chat();
+        set_status_text(AiLocale::korean() ? wxString::FromUTF8("ChatGPT 연결이 해제되었습니다.")
+                                           : wxString("ChatGPT signed out."));
+    };
+    account_cb.relayout = [this]() {
+        if (m_body)
+            m_body->Layout();
+    };
+    m_account_bar = std::make_unique<ChatGptAccountBar>(m_body, row_h, std::move(account_cb));
 
     auto* mode_row = new wxBoxSizer(wxHORIZONTAL);
     m_mode_label = new wxStaticText(m_body, wxID_ANY, _L("Mode"));
@@ -745,7 +790,7 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
     mode_row->AddSpacer(gap);
     mode_row->Add(m_reset_btn, 0, wxALIGN_CENTER_VERTICAL);
 
-    toolbar->Add(m_account_row, 0, wxEXPAND);
+    toolbar->Add(m_account_bar->sizer(), 0, wxEXPAND);
     toolbar->Add(model_row, 0, wxEXPAND | wxTOP, FromDIP(6));
     toolbar->Add(mode_row, 0, wxEXPAND | wxTOP, FromDIP(6));
     body_sizer->Add(toolbar, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, pad);
@@ -968,7 +1013,6 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
         e.Skip();
     });
     m_reset_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { reset_conversation(); });
-    m_account_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { connect_chatgpt(); });
     m_pipeline_stop_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { cancel_inflight(); });
 
     load_settings();
@@ -986,7 +1030,7 @@ OllamaChatPanel::OllamaChatPanel(wxWindow* parent, bool show_header)
 
     g_active_chat_panel = this;
 
-    refresh_account_button();
+    m_account_bar->refresh();
     ensure_assistant_ready();
 }
 
@@ -1294,114 +1338,6 @@ void OllamaChatPanel::reset_conversation()
         set_status_text(AiLocale::korean() ? wxString::FromUTF8("준비됨") : _L("Ready"));
 }
 
-void OllamaChatPanel::refresh_account_button()
-{
-    if (!m_account_btn)
-        return;
-    const bool linked = ChatGptAccount::linked();
-    if (m_account_label) {
-        if (linked) {
-            const std::string email = ChatGptAccount::email();
-            m_account_label->SetLabel(email.empty()
-                ? (AiLocale::korean() ? wxString::FromUTF8("ChatGPT 연결됨") : wxString("ChatGPT connected"))
-                : wxString::FromUTF8(email));
-            m_account_label->Show();
-        } else {
-            m_account_label->Hide();
-        }
-    }
-    if (auto* item = m_account_row ? m_account_row->GetItem(m_account_btn) : nullptr)
-        item->SetProportion(linked ? 0 : 1);
-    if (linked) {
-        SlicePilotUi::style_secondary_button(m_account_btn);
-        m_account_btn->SetStyle(ButtonStyle::Regular, ButtonType::Compact);
-        m_account_btn->SetFont(Label::Body_13);
-        m_account_btn->SetLabel(AiLocale::korean() ? wxString::FromUTF8("해제") : wxString("Sign out"));
-        m_account_btn->SetToolTip(AiLocale::korean() ? wxString::FromUTF8("이 Mac에서 ChatGPT 연결을 지웁니다.")
-                                                     : wxString("Remove the ChatGPT connection on this Mac."));
-        m_account_btn->SetMinSize(wxSize(FromDIP(64), FromDIP(28)));
-    } else if (!m_signing_in) {
-        SlicePilotUi::style_primary_button(m_account_btn);
-        m_account_btn->SetStyle(ButtonStyle::Confirm, ButtonType::Choice);
-        m_account_btn->SetFont(Label::Body_14);
-        m_account_btn->SetLabel(AiLocale::korean() ? wxString::FromUTF8("ChatGPT 계정 연결")
-                                                   : wxString("Connect ChatGPT"));
-        m_account_btn->SetToolTip(AiLocale::korean()
-            ? wxString::FromUTF8("브라우저가 열립니다. ChatGPT에 로그인하고 허용을 누르세요.")
-            : wxString("Opens the browser. Sign in to ChatGPT and allow access."));
-        m_account_btn->SetMinSize(wxSize(FromDIP(160), FromDIP(28)));
-    }
-    if (m_body)
-        m_body->Layout();
-}
-
-void OllamaChatPanel::connect_chatgpt()
-{
-    if (m_busy || m_signing_in)
-        return;
-    if (ChatGptAccount::linked()) {
-        wxMessageDialog confirm(this,
-            AiLocale::korean() ? wxString::FromUTF8("이 Mac에 저장된 ChatGPT 연결을 지울까요?")
-                               : wxString("Remove the saved ChatGPT connection on this Mac?"),
-            AiLocale::korean() ? wxString::FromUTF8("ChatGPT 연결 해제") : wxString("Sign out of ChatGPT"),
-            wxYES_NO | wxNO_DEFAULT | wxICON_QUESTION);
-        if (confirm.ShowModal() != wxID_YES)
-            return;
-        ChatGptAccount::sign_out();
-        m_available_models.clear();
-        m_model.clear();
-        update_model_label_ui();
-        refresh_account_button();
-        update_system_welcome_in_chat();
-        set_status_text(AiLocale::korean() ? wxString::FromUTF8("ChatGPT 연결이 해제되었습니다.")
-                                           : wxString("ChatGPT signed out."));
-        return;
-    }
-
-    m_signing_in = true;
-    if (m_account_btn) {
-        m_account_btn->SetLabel(AiLocale::korean() ? wxString::FromUTF8("브라우저에서 로그인 중…")
-                                                   : wxString("Waiting for the browser…"));
-        m_account_btn->Enable(false);
-    }
-    const wxString waiting = AiLocale::korean()
-        ? wxString::FromUTF8("브라우저가 열립니다. ChatGPT에 로그인하고, VerSlicer 사용 허용을 누르세요. 이 창으로 돌아오면 연결이 끝납니다.")
-        : wxString("The browser will open. Sign in to ChatGPT and allow VerSlicer. Come back here when it finishes.");
-    append_chat(_L("System"), waiting);
-    set_status_text(waiting);
-    const auto alive = m_alive;
-    wxWeakRef<wxWindow> weak(this);
-    std::thread([alive, weak]() {
-        const std::string error = ChatGptAccount::sign_in();
-        wxGetApp().CallAfter([alive, weak, error]() {
-            if (!alive->load() || wxGetApp().is_closing())
-                return;
-            auto* panel = dynamic_cast<OllamaChatPanel*>(weak.get());
-            if (!panel)
-                return;
-            panel->m_signing_in = false;
-            if (panel->m_account_btn)
-                panel->m_account_btn->Enable(!panel->m_busy);
-            panel->refresh_account_button();
-            if (!error.empty()) {
-                const wxString shown = format_chat_error(error);
-                panel->append_chat(_L("System"), shown);
-                panel->set_status_text(shown);
-                return;
-            }
-            const wxString ready = AiLocale::korean()
-                ? wxString::FromUTF8("ChatGPT가 연결되었습니다. 이제 원하는 것을 입력하고 보내세요.")
-                : wxString("ChatGPT is connected. Type what you want and send it.");
-            panel->append_chat(_L("System"), ready);
-            panel->update_system_welcome_in_chat();
-            panel->set_status_text(ready);
-            panel->m_model_poll_failures = 0;
-            panel->refresh_models();
-            panel->focus_input();
-        });
-    }).detach();
-}
-
 void OllamaChatPanel::ensure_assistant_ready()
 {
     if (!ChatGptAccount::linked()) {
@@ -1424,7 +1360,7 @@ void OllamaChatPanel::refresh_models()
     const auto alive = m_alive;
     wxWeakRef<wxWindow> weak(this);
     m_client.list_models([alive, weak](const std::vector<std::string>& models, const std::string& error) {
-        wxGetApp().CallAfter([alive, weak, models, error]() {
+        post_to_ui([alive, weak, models, error]() {
             if (!alive->load() || wxGetApp().is_closing())
                 return;
             auto* panel = dynamic_cast<OllamaChatPanel*>(weak.get());
@@ -1471,7 +1407,7 @@ MakerWorldFlowUiCallbacks OllamaChatPanel::makerworld_flow_callbacks()
         }
     };
     cb.on_flow_finished = [weak]() {
-        wxGetApp().CallAfter([weak]() {
+        post_to_ui([weak]() {
             if (auto* panel = weak.get()) {
                 const wxString last = panel->m_history_list ? panel->m_history_list->last_assistant_text()
                                                             : wxString{};
@@ -1524,7 +1460,7 @@ AIPipeline::PrintJobUiCallbacks OllamaChatPanel::orchestrator_ui_callbacks()
             panel->on_pipeline_step(state, detail);
     };
     ui.on_finished = [weak]() {
-        wxGetApp().CallAfter([weak]() {
+        post_to_ui([weak]() {
             if (auto* panel = weak.get()) {
                 // Belt-and-braces: the job is over, so no indicator may survive
                 // even if a set_busy(false) was missed on some path.
@@ -1544,7 +1480,7 @@ void OllamaChatPanel::on_pipeline_step(AIPipeline::PrintJobState state, const wx
     using AIPipeline::PrintJobState;
 
     struct StepInfo { int index; const char* en; const char* ko; };
-    // 6 visible pipeline steps: search -> import -> analyze -> configure -> slice -> send.
+    // 6 visible pipeline steps: search -> import -> analyze -> configure -> slice -> ready.
     StepInfo info{0, "", ""};
     switch (state) {
     case PrintJobState::Searching:
@@ -1556,8 +1492,7 @@ void OllamaChatPanel::on_pipeline_step(AIPipeline::PrintJobState state, const wx
     case PrintJobState::AutoConfig:       info = {4, "Configure", "설정"};       break;
     case PrintJobState::Slicing:
     case PrintJobState::Estimating:       info = {5, "Slice",     "슬라이스"};   break;
-    case PrintJobState::ReadyToPrint:
-    case PrintJobState::Sending:          info = {6, "Send",      "전송"};       break;
+    case PrintJobState::ReadyToPrint:     info = {6, "Ready",     "준비 완료"};  break;
     default:
         // Idle / intent / clarify / terminal states: no strip.
         hide_pipeline_progress();
@@ -1651,8 +1586,8 @@ void OllamaChatPanel::set_busy(bool busy)
         m_mode_combo->Enable(!busy);
     if (m_model_combo)
         m_model_combo->Enable(!busy);
-    if (m_account_btn)
-        m_account_btn->Enable(!busy && !m_signing_in);
+    if (m_account_bar)
+        m_account_bar->set_busy(busy);
     if (m_input_field)
         m_input_field->Enable(!busy);
     Plater* plater = wxGetApp().plater();
@@ -1694,7 +1629,7 @@ OllamaClient::StreamCallback OllamaChatPanel::make_stream_callback(uint64_t gen)
     return [alive, gen, weak](const std::string& chunk) {
         if (!alive->load())
             return;
-        wxGetApp().CallAfter([alive, gen, weak, chunk]() {
+        post_to_ui([alive, gen, weak, chunk]() {
             if (!alive->load() || wxGetApp().is_closing())
                 return;
             auto* panel = dynamic_cast<OllamaChatPanel*>(weak.get());
@@ -1861,7 +1796,7 @@ void OllamaChatPanel::dispatch_single_shot_chat(const std::string& user_msg, con
     const uint64_t    gen   = ++m_request_gen;
     wxWeakRef<wxWindow> weak_panel(this);
     m_client.chat(model, m_messages, [alive, gen, weak_panel](const std::string& text, const std::string& error) {
-        wxGetApp().CallAfter([alive, gen, weak_panel, text, error]() {
+        post_to_ui([alive, gen, weak_panel, text, error]() {
             if (!alive->load() || wxGetApp().is_closing())
                 return;
             auto* panel = dynamic_cast<OllamaChatPanel*>(weak_panel.get());
@@ -1936,7 +1871,7 @@ void OllamaChatPanel::toggle_voice()
     const auto alive = m_alive;
     wxWeakRef<wxWindow> weak(this);
     app.ollama_voice_input->set_on_error([alive, weak](const std::string& err) {
-        wxGetApp().CallAfter([alive, weak, err]() {
+        post_to_ui([alive, weak, err]() {
             if (!alive->load() || wxGetApp().is_closing())
                 return;
             auto* panel = dynamic_cast<OllamaChatPanel*>(weak.get());
@@ -1949,7 +1884,7 @@ void OllamaChatPanel::toggle_voice()
     app.ollama_voice_input->set_on_final_text([alive, weak](const std::string& text) {
         if (text.empty())
             return;
-        wxGetApp().CallAfter([alive, weak, text]() {
+        post_to_ui([alive, weak, text]() {
             if (!alive->load() || wxGetApp().is_closing())
                 return;
             auto* panel = dynamic_cast<OllamaChatPanel*>(weak.get());
@@ -1988,9 +1923,12 @@ void OllamaChatPanel::on_send(wxCommandEvent&)
         append_chat(_L("System"), AiLocale::korean()
             ? wxString::FromUTF8("아직 ChatGPT가 연결되지 않았습니다. 입력한 문장은 남겨 두고, 브라우저에서 로그인을 진행합니다.")
             : wxString("ChatGPT is not connected yet. Your text stays in the box while the browser opens."));
-        connect_chatgpt();
+        m_account_bar->toggle();
         return;
     }
+    // Sessions linked before the consent notice existed still need to agree once.
+    if (!ensure_ai_privacy_consent(this))
+        return;
 
     save_settings();
     OllamaClient::cancel_active_requests(OllamaCancelDomain::Chat);
@@ -2101,7 +2039,7 @@ void OllamaChatPanel::retry_last_chat_simple()
     const uint64_t gen      = m_request_gen;
     wxWeakRef<wxWindow> weak_panel(this);
     m_client.chat(model, m_messages, [alive, gen, weak_panel](const std::string& text, const std::string& error) {
-        wxGetApp().CallAfter([alive, gen, weak_panel, text, error]() {
+        post_to_ui([alive, gen, weak_panel, text, error]() {
             if (!alive->load() || wxGetApp().is_closing())
                 return;
             auto* panel = dynamic_cast<OllamaChatPanel*>(weak_panel.get());
@@ -2124,7 +2062,6 @@ void OllamaChatPanel::on_models_loaded(const std::vector<std::string>& models, c
 
     m_model_poll_failures = 0;
     m_available_models    = models;
-    OllamaServerManager::note_serve_reachable();
     m_model = resolve_installed_model(models, m_model);
     if (m_assist_controller)
         m_assist_controller->set_model(normalize_ollama_model_tag(m_model));
@@ -2142,6 +2079,23 @@ void OllamaChatPanel::ensure_default_model_ready(const std::vector<std::string>&
 }
 
 void OllamaChatPanel::on_chat_response(const std::string& assistant_text, const std::string& error)
+{
+    try {
+        on_chat_response_impl(assistant_text, error);
+    } catch (const std::exception& e) {
+        BOOST_LOG_TRIVIAL(error) << "Assistant reply handling threw: " << e.what();
+        if (!m_alive->load() || wxGetApp().is_closing())
+            return;
+        set_busy(false);
+        const wxString msg = AiLocale::korean()
+            ? wxString::FromUTF8("AI 응답을 처리하지 못했습니다. 다시 보내 보세요.")
+            : wxString("Couldn't process the AI reply. Try sending again.");
+        append_chat(_L("System"), msg);
+        set_status_text(msg);
+    }
+}
+
+void OllamaChatPanel::on_chat_response_impl(const std::string& assistant_text, const std::string& error)
 {
     if (!m_alive->load() || wxGetApp().is_closing())
         return;

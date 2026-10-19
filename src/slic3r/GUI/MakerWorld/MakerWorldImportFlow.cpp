@@ -1,4 +1,5 @@
 #include "MakerWorldImportFlow.hpp"
+#include "../UiDispatch.hpp"
 #include "MakerWorldIntent.hpp"
 #include "MakerWorldPickDialog.hpp"
 #include "MakerWorldPrintOfferDialog.hpp"
@@ -108,10 +109,10 @@ void finish_flow(const MakerWorldFlowUiCallbacks& cb)
         cb.on_flow_finished();
 }
 
-/** Slice the current plate, then send to printer once slicing completes.
+/** Slice the current plate and tell the user to press Print plate (the AI never sends).
  *  Subscribes for a single SliceDone event, unsubscribes after handling it, and
- *  calls finish_flow() only after slice+send resolves (success OR failure). */
-void schedule_slice_and_send(MakerWorldFlowUiCallbacks cb)
+ *  calls finish_flow() only after slicing resolves (success OR failure). */
+void schedule_slice(MakerWorldFlowUiCallbacks cb)
 {
     Plater* plater = wxGetApp().plater();
     if (!plater) {
@@ -133,7 +134,7 @@ void schedule_slice_and_send(MakerWorldFlowUiCallbacks cb)
         OllamaAgentEventBus::instance().unsubscribe(*sub_id);
 
         const bool ok = evt.payload.value("success", false);
-        wxGetApp().CallAfter([ok, cb]() {
+        post_to_ui([ok, cb]() {
             Plater* p = wxGetApp().plater();
             if (!p) {
                 chat_notify(cb, _L("The slicer is no longer available."));
@@ -146,14 +147,8 @@ void schedule_slice_and_send(MakerWorldFlowUiCallbacks cb)
                 return;
             }
 
-            const OllamaFlowDispatchResult dispatch = OllamaUserFlow::dispatch_coach_action("send_print", p);
-            if (dispatch.setup_blocked) {
-                chat_notify(cb, dispatch.blocked_message.empty()
-                                    ? _L("Complete printer setup before sending to the printer.")
-                                    : wxString::FromUTF8(dispatch.blocked_message));
-            } else {
-                chat_notify(cb, _L("Slicing finished — sending the model to your printer."));
-            }
+            // The AI never sends to the printer; the user does, with Print plate.
+            chat_notify(cb, _L("Slicing finished. Check the preview, then press Print plate to send it to your printer."));
             finish_flow(cb);
         });
     });
@@ -239,9 +234,9 @@ void MakerWorldImportFlow::notify_plater_import_done(bool ok, const std::string&
     if (ok && slice_and_send) {
         if (cb.append_chat)
             cb.append_chat(_L("Slicing and sending to printer…"));
-        // finish_flow is deferred until slice+send completes (success or failure)
+        // finish_flow is deferred until slicing completes (success or failure)
         // so busy state / on_flow_finished do not fire mid-slice.
-        schedule_slice_and_send(cb);
+        schedule_slice(cb);
         return;
     }
     finish_flow(cb);

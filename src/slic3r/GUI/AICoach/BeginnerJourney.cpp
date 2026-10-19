@@ -115,7 +115,7 @@ bool BeginnerJourney::update(int64_t delta_ms)
         if (!printers.get_selected_preset_name().empty())
             set_flag(kPrinterDone, true);
     }
-    if (!get_flag(kModelDone) && !wxGetApp().plater()->model().objects.empty())
+    if (!get_flag(kModelDone) && wxGetApp().plater() && !wxGetApp().plater()->model().objects.empty())
         set_flag(kModelDone, true);
 
     return show_journey_ui();

@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <vector>
 
 namespace Slic3r { namespace GUI {
 
@@ -245,6 +246,28 @@ void strip_ascii_word_insensitive(std::string& text, const char* word)
     }
 }
 
+// Particles left behind once the word they were attached to is stripped
+// ("MakerWorld에서" -> "에서"). Only whole tokens are dropped.
+std::string drop_orphan_korean_particles(const std::string& text)
+{
+    static const char* kParticles[] = {
+        "에서", "에게", "으로", "로", "에", "의", "을", "를", "이", "가", "은", "는", "와", "과", "도", "랑",
+    };
+    std::vector<std::string> tokens;
+    boost::algorithm::split(tokens, text, boost::algorithm::is_space(), boost::algorithm::token_compress_on);
+    std::string out;
+    for (const std::string& tok : tokens) {
+        if (tok.empty())
+            continue;
+        if (std::any_of(std::begin(kParticles), std::end(kParticles), [&tok](const char* p) { return tok == p; }))
+            continue;
+        if (!out.empty())
+            out += ' ';
+        out += tok;
+    }
+    return out;
+}
+
 std::string extract_quoted_phrase(const std::string& text)
 {
     for (size_t i = 0; i + 1 < text.size(); ++i) {
@@ -301,7 +324,7 @@ std::string normalize_makerworld_search_query(const std::string& user_text)
     for (const char* s : kStripEn)
         strip_ascii_word_insensitive(q, s);
 
-    q = sanitize_search_text(q);
+    q = sanitize_search_text(drop_orphan_korean_particles(q));
     if (!q.empty())
         return q;
 

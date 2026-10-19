@@ -1,5 +1,6 @@
 #include "PrintJobOrchestrator.hpp"
 
+#include "../UiDispatch.hpp"
 #include "PrintJobStepExecutors.hpp"
 
 #include "../GUI.hpp"
@@ -198,7 +199,6 @@ bool PrintJobOrchestrator::start(const std::string& user_utterance, wxWindow* pa
     job->apply_mode          = apply_mode;
     job->parent              = parent;
     job->ui                  = std::move(ui);
-    job->auto_slice_and_send = true; // full "find and print" intent
     m_job                    = job;
     m_last_terminal          = PrintJobState::Idle;
 
@@ -260,13 +260,6 @@ void PrintJobOrchestrator::select_candidate(int index)
     transition_to(PrintJobState::Importing);
 }
 
-void PrintJobOrchestrator::confirm_print()
-{
-    if (!m_job || m_job->state != PrintJobState::ReadyToPrint)
-        return;
-    transition_to(PrintJobState::Sending);
-}
-
 void PrintJobOrchestrator::cancel()
 {
     if (!m_job || is_terminal(m_job->state))
@@ -308,7 +301,7 @@ void PrintJobOrchestrator::transition_to(PrintJobState next)
     std::weak_ptr<PrintJob>          weak_job   = m_job;
     const std::uint64_t              jid        = m_job->job_id;
 
-    wxGetApp().CallAfter([this, weak_alive, weak_job, jid]() {
+    post_to_ui([this, weak_alive, weak_job, jid]() {
         auto alive = weak_alive.lock();
         if (!alive || !alive->load())
             return;
@@ -341,7 +334,6 @@ void PrintJobOrchestrator::enter_state()
         case PrintJobState::Slicing:          step_slice();           break;
         case PrintJobState::Estimating:       step_estimate();        break;
         case PrintJobState::ReadyToPrint:     step_ready();           break;
-        case PrintJobState::Sending:          step_send();            break;
         case PrintJobState::Idle:
         case PrintJobState::Done:
         case PrintJobState::Failed:
@@ -663,7 +655,7 @@ void PrintJobOrchestrator::step_slice()
             if (!alive || !alive->load())
                 return;
             // Marshal onto the main thread and re-validate before mutating state.
-            wxGetApp().CallAfter([this, weak_alive, weak_job, jid, evt]() {
+            post_to_ui([this, weak_alive, weak_job, jid, evt]() {
                 auto a = weak_alive.lock();
                 if (!a || !a->load())
                     return;
@@ -724,29 +716,10 @@ void PrintJobOrchestrator::step_estimate()
 
 void PrintJobOrchestrator::step_ready()
 {
-    PrintJob& job = *m_job;
-    if (job.auto_slice_and_send) {
-        transition_to(PrintJobState::Sending);
-        return;
-    }
-    // Manual confirmation path: wait for confirm_print().
-    chat(AiLocale::text("Ready to print. Confirm to send to the printer.",
-           "출력 준비가 되었습니다. 확인하면 프린터로 전송합니다."));
-    set_busy(false);
-}
-
-void PrintJobOrchestrator::step_send()
-{
-    set_busy(true, AiLocale::text("Sending to printer…", "프린터로 전송하는 중…"));
-
-    const PrintJobStepExecutors::SendResult res = PrintJobStepExecutors::trigger_send();
-    if (res.setup_blocked) {
-        chat(res.blocked_message.empty()
-                 ? AiLocale::text("Complete printer setup before sending.", "전송 전에 프린터 설정을 완료하세요.")
-                 : wxString::FromUTF8(res.blocked_message));
-    } else {
-        chat(AiLocale::text("Sending the model to your printer.", "모델을 프린터로 전송합니다."));
-    }
+    // The AI never sends to the printer: the job ends here and the user
+    // prints with the regular Print plate button.
+    chat(AiLocale::text("Sliced and ready. Check the preview, then press Print plate to send it to your printer.",
+           "슬라이스가 끝났습니다. 미리보기를 확인한 뒤 「플레이트 출력」을 눌러 프린터로 보내세요."));
     finish_success();
 }
 

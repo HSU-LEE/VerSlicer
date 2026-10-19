@@ -1,5 +1,6 @@
 #include "SlicePilotOnboardingCoordinator.hpp"
 
+#include "../UiDispatch.hpp"
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
 #include "../Plater.hpp"
@@ -38,7 +39,7 @@ void SlicePilotOnboardingCoordinator::schedule_post_init()
     SlicePilotOnboardingFunnel::initialize_defaults(wxGetApp().app_config);
     SlicePilotOnboardingCoordinator::initialize_defaults(wxGetApp().app_config);
 
-    wxGetApp().CallAfter([]() {
+    post_to_ui([]() {
         if (!wxGetApp().app_config)
             return;
         if (wxGetApp().app_config->get(kSection, kStartupDone) == "1")
@@ -72,7 +73,7 @@ void SlicePilotOnboardingCoordinator::on_guide_completed()
     if (!wxGetApp().app_config->has("bambu_smart_print_auto_load_mode"))
         BambuSmartPrintService::set_auto_load_mode(BambuSmartPrintService::AutoLoadMode::Notify);
 
-    wxGetApp().CallAfter([]() {
+    post_to_ui([]() {
         Plater* plater = wxGetApp().plater();
         SlicePilotSetupHub::refresh_all(plater);
         on_setup_hub_first_visit(plater);

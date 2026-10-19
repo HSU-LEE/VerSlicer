@@ -116,22 +116,4 @@ void OllamaTelemetry::intent_signal_injected(const std::string& signal, const st
     track_json("ollama_intent_signal_injected", {{"signal", signal}, {"source", source}});
 }
 
-void OllamaTelemetry::server_spawn_attempt(int attempt, const std::string& command)
-{
-    track_json("ollama_server_spawn_attempt", {{"attempt", attempt}, {"command", command}});
-}
-
-void OllamaTelemetry::server_spawn_success(long pid)
-{
-    track_json("ollama_server_spawn_success", {{"pid", pid}});
-}
-
-void OllamaTelemetry::server_spawn_failed(const std::string& reason)
-{
-    nlohmann::json payload = nlohmann::json::object();
-    if (!reason.empty())
-        payload["reason"] = reason;
-    track_json("ollama_server_spawn_failed", payload);
-}
-
 }} // namespace

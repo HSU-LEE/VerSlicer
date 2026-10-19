@@ -153,7 +153,26 @@ if (ORCA_TOOLS)
     target_link_libraries(ollama_benchmark_test libslic3r boost_headeronly)
     target_compile_definitions(ollama_benchmark_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST)
 
+    add_executable(assistant_eval_test
+        assistant_eval_test.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaEvalGrader.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaFailureDoctor.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaPrinterControl.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaSettingAliases.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaActionRegistry.cpp
+    )
+    target_include_directories(assistant_eval_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r)
+    target_link_libraries(assistant_eval_test libslic3r boost_headeronly)
+    target_compile_definitions(assistant_eval_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST
+        -DASSISTANT_EVAL_CASES="${CMAKE_CURRENT_SOURCE_DIR}/eval/assistant_cases.json")
+
     add_test(NAME ollama_assistant_test COMMAND ollama_assistant_test)
+    add_test(NAME assistant_eval_test COMMAND assistant_eval_test)
     add_test(NAME ollama_pipeline_test COMMAND ollama_pipeline_test)
     add_test(NAME mesh_assist_test COMMAND mesh_assist_test)
     add_test(NAME print_planner_test COMMAND print_planner_test)

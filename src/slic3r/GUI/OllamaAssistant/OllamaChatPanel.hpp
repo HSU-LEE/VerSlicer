@@ -5,6 +5,7 @@
 #include "../MakerWorld/MakerWorldImportFlow.hpp"
 #include "../AIPipeline/PrintJobState.hpp"
 #include "ChatGptAccount.hpp"
+#include "ChatGptAccountBar.hpp"
 #include "OllamaClient.hpp"
 #include "OllamaAgentController.hpp"
 #include "OllamaExecutionPolicy.hpp"
@@ -68,8 +69,6 @@ private:
     void load_settings();
     void save_settings();
     void ensure_assistant_ready();
-    void refresh_account_button();
-    void connect_chatgpt();
     void ensure_default_model_ready(const std::vector<std::string>& models);
     void append_chat(const wxString& role, const wxString& text);
     void append_chat_message(ChatMessageRole role, const wxString& text,
@@ -96,6 +95,7 @@ private:
     void start_assist_loop_turn(const std::string& user_utf8);
     void on_assist_loop_finished(const OllamaAgentRunResult& result);
     void on_chat_response(const std::string& assistant_text, const std::string& error);
+    void on_chat_response_impl(const std::string& assistant_text, const std::string& error);
     void schedule_model_poll(int delay_ms);
     void trim_message_history();
     void reset_conversation();
@@ -141,10 +141,7 @@ private:
     Button*       m_send_btn{nullptr};
     Button*       m_voice_btn{nullptr};
     Button*       m_reset_btn{nullptr};
-    wxBoxSizer*   m_account_row{nullptr};
-    wxStaticText* m_account_label{nullptr};
-    Button*       m_account_btn{nullptr};
-    bool          m_signing_in{false};
+    std::unique_ptr<ChatGptAccountBar> m_account_bar;
     ComboBox*     m_mode_combo{nullptr};
     wxStaticText* m_mode_label{nullptr};
     ComboBox*     m_model_combo{nullptr};

@@ -1,0 +1,14 @@
+VerSlicer
+Copyright (c) 2026 Lee Hee Seung
+
+VerSlicer is a fork of OrcaSlicer (https://github.com/SoftFever/OrcaSlicer),
+which builds on Bambu Studio, PrusaSlicer and Slic3r. The whole program,
+including the AI assistant, MakerWorld and Smart Print code added by
+VerSlicer, is distributed under the GNU Affero General Public License v3.0;
+see LICENSE. Upstream copyright notices in individual files remain in force.
+
+Third-party libraries under deps_src/ keep their own licenses.
+
+"ChatGPT" and "OpenAI" are trademarks of OpenAI. "Bambu Lab" and "MakerWorld"
+are trademarks of Bambu Lab. VerSlicer is not affiliated with or endorsed by
+either company.

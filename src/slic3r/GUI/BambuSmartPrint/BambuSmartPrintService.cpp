@@ -1,4 +1,5 @@
 #include "BambuSmartPrintService.hpp"
+#include "../UiDispatch.hpp"
 #include "BambuSmartPrintPanel.hpp"
 #include "FirstPrintExperience.hpp"
 #include "PrintReadinessGate.hpp"
@@ -497,7 +498,7 @@ void BambuSmartPrintService::notify_storage_save_error(const std::string& detail
     if (m_storage_save_error_notified || detail.empty())
         return;
     m_storage_save_error_notified = true;
-    wxGetApp().CallAfter([detail]() {
+    post_to_ui([detail]() {
         wxWindow* parent = wxGetApp().plater();
         wxString msg = wxString::Format(
             _L("Smart Print could not save local data:\n\n%s\n\n"
@@ -569,9 +570,9 @@ void BambuSmartPrintService::initialize()
 
     if (BambuSmartPrint::FailureDatabase::instance().had_load_error()
         || BambuSmartPrint::PrinterLearningStore::instance().had_load_error())
-        wxGetApp().CallAfter([this]() { notify_storage_errors(); });
+        post_to_ui([this]() { notify_storage_errors(); });
 
-    wxGetApp().CallAfter([this]() { scan_bambu_printers_on_network(); });
+    post_to_ui([this]() { scan_bambu_printers_on_network(); });
     SlicePilotOnboardingCoordinator::schedule_post_init();
 }
 
@@ -1848,7 +1849,7 @@ void BambuSmartPrintService::handle_print_success(MachineObject* obj)
 
     if (plater && AICoachController::is_enabled_for_current_mode()) {
         const std::string job_name = obj->subtask_name.empty() ? obj->m_gcode_file : obj->subtask_name;
-        wxGetApp().CallAfter([plater, job_name]() {
+        post_to_ui([plater, job_name]() {
             if (wxGetApp().plater())
                 AIGuiOrchestrator::instance().on_print_success(plater, job_name);
         });
@@ -1867,7 +1868,7 @@ void BambuSmartPrintService::on_print_state_changed(MachineObject* obj,
     if (is_running_print_state(new_state)) {
         if (Plater* plater = wxGetApp().plater()) {
             const int percent = obj->mc_print_percent;
-            wxGetApp().CallAfter([plater, percent]() {
+            post_to_ui([plater, percent]() {
                 if (wxGetApp().plater())
                     AIGuiOrchestrator::instance().on_print_running(plater, percent);
             });
@@ -1931,7 +1932,7 @@ void BambuSmartPrintService::on_slice_completed(Plater* plater, const Print* pri
         m_silent_workflow        = false;
         set_one_click_phase(OneClickPhase::Exporting);
         const int plate_index = plater->get_partplate_list().get_curr_plate_index();
-        wxGetApp().CallAfter([this, plater, plate_index]() {
+        post_to_ui([this, plater, plate_index]() {
             if (!plater)
                 return;
             plater->send_print_job_for_plate(plate_index, true);
@@ -1971,7 +1972,7 @@ void BambuSmartPrintService::on_slice_completed(Plater* plater, const Print* pri
 
     if (m_pending_smart_slice_followup) {
         m_pending_smart_slice_followup = false;
-        wxGetApp().CallAfter([this, plater]() { maybe_notify_slice_analysis(plater); });
+        post_to_ui([this, plater]() { maybe_notify_slice_analysis(plater); });
     }
 }
 

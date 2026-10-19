@@ -1,4 +1,5 @@
 #include "MakerWorldSearchService.hpp"
+#include "../UiDispatch.hpp"
 #include "MakerWorldQueryTranslator.hpp"
 #include "MakerWorldSearchCore.hpp"
 #include "MakerWorldTelemetry.hpp"
@@ -1045,9 +1046,7 @@ void MakerWorldSearchService::search_async(const std::string& query, const Maker
     const uint64_t generation = ++search_request_generation();
     std::thread([query, ctx, cb = std::move(callback), generation]() {
         MakerWorldSearchResult r = MakerWorldSearchService::search_sync(query, ctx);
-        if (wxGetApp().is_closing())
-            return; // shutting down: never post to a dying main loop
-        wxGetApp().CallAfter([r, cb, generation]() {
+        post_to_ui([r, cb, generation]() {
             if (wxGetApp().is_closing())
                 return;
             if (generation != search_request_generation().load())

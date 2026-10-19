@@ -53,7 +53,7 @@ if [ "${BUILD_ONLY}" -eq 1 ]; then
     exit 0
 fi
 
-VERSION="$(grep -E '^set\(SoftFever_VERSION' "${PROJECT_DIR}/version.inc" 2>/dev/null \
+VERSION="$(grep -E '^set\(VERSLICER_VERSION' "${PROJECT_DIR}/version.inc" 2>/dev/null \
     | sed -E 's/.*"([^"]+)".*/\1/' || echo "0.0.0")"
 OUT_DMG="${PROJECT_DIR}/build/${ARCH}/dist/VerSlicer-macOS-${ARCH}-${VERSION}.dmg"
 
@@ -64,4 +64,4 @@ echo "Installer ready:"
 echo "  ${OUT_DMG}"
 echo ""
 echo "Copy this .dmg to another Mac, open it, and drag VerSlicer to Applications."
-echo "Ollama and qwen2.5:7b are inside the app. Launch VerSlicer and open AI chat."
+echo "Launch VerSlicer, open AI chat, and sign in with ChatGPT."

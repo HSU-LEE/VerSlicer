@@ -76,8 +76,5 @@ if [ ! -f "${RES}/Icon.icns" ]; then
     exit 1
 fi
 
-echo "Bundling Ollama and ${OLLAMA_BUNDLE_MODEL:-qwen2.5:7b}..."
-"${SCRIPT_DIR}/bundle_ollama_macos.sh" --into "${OUT_APP}"
-
 echo "Done: ${OUT_APP}"
 du -sh "${OUT_APP}"

@@ -10,8 +10,10 @@
 
 #include <nlohmann/json.hpp>
 
+#ifndef OLLAMA_HEADLESS_TEST
 #include <wx/intl.h>
 #include <wx/string.h>
+#endif
 
 #include <algorithm>
 #include <optional>
@@ -20,6 +22,16 @@
 namespace Slic3r { namespace GUI {
 
 namespace {
+
+// Headless tests have no wx; labels stay untranslated there.
+std::string translate_label(const std::string& source)
+{
+#ifndef OLLAMA_HEADLESS_TEST
+    return wxGetTranslation(wxString::FromUTF8(source)).utf8_string();
+#else
+    return source;
+#endif
+}
 
 int score_token(const std::string& haystack, const std::string& token)
 {
@@ -51,9 +63,9 @@ void consider_translated(int& score, const std::string& source, const std::strin
     if (source.empty())
         return;
     consider_phrase(score, source, query);
-    const wxString translated = wxGetTranslation(wxString::FromUTF8(source));
-    if (!translated.empty())
-        consider_phrase(score, translated.utf8_string(), query);
+    const std::string translated = translate_label(source);
+    if (!translated.empty() && translated != source)
+        consider_phrase(score, translated, query);
 }
 
 bool is_off_enum_value(const std::string& value)
@@ -172,7 +184,7 @@ nlohmann::json OllamaSettingSearch::lookup(const std::vector<std::string>& keys,
             if (!def->enum_labels.empty()) {
                 nlohmann::json labels = nlohmann::json::array();
                 for (const std::string& label : def->enum_labels)
-                    labels.push_back(wxGetTranslation(wxString::FromUTF8(label)).utf8_string());
+                    labels.push_back(translate_label(label));
                 e["enum_labels"] = std::move(labels);
             }
         }
@@ -217,7 +229,7 @@ std::optional<OllamaObviousSettingChange> OllamaSettingSearch::obvious_toggle(co
     OllamaObviousSettingChange change;
     change.preset = sp->preset_scope.empty() ? "print" : sp->preset_scope;
     change.key    = sp->key;
-    change.label  = wxGetTranslation(wxString::FromUTF8(sp->label.empty() ? sp->key : sp->label)).utf8_string();
+    change.label  = translate_label(sp->label.empty() ? sp->key : sp->label);
 
     if (sp->value_type == "bool") {
         change.value = on;

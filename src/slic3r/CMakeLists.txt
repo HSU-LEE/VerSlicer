@@ -148,12 +148,6 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaToolResult.hpp
     GUI/OllamaAssistant/OllamaChatDialog.cpp
     GUI/OllamaAssistant/OllamaChatDialog.hpp
-    GUI/AIModelCreate/AIModelCreateDialog.cpp
-    GUI/AIModelCreate/AIModelCreateDialog.hpp
-    GUI/AIModelCreate/AIModelCreateEngine.cpp
-    GUI/AIModelCreate/AIModelCreateEngine.hpp
-    GUI/AIModelCreate/AIModelCreateSketchPanel.cpp
-    GUI/AIModelCreate/AIModelCreateSketchPanel.hpp
     GUI/OllamaAssistant/AiLocale.cpp
     GUI/OllamaAssistant/AiLocale.hpp
     GUI/OllamaAssistant/OllamaChatMessageList.cpp
@@ -161,6 +155,20 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaChatPanel.cpp
     GUI/OllamaAssistant/OllamaChatPanel.hpp
     GUI/OllamaAssistant/ChatGptAccount.cpp
+    GUI/CrashReporter.cpp
+    GUI/CrashReporter.hpp
+    GUI/UiDispatch.cpp
+    GUI/UiDispatch.hpp
+    GUI/OllamaAssistant/AiPrivacyConsent.cpp
+    GUI/OllamaAssistant/AiPrivacyConsent.hpp
+    GUI/OllamaAssistant/ChatGptAccountBar.cpp
+    GUI/OllamaAssistant/ChatGptAccountBar.hpp
+    GUI/OllamaAssistant/OllamaFailureDoctor.cpp
+    GUI/OllamaAssistant/OllamaPrinterControl.cpp
+    GUI/OllamaAssistant/OllamaPrinterControl.hpp
+    GUI/OllamaAssistant/OllamaFailureDoctor.hpp
+    GUI/OllamaAssistant/OllamaEvalGrader.cpp
+    GUI/OllamaAssistant/OllamaEvalGrader.hpp
     GUI/OllamaAssistant/ChatGptAccount.hpp
     GUI/OllamaAssistant/OllamaClient.cpp
     GUI/OllamaAssistant/OllamaClient.hpp
@@ -174,8 +182,6 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/OllamaProcessingNotice.hpp
     GUI/OllamaAssistant/OllamaResponseNormalizer.cpp
     GUI/OllamaAssistant/OllamaResponseNormalizer.hpp
-    GUI/OllamaAssistant/OllamaServerManager.cpp
-    GUI/OllamaAssistant/OllamaServerManager.hpp
     GUI/OllamaAssistant/OllamaSettingRegistry.cpp
     GUI/OllamaAssistant/OllamaSettingRegistry.hpp
     GUI/OllamaAssistant/OllamaSettingDescriptions.cpp

@@ -7,13 +7,17 @@ set(SLIC3R_APP_KEY "verslicer")
 if(NOT DEFINED BBL_INTERNAL_TESTING)
 set(BBL_INTERNAL_TESTING "0")
 endif()
-set(SoftFever_VERSION "3.1.1")
+# VerSlicer's own version: the About box, update check and DMG name use it.
+# Release tags are v<this>. (The SoftFever_ name is kept for upstream code.)
+set(VERSLICER_VERSION "3.2.0")
+set(SoftFever_VERSION "${VERSLICER_VERSION}")
 string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)"
        SoftFever_VERSION_MATCH ${SoftFever_VERSION})
 set(ORCA_VERSION_MAJOR ${CMAKE_MATCH_1})
 set(ORCA_VERSION_MINOR ${CMAKE_MATCH_2})
 set(ORCA_VERSION_PATCH ${CMAKE_MATCH_3})
 
+# Bambu Studio compatibility version for profiles and the network plugin. Not VerSlicer's version.
 set(SLIC3R_VERSION "02.06.00.51")
 
 if (NOT DEFINED ORCA_UPDATER_SIG_KEY)

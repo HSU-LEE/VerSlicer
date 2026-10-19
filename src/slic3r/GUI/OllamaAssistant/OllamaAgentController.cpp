@@ -1,5 +1,6 @@
 #include "OllamaAgentController.hpp"
 
+#include "../UiDispatch.hpp"
 #include "OllamaActionExecutor.hpp"
 #include "OllamaActionPipeline.hpp"
 #include "OllamaActionWorkflow.hpp"
@@ -118,8 +119,7 @@ std::string mutating_action_fingerprint(const nlohmann::json& root)
         if (!action.is_object())
             continue;
         const std::string type = action.value("type", "");
-        if (type.empty() || type == "get_state" || type == "list_objects" || type == "select_object"
-            || type == "wiki_search" || type == "find_setting")
+        if (type.empty() || OllamaToolRegistry::is_observation(type))
             continue;
         out += type;
         out += '\n';
@@ -138,8 +138,7 @@ bool step_has_substantive_change(const std::vector<nlohmann::json>& steps)
             if (!r.is_object() || !r.value("changed", false))
                 continue;
             const std::string tool = r.value("tool", "");
-            if (tool == "get_state" || tool == "list_objects" || tool == "select_object" || tool == "wiki_search"
-                || tool == "find_setting" || tool == "verify_config" || tool == "ui_select_tab")
+            if (OllamaToolRegistry::is_observation(tool) || tool == "verify_config" || tool == "ui_select_tab")
                 continue;
             return true;
         }
@@ -155,8 +154,7 @@ bool tool_step_is_readonly(const nlohmann::json& step)
         if (!r.is_object())
             return false;
         const std::string tool = r.value("tool", "");
-        if (tool != "get_state" && tool != "list_objects" && tool != "select_object" && tool != "wiki_search"
-            && tool != "find_setting")
+        if (!OllamaToolRegistry::is_observation(tool))
             return false;
     }
     return true;
@@ -176,7 +174,7 @@ void on_global_agent_event(const OllamaAgentEvent& evt)
     if (!agent || !agent->is_running())
         return;
     const bool success = evt.payload.value("success", false);
-    wxGetApp().CallAfter([agent, success]() {
+    post_to_ui([agent, success]() {
         if (!wxGetApp().initialized() || wxGetApp().is_closing())
             return;
         if (!g_active_agent || g_active_agent != agent || !agent->is_running())
@@ -316,7 +314,7 @@ void OllamaAgentController::begin_step()
     const std::string model = m_model;
     m_client.chat(model, m_messages,
                   [this, alive](const std::string& text, const std::string& error) {
-                      wxGetApp().CallAfter([this, alive, text, error]() {
+                      post_to_ui([this, alive, text, error]() {
                           if (!alive->load() || wxGetApp().is_closing())
                               return;
                           on_llm_response(text, error);
@@ -483,7 +481,7 @@ void OllamaAgentController::schedule_post_apply_verification(const nlohmann::jso
                                                              OllamaWorkflowRun workflow)
 {
     const auto alive = m_alive;
-    wxGetApp().CallAfter([this, alive, root, assistant_msg, raw_text, applied, workflow = std::move(workflow)]() mutable {
+    post_to_ui([this, alive, root, assistant_msg, raw_text, applied, workflow = std::move(workflow)]() mutable {
         if (!alive->load() || wxGetApp().is_closing() || !m_running || m_cancelled)
             return;
         handle_post_apply_verification(root, assistant_msg, raw_text, applied, workflow);

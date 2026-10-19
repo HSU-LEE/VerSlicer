@@ -9,9 +9,9 @@ namespace Slic3r { namespace GUI { namespace AIPipeline {
  * The happy path advances monotonically:
  *   Idle -> IntentExtracted -> [Clarifying] -> Searching -> CandidateSelect ->
  *   Importing -> MeshHealth -> [Repairing] -> GeometryAnalysis -> AutoConfig ->
- *   Slicing -> Estimating -> ReadyToPrint -> [Sending] -> Done
+ *   Slicing -> Estimating -> ReadyToPrint -> Done (the user sends with Print plate)
  *
- * Terminal states are Done / Failed / Cancelled. Clarifying / Repairing / Sending
+ * Terminal states are Done / Failed / Cancelled. Clarifying / Repairing
  * are optional and entered conditionally.
  */
 enum class PrintJobState {
@@ -28,7 +28,6 @@ enum class PrintJobState {
     Slicing,
     Estimating,
     ReadyToPrint,
-    Sending,
     Done,
     Failed,
     Cancelled,
@@ -51,7 +50,6 @@ inline const char* to_string(PrintJobState s)
     case PrintJobState::Slicing:          return "Slicing";
     case PrintJobState::Estimating:       return "Estimating";
     case PrintJobState::ReadyToPrint:     return "ReadyToPrint";
-    case PrintJobState::Sending:          return "Sending";
     case PrintJobState::Done:             return "Done";
     case PrintJobState::Failed:           return "Failed";
     case PrintJobState::Cancelled:        return "Cancelled";

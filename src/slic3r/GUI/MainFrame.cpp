@@ -1,3 +1,4 @@
+#include "OllamaAssistant/OllamaPrinterControl.hpp"
 #include "MainFrame.hpp"
 
 #include <wx/panel.h>
@@ -33,7 +34,6 @@
 #include "BambuSmartPrint/BambuSmartPrintPanel.hpp"
 #include "BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "BambuSmartPrint/SlicePilotSimpleLayout.hpp"
-#include "AIModelCreate/AIModelCreateDialog.hpp"
 
 #include "Tab.hpp"
 #include "Widgets/TextInput.hpp"
@@ -2822,9 +2822,6 @@ void MainFrame::init_menubar_as_editor()
         append_menu_item(import_menu, wxID_ANY, _L("Import Configs") + dots /*+ "\t" + ctrl + "I"*/, _L("Load configs"),
             [this](wxCommandEvent&) { load_config_file(); }, "menu_import", nullptr,
             [this](){return true; }, this);
-        append_menu_item(import_menu, wxID_ANY, _L("Create Model") + dots, _L("Draw and describe a model; AI generates mesh for the plater"),
-            [](wxCommandEvent&) { show_ai_model_create_dialog(); }, "menu_add_part", nullptr,
-            [this]() { return can_add_models(); }, this);
 
         append_submenu(fileMenu, import_menu, wxID_ANY, _L("Import"), "");
 
@@ -3590,6 +3587,10 @@ void MainFrame::init_menubar_as_editor()
         "", nullptr,
         []() { return BambuSmartPrintService::instance().is_bambu_account_logged_in(); }, this);
     smart_print_menu->AppendSeparator();
+    append_menu_check_item(smart_print_menu, wxID_ANY, _L("Allow AI printer control"),
+        _L("Let the AI assistant set nozzle, bed and chamber temperature and print speed on the connected printer"),
+        [](wxCommandEvent&) { OllamaPrinterControl::set_enabled(!OllamaPrinterControl::enabled()); },
+        this, []() { return true; }, []() { return OllamaPrinterControl::enabled(); }, this);
     append_menu_item(smart_print_menu, wxID_ANY, _L("View failure history"), _L("Browse recorded print failures and feedback"),
         [](wxCommandEvent&) { BambuSmartPrintService::instance().show_history_dialog(wxGetApp().plater()); },
         "", nullptr, []() { return true; }, this);

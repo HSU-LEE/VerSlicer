@@ -145,9 +145,14 @@ static nlohmann::json parse_salvaged_scalar(std::string val)
             is_num = false;
     }
     if (is_num) {
-        if (val.find('.') != std::string::npos)
-            return std::stod(val);
-        return std::stoi(val);
+        // "-", "." or an overlong integer pass the character check but make
+        // stod/stoi throw; keep such values as text instead.
+        try {
+            if (val.find('.') != std::string::npos)
+                return std::stod(val);
+            return std::stoi(val);
+        } catch (const std::exception&) {
+        }
     }
     return val;
 }

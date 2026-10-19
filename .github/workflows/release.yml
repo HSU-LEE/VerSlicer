@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos-dmg:
+    runs-on: macos-14 # Apple Silicon
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check tag matches version.inc
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          want="$(grep -E '^set\(VERSLICER_VERSION' version.inc | sed -E 's/.*"([^"]+)".*/\1/')"
+          [ "v${want}" = "${GITHUB_REF_NAME}" ] || { echo "tag ${GITHUB_REF_NAME} != version.inc v${want}"; exit 1; }
+
+      - name: Install build tools
+        run: brew install ninja ccache xz autoconf automake libtool texinfo
+
+      - name: Restore dependencies
+        id: deps-cache
+        uses: actions/cache@v4
+        with:
+          path: deps/build/arm64/OrcaSlicer_dep
+          key: deps-macos-arm64-${{ hashFiles('deps/**') }}
+
+      - name: Build dependencies
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        run: ./build_release_macos.sh -d -x -a arm64
+
+      # Signing is optional: without these secrets the DMG is ad-hoc signed and
+      # users must right-click > Open the first time.
+      - name: Import Developer ID certificate
+        env:
+          APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+        if: env.APPLE_CERT_P12_BASE64 != ''
+        run: |
+          kc="$RUNNER_TEMP/signing.keychain-db"
+          security create-keychain -p "" "$kc"
+          security set-keychain-settings -lut 21600 "$kc"
+          security unlock-keychain -p "" "$kc"
+          echo "$APPLE_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$APPLE_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" "$kc"
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+
+      - name: Build app and DMG
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: ./scripts/make_macos_installer.sh --build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VerSlicer-macOS-arm64
+          path: build/arm64/dist/*.dmg
+
+      - name: Attach DMG to the GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "VerSlicer $GITHUB_REF_NAME" --notes-file CHANGELOG.md
+          gh release upload "$GITHUB_REF_NAME" build/arm64/dist/*.dmg --clobber

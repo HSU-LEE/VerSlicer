@@ -49,7 +49,7 @@ bool is_allowed_action_type(const std::string& type)
 
 bool is_model_shape_action_type(const std::string& type)
 {
-    return type == "scale" || type == "rotate" || type == "translate" || type == "mesh_boolean"
+    return type == "scale" || type == "rotate" || type == "translate"
         || type == "mirror_mesh" || type == "repair_mesh" || type == "split_object" || type == "clone_selection";
 }
 
@@ -338,16 +338,6 @@ bool sanitize_one_action(nlohmann::json& action, const std::string& user, Ollama
         return false;
     if ((type == "translate" || type == "rotate" || type == "scale") && !sanitize_transform(action, type, out))
         return false;
-    if (type == "mesh_boolean") {
-        const std::string op = action.value("operation", "");
-        static const std::unordered_set<std::string> kOps = {
-            "subtract_cylinder", "drill_hole", "union_box", "add_handle", "add_rib",
-        };
-        if (kOps.find(op) == kOps.end()) {
-            block_action(out, "mesh_boolean: unknown operation");
-            return false;
-        }
-    }
     if (type == "mirror_mesh") {
         const std::string axis = action.value("axis", "x");
         if (axis != "x" && axis != "y" && axis != "z" && axis != "X" && axis != "Y" && axis != "Z") {

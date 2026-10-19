@@ -107,6 +107,11 @@ bool ollama_critic_enabled()
     return pipeline_flag(kOllamaCriticKey, "OLLAMA_CRITIC", false);
 }
 
+bool ollama_mcp_server_enabled()
+{
+    return pipeline_flag(kOllamaMcpServerKey, "VERSLICER_MCP_SERVER", false);
+}
+
 int config_int(const char* key, int default_value)
 {
 #ifndef OLLAMA_HEADLESS_TEST
