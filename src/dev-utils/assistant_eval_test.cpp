@@ -6,6 +6,7 @@
 // reported, not failed, unless ASSISTANT_EVAL_MIN_PASS (0-100) is set.
 
 #include "../slic3r/GUI/OllamaAssistant/OllamaEvalGrader.hpp"
+#include "../slic3r/GUI/OllamaAssistant/OllamaFailureDoctor.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -66,6 +67,14 @@ int main()
     });
     expect_true(scores.at("gpt-a").total == 2 && scores.at("gpt-a").passed == 1, "score_log gpt-a");
     expect_true(scores.at("gpt-b").total == 1 && scores.at("gpt-b").passed == 0, "score_log gpt-b");
+
+    // Failure doctor: error codes map to the module that raised them.
+    expect_true(OllamaFailureDoctor::area_for_code("0700200000020001").area == "ams_feeding", "doctor AMS HMS code");
+    expect_true(OllamaFailureDoctor::area_for_code("0300-8001").area == "motion_first_layer", "doctor MC print_error");
+    expect_true(OllamaFailureDoctor::area_for_code("0c00-8005").area == "camera_detection", "doctor lowercase xcam");
+    expect_true(OllamaFailureDoctor::area_for_code("0500-4001").setting_keys.empty(), "doctor mainboard has no settings");
+    expect_true(OllamaFailureDoctor::area_for_code("").area == "unknown", "doctor empty code");
+    expect_true(OllamaFailureDoctor::printer_diagnostics_json().is_object(), "doctor headless json");
 
     if (const char* log_path = std::getenv("ASSISTANT_EVAL_LOG")) {
         std::ifstream log(log_path);

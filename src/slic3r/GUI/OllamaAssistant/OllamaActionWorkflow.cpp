@@ -55,7 +55,7 @@ static bool ui_prefers_korean()
 
 static bool is_readonly_action(const std::string& type)
 {
-    return type == "get_state" || type == "list_objects" || type == "wiki_search" || type == "find_setting";
+    return OllamaToolRegistry::category_for(type) == OllamaToolCategory::Readonly;
 }
 
 static bool is_workflow_only_action(const std::string& type)

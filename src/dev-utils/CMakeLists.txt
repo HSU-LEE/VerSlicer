@@ -157,6 +157,7 @@ if (ORCA_TOOLS)
         assistant_eval_test.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaEvalGrader.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaFailureDoctor.cpp
     )
     target_include_directories(assistant_eval_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
     target_link_libraries(assistant_eval_test libslic3r boost_headeronly)

@@ -163,6 +163,10 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/ChatGptAccount.cpp
     GUI/OllamaAssistant/ChatGptAccountBar.cpp
     GUI/OllamaAssistant/ChatGptAccountBar.hpp
+    GUI/OllamaAssistant/OllamaFailureDoctor.cpp
+    GUI/OllamaAssistant/OllamaFailureDoctor.hpp
+    GUI/OllamaAssistant/OllamaEvalGrader.cpp
+    GUI/OllamaAssistant/OllamaEvalGrader.hpp
     GUI/OllamaAssistant/ChatGptAccount.hpp
     GUI/OllamaAssistant/OllamaClient.cpp
     GUI/OllamaAssistant/OllamaClient.hpp

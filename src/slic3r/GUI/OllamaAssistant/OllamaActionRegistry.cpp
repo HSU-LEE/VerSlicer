@@ -13,6 +13,7 @@ const OllamaActionTypeSpec kActionTypes[] = {
     {"find_setting", true, true, true, "Find a slicer setting by name. Pass query.", "설정 이름 찾기. query를 넣으세요."},
     {"wiki_search", true, true, true, "Search Bambu Lab wiki for a query", "도움말 검색"},
     {"list_objects", true, true, true, "List models on the plate", "플레이트 모델 목록"},
+    {"printer_diagnostics", true, true, true, "Read printer error codes and HMS alerts", "프린터 오류·HMS 알림 읽기"},
     {"select_object", true, true, true, "Select object by id or name", "객체 선택"},
     {"set_config", true, true, true, "Change print/filament/printer preset options", "프리셋 설정 변경"},
     {"translate", true, true, true, "Move selection on the bed", "선택 모델 이동"},

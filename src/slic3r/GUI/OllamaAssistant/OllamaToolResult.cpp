@@ -220,7 +220,8 @@ std::string ollama_verified_user_message(const std::vector<nlohmann::json>& step
             saw_tool = true;
             const std::string tool = r.value("tool", "");
             const bool readonly = tool == "get_state" || tool == "list_objects" || tool == "select_object"
-                                  || tool == "wiki_search" || tool == "find_setting" || tool == "verify_config";
+                                  || tool == "wiki_search" || tool == "find_setting" || tool == "verify_config"
+                                  || tool == "printer_diagnostics";
             if (!readonly)
                 saw_mutating = true;
             if (!r.value("ok", true)) {
@@ -393,6 +394,8 @@ std::string activity_line_for_action(const nlohmann::json& action, bool korean)
         return korean ? "설정에서 \"" + query + "\"을(를) 찾습니다."
                       : "Looking up the setting \"" + query + "\".";
     }
+    if (type == "printer_diagnostics")
+        return korean ? "프린터 오류 기록을 확인합니다." : "Checking the printer's error state.";
     if (type == "wiki_search") {
         const std::string query = action.value("query", "");
         if (query.empty())
@@ -466,7 +469,7 @@ std::string ollama_thinking_after_tools(const nlohmann::json& tool_results, bool
             continue;
         const std::string tool = r.value("tool", "");
         if (tool == "get_state" || tool == "list_objects" || tool == "select_object" || tool == "wiki_search"
-            || tool == "find_setting")
+            || tool == "find_setting" || tool == "printer_diagnostics")
             continue;
         if (!r.value("ok", false)) {
             add(korean ? "이 단계는 적용되지 않았습니다. 다른 방법을 시도합니다."

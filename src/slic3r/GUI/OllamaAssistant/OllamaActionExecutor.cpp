@@ -1,6 +1,7 @@
 #include "OllamaMeshOps.hpp"
 #include "OllamaActionExecutor.hpp"
 #include "OllamaActionRegistry.hpp"
+#include "OllamaFailureDoctor.hpp"
 #include "OllamaActionJsonExtract.hpp"
 #include "OllamaActionValidator.hpp"
 #include "OllamaConfig.hpp"
@@ -1776,6 +1777,9 @@ const std::unordered_map<std::string, ActionHandler>& action_handlers()
         h["get_state"]        = apply_get_state;
         h["find_setting"]     = apply_find_setting;
         h["wiki_search"]      = apply_wiki_search;
+        h["printer_diagnostics"] = [](const nlohmann::json&) {
+            return OllamaActionResult{true, false, OllamaFailureDoctor::printer_diagnostics_json().dump()};
+        };
         h["list_objects"]     = apply_list_objects;
         h["select_object"]    = apply_select_object;
         h["set_config"]       = apply_set_config;
