@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.2.1
+
+### Printing to Bambu Lab printers
+- New **Print with Bambu Connect** in the print button menu, and the default for Bambu printers. It hands the sliced plate to Bambu Connect, Bambu Lab's helper app, which is how printers with Authorization Control firmware accept jobs from slicers other than Bambu Studio — no Developer Mode needed. Choose **Print plate** to keep printing directly over LAN; the choice is remembered.
+- Smart Print's one-click Print follows the same choice.
+- The Device tab shows a short, dismissible note for cloud-connected Bambu printers, with an **Open Bambu Connect** button (or a link to download it).
+
+### AI assistant
+- An expired ChatGPT sign-in ("invalid_grant") no longer leaves the panel looking connected with a raw error code; it asks you to connect again.
+- Mode, model and **New chat** share one row, leaving more room for the conversation.
+- On cloud-connected printers, AI printer control says the printer may ignore the command instead of claiming success.
+
+### Smart Print
+- The docked panel focuses on the plate: readiness, workflow, insights. Account, assistant options, history and printer learning moved to **Preferences → Smart Print**, opened from the link at the bottom.
+
+### Project
+- CI: the dependency cache step no longer times out, and runs on main are not cancelled by the next push.
+
 ## 3.2.0
 
 ### Assistant

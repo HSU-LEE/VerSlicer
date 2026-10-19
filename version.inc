@@ -9,7 +9,7 @@ set(BBL_INTERNAL_TESTING "0")
 endif()
 # VerSlicer's own version: the About box, update check and DMG name use it.
 # Release tags are v<this>. (The SoftFever_ name is kept for upstream code.)
-set(VERSLICER_VERSION "3.2.0")
+set(VERSLICER_VERSION "3.2.1")
 set(SoftFever_VERSION "${VERSLICER_VERSION}")
 string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)"
        SoftFever_VERSION_MATCH ${SoftFever_VERSION})

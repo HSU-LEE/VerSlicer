@@ -36,13 +36,15 @@ Just describe what you want — in chat or by voice — and VerSlicer turns it i
 - **Question and Apply modes**  
   Ask for advice without touching anything, or let the assistant apply changes. Setting changes always open a review dialog first.
 - **Find & print from MakerWorld**  
-  On an empty plate, “print me a dragon” searches MakerWorld, lets you pick a model, imports it, checks the mesh, configures and slices. You press **Print plate** to send it.
+  On an empty plate, “print me a dragon” searches MakerWorld, lets you pick a model, imports it, checks the mesh, configures and slices. You send it to the printer yourself.
 - **Failed-print diagnosis**  
   “My print failed” reads the printer’s error code and HMS alerts, names the likely cause and the settings worth checking.
 - **Printer control (opt-in)**  
-  Once you allow it, the assistant can set the connected printer’s nozzle, bed and chamber target temperature and print speed level — always within the printer’s own limits. Turn it off in **Smart Print → Allow AI printer control**.
+  Once you allow it, the assistant can set the connected printer’s nozzle, bed and chamber target temperature and print speed level — always within the printer’s own limits. Turn it off in **Smart Print → Allow AI printer control**. Bambu printers with Authorization Control firmware may ignore these commands over the cloud; they apply over LAN with Developer Mode.
 - **You stay in charge of printing**  
   The AI never sends a job to the printer and never creates or sculpts geometry.
+- **Print to Bambu Lab printers without Developer Mode**  
+  **Print with Bambu Connect** (the default for Bambu printers) hands the sliced plate to [Bambu Connect](https://wiki.bambulab.com/en/software/bambu-connect), Bambu Lab’s helper app for slicers other than Bambu Studio. Prefer direct LAN printing? Pick **Print plate** in the print button menu.
 - **Voice input (macOS)**  
   Speak your request instead of typing it.
 - **Rollback**  
@@ -99,7 +101,11 @@ Open the **AI assistant** on the 3D view toolbar and press **Connect ChatGPT**. 
 
 Try: *“Increase infill to 30%”*, *“Make this stronger”*, *“Rotate it 45 degrees”*, *“용 피규어 출력해줘”*, *“My print failed”*.
 
-### 3. Voice
+### 3. Print
+
+Slice the plate, then press **Print with Bambu Connect**. VerSlicer opens the sliced file in [Bambu Connect](https://wiki.bambulab.com/en/software/bambu-connect#download) (free, macOS 13 or later), where you pick the printer and start the print. Recent Bambu Lab firmware only accepts jobs from slicers other than Bambu Studio this way, unless the printer is in LAN mode with Developer Mode on — then **Print plate** sends directly.
+
+### 4. Voice
 
 Allow Microphone and Speech Recognition when asked. For Korean, put Korean above English in **System Settings → General → Language & Region**.
 
@@ -190,7 +196,7 @@ Release process (signing, notarization, tagging): [docs/RELEASING.md](docs/RELEA
 
 # Supported printers
 
-VerSlicer inherits **OrcaSlicer’s full printer profiles**. Guided setup, sending, failed-print diagnosis and printer control follow the Bambu Lab path; other printers still slice and get the assistant’s settings help.
+VerSlicer inherits **OrcaSlicer’s full printer profiles**. Bambu Lab printers print through Bambu Connect (or directly over LAN with Developer Mode) and get failed-print diagnosis and printer control; other printers still slice, send through their usual print host, and get the assistant’s settings help.
 
 # Some Background
 

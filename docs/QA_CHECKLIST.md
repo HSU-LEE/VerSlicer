@@ -9,10 +9,20 @@ Run on a **Release** build installed from the DMG, on a Mac that has not run Ver
 
 ## Privacy notice and ChatGPT
 - [ ] Press **Connect ChatGPT** → the data notice appears first; **Cancel** does nothing further.
-- [ ] Agree → browser opens → sign in and allow → panel shows your email, **Sign out**, and five example requests.
+- [ ] Agree → browser opens → sign in and allow → panel shows your email and **Sign out**; mode, model and **New chat** sit on one row.
 - [ ] Quit and relaunch: still connected, the data notice does not appear again, no Keychain prompt.
 - [ ] **Sign out** → confirm → button returns to **Connect ChatGPT**.
 - [ ] Disconnect Wi-Fi and send a message → "Can't reach ChatGPT…" in your language.
+
+- [ ] Expired sign-in: if the panel ever shows a sign-in error, it offers **Connect ChatGPT** again (no raw `invalid_grant`).
+
+## Printing (Bambu printer)
+- [ ] With a Bambu printer selected, the print button reads **Print with Bambu Connect**.
+- [ ] Bambu Connect not installed → pressing it explains why and **Download Bambu Connect** opens the Bambu wiki download section (not a 404).
+- [ ] Bambu Connect installed → slice, press it → Bambu Connect opens with the sliced file ready to print.
+- [ ] Print button menu → **Print plate** → relaunch: the button still reads Print plate.
+- [ ] Device tab with a cloud-connected Bambu printer: the Bambu Connect note shows; **Dismiss** hides it for good; **Open Bambu Connect** opens the app (or the download page).
+- [ ] Smart Print panel shows readiness, workflow and insights; the link at the bottom opens Preferences on the Smart Print tab.
 
 ## Assistant actions
 - [ ] Load a model. "Rotate it 45 degrees" → rotates without a review dialog.
@@ -28,7 +38,7 @@ Run on a **Release** build installed from the DMG, on a Mac that has not run Ver
 
 ## Printer control (needs a connected Bambu printer)
 - [ ] "Set the nozzle to 215" → "AI printer control" dialog; **Don't allow** → nothing changes and the AI says so.
-- [ ] Ask again → **Allow** → Device tab shows the nozzle target 215; chat says "Printer set: nozzle temperature 215 °C".
+- [ ] Ask again → **Allow** → chat says "Printer set: nozzle temperature 215 °C". In LAN/Developer Mode the Device tab shows the new target; over the cloud the chat adds that the printer may ignore it.
 - [ ] "Set the bed to 200" → refused with the printer's limit; nothing sent.
 - [ ] "Set the chamber to 50" on a printer not in heating mode → refused, tells you to use the Device tab.
 - [ ] Not printing: "Switch to sport speed" → refused (only while printing).
