@@ -1,3 +1,4 @@
+#include "OllamaAssistant/OllamaPrinterControl.hpp"
 #include "MainFrame.hpp"
 
 #include <wx/panel.h>
@@ -3586,6 +3587,10 @@ void MainFrame::init_menubar_as_editor()
         "", nullptr,
         []() { return BambuSmartPrintService::instance().is_bambu_account_logged_in(); }, this);
     smart_print_menu->AppendSeparator();
+    append_menu_check_item(smart_print_menu, wxID_ANY, _L("Allow AI printer control"),
+        _L("Let the AI assistant set nozzle, bed and chamber temperature and print speed on the connected printer"),
+        [](wxCommandEvent&) { OllamaPrinterControl::set_enabled(!OllamaPrinterControl::enabled()); },
+        this, []() { return true; }, []() { return OllamaPrinterControl::enabled(); }, this);
     append_menu_item(smart_print_menu, wxID_ANY, _L("View failure history"), _L("Browse recorded print failures and feedback"),
         [](wxCommandEvent&) { BambuSmartPrintService::instance().show_history_dialog(wxGetApp().plater()); },
         "", nullptr, []() { return true; }, this);

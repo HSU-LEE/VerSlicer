@@ -158,6 +158,7 @@ if (ORCA_TOOLS)
         ../slic3r/GUI/OllamaAssistant/OllamaEvalGrader.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaFailureDoctor.cpp
+        ../slic3r/GUI/OllamaAssistant/OllamaPrinterControl.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
         ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp

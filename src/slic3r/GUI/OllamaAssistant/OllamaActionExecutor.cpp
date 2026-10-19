@@ -2,6 +2,7 @@
 #include "OllamaActionExecutor.hpp"
 #include "OllamaActionRegistry.hpp"
 #include "OllamaFailureDoctor.hpp"
+#include "OllamaPrinterControl.hpp"
 #include "OllamaActionJsonExtract.hpp"
 #include "OllamaActionValidator.hpp"
 #include "OllamaConfig.hpp"
@@ -1784,6 +1785,7 @@ const std::unordered_map<std::string, ActionHandler>& action_handlers()
         h["get_state"]        = apply_get_state;
         h["find_setting"]     = apply_find_setting;
         h["wiki_search"]      = apply_wiki_search;
+        h["printer_control"] = OllamaPrinterControl::apply;
         h["printer_diagnostics"] = [](const nlohmann::json&) {
             return OllamaActionResult{true, false, OllamaFailureDoctor::printer_diagnostics_json().dump()};
         };

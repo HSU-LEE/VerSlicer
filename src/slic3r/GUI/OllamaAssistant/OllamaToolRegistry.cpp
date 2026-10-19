@@ -17,6 +17,11 @@ const OllamaToolSpec kTools[] = {
     {"printer_diagnostics", OllamaToolCategory::Readonly,
      "Read the printer's current error code, HMS alerts and print stage, with suspect areas and settings to check. Call first when the user says a print failed.",
      "프린터의 현재 오류 코드·HMS 알림·출력 단계와 의심 원인·확인할 설정을 읽는다. 출력이 실패했다고 하면 먼저 호출하세요."},
+    {"printer_control", OllamaToolCategory::Mutating,
+     "Change the connected printer: target nozzle_temp, bed_temp or chamber_temp (value in °C, 0 = off), or print_speed "
+     "(silent/standard/sport/ludicrous, while printing). Only when the user asks. The user must allow it once; limits are enforced.",
+     "연결된 프린터 변경: target은 nozzle_temp, bed_temp, chamber_temp(value는 °C, 0은 끄기) 또는 print_speed"
+     "(silent/standard/sport/ludicrous, 출력 중에만). 사용자가 요청할 때만. 처음 한 번 사용자 허용이 필요하고 범위는 강제됨"},
     {"select_object", OllamaToolCategory::Mutating, "Select object by id or name", "객체 선택"},
     {"set_config", OllamaToolCategory::Dangerous, "Change print settings", "설정 변경"},
     {"arrange", OllamaToolCategory::Mutating, "Auto-arrange on plate (by layer)", "플레이트 자동 배치 (층별)"},

@@ -592,6 +592,36 @@
     "mesh_boolean",
     "set_config"
    ]
+  },
+  {
+   "id": "pc_nozzle_en",
+   "request": "Set the nozzle to 215 degrees now",
+   "expect_actions": [
+    "printer_control"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "set_config"
+   ]
+  },
+  {
+   "id": "pc_bed_ko",
+   "request": "베드 온도 지금 60도로 올려줘",
+   "expect_actions": [
+    "printer_control"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "set_config"
+   ]
+  },
+  {
+   "id": "pc_speed_en",
+   "request": "Switch the printer to silent mode",
+   "expect_actions": [
+    "printer_control"
+   ],
+   "expect_keys": []
   }
  ]
 }

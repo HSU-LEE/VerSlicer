@@ -66,7 +66,9 @@ static bool is_workflow_only_action(const std::string& type)
         || type == "export_gcode" || type == "rollback_apply"
         || type == "get_state" || type == "list_objects" || type == "select_object"
         || type == "add_plate" || type == "delete_plate" || type == "select_plate"
-        || type == "open_calibration" || type == "run_smart_print" || type == "select_preset";
+        || type == "open_calibration" || type == "run_smart_print" || type == "select_preset"
+        // Gated by the user's one-time printer-control consent instead of a review dialog.
+        || type == "printer_control";
 }
 
 static bool is_geometry_action(const std::string& type)
