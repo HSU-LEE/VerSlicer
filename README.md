@@ -11,17 +11,9 @@ Just describe what you want — in chat or by voice — and VerSlicer turns it i
 
 # Official links
 
-#### GitHub Repository:
-
-<a href="https://github.com/HSU-LEE/VerSlicer"><img src="https://img.shields.io/badge/VerSlicer-181717?style=flat&logo=github&logoColor=white" width="200" alt="GitHub Logo"/></a>
-
-#### Releases:
-
-<a href="https://github.com/HSU-LEE/VerSlicer/releases/latest"><img src="https://img.shields.io/badge/Download-latest-2ea44f?style=flat&logo=apple&logoColor=white" width="200" alt="Download latest release"/></a>
-
-#### Report a problem:
-
-<a href="https://github.com/HSU-LEE/VerSlicer/issues"><img src="https://img.shields.io/badge/Issues-GitHub-181717?style=flat&logo=github&logoColor=white" width="200" alt="GitHub Issues"/></a>
+<a href="https://github.com/HSU-LEE/VerSlicer"><img src="https://img.shields.io/badge/VerSlicer-181717?style=flat&logo=github&logoColor=white" height="40" alt="GitHub Repository"/></a>
+<a href="https://github.com/HSU-LEE/VerSlicer/releases/latest"><img src="https://img.shields.io/badge/Download-latest-2ea44f?style=flat&logo=apple&logoColor=white" height="40" alt="Download latest release"/></a>
+<a href="https://github.com/HSU-LEE/VerSlicer/issues"><img src="https://img.shields.io/badge/Issues-GitHub-181717?style=flat&logo=github&logoColor=white" height="40" alt="Report a problem"/></a>
 
 </div>
 
