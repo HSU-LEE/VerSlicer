@@ -34,15 +34,14 @@ void SlicePilotSimpleLayout::initialize_defaults(Slic3r::AppConfig* cfg)
 {
     if (!cfg)
         return;
-    if (!cfg->has(kConfigKey))
-        cfg->set_bool(kConfigKey, false);
+    cfg->set_bool(kConfigKey, false);
 }
 
 bool SlicePilotSimpleLayout::is_enabled()
 {
-    if (!wxGetApp().app_config)
-        return false;
-    return wxGetApp().app_config->get_bool(kConfigKey);
+    // The Simple layout option was removed; the full tab bar is always shown,
+    // also for configs that still have slicepilot_simple_layout = 1.
+    return false;
 }
 
 void SlicePilotSimpleLayout::set_enabled(bool enabled)

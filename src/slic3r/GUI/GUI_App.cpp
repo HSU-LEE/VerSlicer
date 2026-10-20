@@ -7512,7 +7512,7 @@ std::string effective_mode_to_string(ConfigOptionMode mode)
 ConfigOptionMode GUI_App::get_saved_mode()
 {
     if (!app_config->has("user_mode"))
-        return comSimple;
+        return comAdvanced;
 
     return saved_mode_from_string(app_config->get("user_mode"));
 }
