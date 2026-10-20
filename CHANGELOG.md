@@ -16,6 +16,7 @@
 - macOS no longer asks for your login Keychain password after an update. The ChatGPT sign-in is kept in a file only your user can read; a sign-in saved by 3.2.0 moves there once, without a prompt.
 - Free-plan ChatGPT accounts get a notice that the assistant needs ChatGPT Plus or Pro.
 - A ChatGPT reply could run the same action twice (for example rotating twice); each action now runs once.
+- Quitting from the Dock, menu or logout could end in a crash report from the Bambu network plugin (#5); VerSlicer now exits after saving without running the plugin's shutdown code.
 
 ### Printers
 - Picking a printer that is connected through your Bambu Lab account (not LAN mode) shows how to turn on LAN Only mode and Developer Mode.

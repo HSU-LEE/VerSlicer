@@ -52,7 +52,7 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "" "$kc"
           security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
 
-      - name: Build app and DMG
+      - name: Build app, DMG and PKG
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -63,16 +63,20 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: VerSlicer-macOS-arm64
-          path: build/arm64/dist/*.dmg
+          path: |
+            build/arm64/dist/*.dmg
+            build/arm64/dist/*.pkg
 
-      - name: Attach DMG to the GitHub release
+      - name: Attach installers to the GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "VerSlicer $GITHUB_REF_NAME" --notes-file CHANGELOG.md
-          # Never replace a DMG that is already published (it may have been verified by hand).
-          for f in build/arm64/dist/*.dmg; do
+          # Release notes: only this version's section of CHANGELOG.md.
+          awk -v v="${GITHUB_REF_NAME#v}" '$0 == "## " v {on=1; next} /^## / && on {exit} on' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "VerSlicer ${GITHUB_REF_NAME#v}" --notes-file "$RUNNER_TEMP/notes.md"
+          # Never replace an installer that is already published (it may have been verified by hand).
+          for f in build/arm64/dist/*.dmg build/arm64/dist/*.pkg; do
             if gh release view "$GITHUB_REF_NAME" --json assets -q '.assets[].name' | grep -qx "$(basename "$f")"; then
               echo "$(basename "$f") already attached; leaving it"
             else

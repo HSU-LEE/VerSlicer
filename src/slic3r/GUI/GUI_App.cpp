@@ -2821,7 +2821,16 @@ bool GUI_App::on_init_inner()
             BBLNetworkPlugin::shutdown();
             m_bambu_libs_released = true;
         }
+        if (app_config && app_config->dirty())
+            app_config->save();
         flush_logs();
+#ifdef __APPLE__
+        // AppKit calls exit() next. The plugin can still have file-transfer
+        // threads (ft_job_*) that call std::terminate from its static
+        // destructors (issue #5). Settings and logs are saved by now, so end
+        // the process without running static destructors.
+        std::_Exit(EXIT_SUCCESS);
+#endif
     });
 
     // Verify resources path
