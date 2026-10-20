@@ -9,6 +9,7 @@
 #include "I18N.hpp"
 #include "PartPlate.hpp"
 #include "Plater.hpp"
+#include "DeviceManager.hpp"
 
 #include <boost/filesystem.hpp>
 #include <boost/log/trivial.hpp>
@@ -128,6 +129,22 @@ bool send_current_plate(Plater* plater)
         return false;
     }
     return true;
+}
+
+void notify_cloud_printer_selected(wxWindow* parent, MachineObject* obj)
+{
+    if (!obj || obj->is_lan_mode_printer())
+        return;
+    wxMessageDialog dlg(parent,
+                        wxString::Format(_L("\"%s\" is connected through your Bambu Lab account, not in LAN mode.\n\n"
+                                            "To print and control it directly from VerSlicer, on the printer's screen:\n"
+                                            "1. Open Settings > Network (WLAN) and turn on LAN Only mode.\n"
+                                            "2. Turn on Developer Mode.\n"
+                                            "3. Note the IP address and access code, then add the printer here in LAN mode.\n\n"
+                                            "Without this, print with Bambu Connect instead."),
+                                         wxString::FromUTF8(obj->get_dev_name())),
+                        _L("Turn on LAN mode and Developer Mode"), wxOK | wxICON_INFORMATION);
+    dlg.ShowModal();
 }
 
 void open_app()

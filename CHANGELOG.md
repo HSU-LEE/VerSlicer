@@ -13,11 +13,19 @@
 - Mode, model and **New chat** share one row, leaving more room for the conversation.
 - On cloud-connected printers, AI printer control says the printer may ignore the command instead of claiming success.
 - Request routing and MakerWorld search now rely on ChatGPT's intent and query instead of local keyword lists.
+- macOS no longer asks for your login Keychain password after an update. The ChatGPT sign-in is kept in a file only your user can read; a sign-in saved by 3.2.0 moves there once, without a prompt.
+- Free-plan ChatGPT accounts get a notice that the assistant needs ChatGPT Plus or Pro.
+- A ChatGPT reply could run the same action twice (for example rotating twice); each action now runs once.
+
+### Printers
+- Picking a printer that is connected through your Bambu Lab account (not LAN mode) shows how to turn on LAN Only mode and Developer Mode.
 
 ### Smart Print
 - The docked panel focuses on the plate: readiness, workflow, insights. Account, assistant options, history and printer learning moved to **Preferences → Smart Print**, opened from the link at the bottom.
 
 ### Project
+- The DMG opens a styled install window (drag VerSlicer to Applications, plus the Terminal fix for a blocked first launch).
+- New .pkg installer next to the DMG; its screens show the Terminal fix as copyable text.
 - CI: the dependency cache step no longer times out, and runs on main are not cancelled by the next push.
 
 ## 3.2.0

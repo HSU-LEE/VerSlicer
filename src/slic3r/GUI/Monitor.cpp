@@ -288,12 +288,22 @@ void MonitorPanel::on_select_printer(wxCommandEvent& event)
     Slic3r::DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
     if (!dev) return;
 
-    if ( dev->get_selected_machine() && (dev->get_selected_machine()->get_dev_id() != event.GetString().ToStdString()) && m_hms_panel) {
+    const bool changed = !dev->get_selected_machine() || dev->get_selected_machine()->get_dev_id() != event.GetString().ToStdString();
+    if ( dev->get_selected_machine() && changed && m_hms_panel) {
         m_hms_panel->clear_hms_tag();
     }
 
     if (!dev->set_selected_machine(event.GetString().ToStdString()))
         return;
+
+    if (changed) {
+        CallAfter([this, picked_id = event.GetString().ToStdString()]() {
+            DeviceManager* d = wxGetApp().getDeviceManager();
+            MachineObject* o = d ? d->get_selected_machine() : nullptr;
+            if (o && o->get_dev_id() == picked_id)
+                BambuConnect::notify_cloud_printer_selected(this, o);
+        });
+    }
 
     set_default();
     update_all();

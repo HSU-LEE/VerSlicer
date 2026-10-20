@@ -26431,8 +26431,8 @@ msgstr "브라우저에서 허용을 누르지 않았습니다. 이 창을 닫�
 msgid "Your ChatGPT account is connected to VerSlicer. Close this window and return to the app."
 msgstr "ChatGPT 계정이 VerSlicer에 연결되었습니다. 이 창을 닫고 앱으로 돌아가 주세요."
 
-msgid "The AI assistant uses OpenAI's ChatGPT. When you use it, the following is sent to OpenAI under your ChatGPT account:\n\n• What you type or say\n• Plate state: model names, sizes and rotation; current printer, filament and print settings\n• Printer error codes and alerts (when you ask about a failed print)\n\nModel files (STL/3MF) and G-code are not sent. Voice input uses macOS speech recognition. Your sign-in is stored only in this Mac's Keychain; there is no VerSlicer server.\n\nAgree and use the AI assistant?"
-msgstr "AI 도우미는 OpenAI의 ChatGPT를 사용합니다. 사용하면 다음 정보가 내 ChatGPT 계정으로 OpenAI에 전송됩니다.\n\n• 입력하거나 말한 요청 문장\n• 플레이트 상태: 모델 이름·크기·회전, 현재 프린터·필라멘트·출력 설정\n• 프린터 오류 코드와 알림(출력 실패를 물어볼 때)\n\n모델 파일(STL/3MF) 자체와 G-code는 보내지 않습니다. 음성 입력은 macOS 음성 인식을 사용합니다. 로그인 정보는 이 Mac의 키체인에만 저장되며 VerSlicer 서버는 없습니다.\n\n동의하고 AI 도우미를 사용할까요?"
+msgid "The AI assistant uses OpenAI's ChatGPT. When you use it, the following is sent to OpenAI under your ChatGPT account:\n\n• What you type or say\n• Plate state: model names, sizes and rotation; current printer, filament and print settings\n• Printer error codes and alerts (when you ask about a failed print)\n\nModel files (STL/3MF) and G-code are not sent. Voice input uses macOS speech recognition. Your sign-in is stored only on this Mac, in a file only your user account can read; there is no VerSlicer server.\n\nAgree and use the AI assistant?"
+msgstr "AI 도우미는 OpenAI의 ChatGPT를 사용합니다. 사용하면 다음 정보가 내 ChatGPT 계정으로 OpenAI에 전송됩니다.\n\n• 입력하거나 말한 요청 문장\n• 플레이트 상태: 모델 이름·크기·회전, 현재 프린터·필라멘트·출력 설정\n• 프린터 오류 코드와 알림(출력 실패를 물어볼 때)\n\n모델 파일(STL/3MF) 자체와 G-code는 보내지 않습니다. 음성 입력은 macOS 음성 인식을 사용합니다. 로그인 정보는 이 Mac에서 내 사용자 계정만 읽을 수 있는 파일에만 저장되며 VerSlicer 서버는 없습니다.\n\n동의하고 AI 도우미를 사용할까요?"
 
 msgid "AI assistant and your data"
 msgstr "AI 도우미 개인정보 안내"
@@ -26484,3 +26484,22 @@ msgstr "검색어를 입력하거나 MakerWorld 링크를 붙여넣어 주세요
 
 msgid "Please describe the model more specifically (e.g. size, articulated, vase)."
 msgstr "모델을 좀 더 구체적으로 설명해 주세요 (예: 크기, 관절형, 화병)."
+
+#, c-format
+msgid "\"%s\" is connected through your Bambu Lab account, not in LAN mode.\n\nTo print and control it directly from VerSlicer, on the printer's screen:\n1. Open Settings > Network (WLAN) and turn on LAN Only mode.\n2. Turn on Developer Mode.\n3. Note the IP address and access code, then add the printer here in LAN mode.\n\nWithout this, print with Bambu Connect instead."
+msgstr "\"%s\" 프린터는 LAN 모드가 아니라 Bambu Lab 계정으로 연결되어 있습니다.\n\nVerSlicer에서 직접 출력하고 제어하려면 프린터 화면에서:\n1. 설정 > 네트워크(WLAN)에서 LAN 전용 모드를 켜세요.\n2. 개발자 모드를 켜세요.\n3. IP 주소와 액세스 코드를 확인한 뒤, 여기에서 LAN 모드로 프린터를 추가하세요.\n\n그렇지 않으면 Bambu Connect로 출력하세요."
+
+msgid "Turn on LAN mode and Developer Mode"
+msgstr "LAN 모드와 개발자 모드를 켜 주세요"
+
+msgid "Your ChatGPT account is on the Free plan. The VerSlicer AI assistant needs a ChatGPT Plus or Pro plan, so requests will not work with this account.\n\nUpgrade your plan on chatgpt.com, then sign out and connect again."
+msgstr "ChatGPT 계정이 무료(Free) 플랜입니다. VerSlicer AI 도우미는 ChatGPT Plus 또는 Pro 플랜이 필요하므로 이 계정으로는 요청이 동작하지 않습니다.\n\nchatgpt.com에서 플랜을 업그레이드한 뒤, 연결을 해제하고 다시 연결해 주세요."
+
+msgid "ChatGPT Plus or Pro is required"
+msgstr "ChatGPT Plus 또는 Pro가 필요합니다"
+
+msgid "See ChatGPT plans"
+msgstr "ChatGPT 플랜 보기"
+
+msgid "This ChatGPT account is on the Free plan. The AI assistant needs ChatGPT Plus or Pro."
+msgstr "이 ChatGPT 계정은 무료 플랜입니다. AI 도우미는 ChatGPT Plus 또는 Pro가 필요합니다."

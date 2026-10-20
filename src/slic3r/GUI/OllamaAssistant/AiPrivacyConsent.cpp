@@ -47,7 +47,7 @@ bool ensure_ai_privacy_consent(wxWindow* parent)
         "• Plate state: model names, sizes and rotation; current printer, filament and print settings\n"
         "• Printer error codes and alerts (when you ask about a failed print)\n\n"
         "Model files (STL/3MF) and G-code are not sent. Voice input uses macOS speech recognition. "
-        "Your sign-in is stored only in this Mac's Keychain; there is no VerSlicer server.\n\n"
+        "Your sign-in is stored only on this Mac, in a file only your user account can read; there is no VerSlicer server.\n\n"
         "Agree and use the AI assistant?");
     wxMessageDialog dlg(parent, body, _L("AI assistant and your data"), wxYES_NO | wxNO_DEFAULT | wxICON_INFORMATION);
     dlg.SetYesNoLabels(_L("Agree"), _L("Cancel"));

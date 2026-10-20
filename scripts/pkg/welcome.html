@@ -1,0 +1,23 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  body { font: 13px -apple-system, "Helvetica Neue", sans-serif; color: #2b2a28; margin: 0 4px; }
+  h1 { font-size: 20px; margin: 4px 0 2px; }
+  .sub { color: #7a7672; margin: 0 0 18px; }
+  ol { padding-left: 20px; } li { margin: 6px 0; }
+  .note { margin-top: 18px; color: #555; }
+  pre { background: #1f1f21; color: #f3f3ef; padding: 10px 12px; border-radius: 8px;
+        font: 12px ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-all;
+        -webkit-user-select: text; user-select: text; }
+  @media (prefers-color-scheme: dark) { body { color: #ecebe8; } .sub, .note { color: #a5a29d; } }
+</style></head>
+<body>
+<h1>VerSlicer</h1>
+<p class="sub">This installer puts VerSlicer in your Applications folder.</p>
+<ol>
+  <li>Click <b>Continue</b>, then <b>Install</b>.</li>
+  <li>When it finishes, open <b>VerSlicer</b> from Applications.</li>
+</ol>
+<p class="note">If macOS still says VerSlicer is damaged or can’t be opened, run this once in Terminal (select it and press ⌘C):</p>
+<pre>xattr -dr com.apple.quarantine /Applications/VerSlicer.app</pre>
+</body></html>

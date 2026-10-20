@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build a distributable VerSlicer .dmg for other Macs (no dev environment required).
+# Build distributable VerSlicer installers (.dmg and .pkg) for other Macs (no dev environment required).
 #
 # Usage:
 #   ./scripts/make_macos_installer.sh              # package existing Release build
@@ -57,11 +57,16 @@ VERSION="$(grep -E '^set\(VERSLICER_VERSION' "${PROJECT_DIR}/version.inc" 2>/dev
     | sed -E 's/.*"([^"]+)".*/\1/' || echo "0.0.0")"
 OUT_DMG="${PROJECT_DIR}/build/${ARCH}/dist/VerSlicer-macOS-${ARCH}-${VERSION}.dmg"
 
+OUT_PKG="${PROJECT_DIR}/build/${ARCH}/dist/VerSlicer-macOS-${ARCH}-${VERSION}.pkg"
+
 "${SCRIPT_DIR}/package_macos_dmg.sh" "${PORTABLE_APP}" "${OUT_DMG}"
+"${SCRIPT_DIR}/package_macos_pkg.sh" "${PORTABLE_APP}" "${OUT_PKG}"
 
 echo ""
-echo "Installer ready:"
+echo "Installers ready:"
 echo "  ${OUT_DMG}"
+echo "  ${OUT_PKG}"
 echo ""
-echo "Copy this .dmg to another Mac, open it, and drag VerSlicer to Applications."
+echo "DMG: open it and drag VerSlicer to Applications."
+echo "PKG: open it (right-click → Open the first time) and follow the installer."
 echo "Launch VerSlicer, open AI chat, and sign in with ChatGPT."

@@ -6,6 +6,12 @@
 namespace Slic3r { namespace GUI {
 
 class Plater;
+}} // namespace
+
+class wxWindow;
+namespace Slic3r { class MachineObject; }
+
+namespace Slic3r { namespace GUI {
 
 /** Printing through Bambu Connect, Bambu Lab's supported path for third-party
  *  slicers on printers with Authorization Control firmware (no Developer Mode
@@ -32,6 +38,10 @@ bool installed();
  *  Shows a message and returns false when the plate is not sliced, the export
  *  fails, or Bambu Connect is missing (with a link to download it). */
 bool send_current_plate(Plater* plater);
+
+/** The user picked a printer that is linked through the Bambu cloud (not LAN
+ *  mode): tell them to turn on LAN Only mode and Developer Mode on the printer. */
+void notify_cloud_printer_selected(wxWindow* parent, MachineObject* obj);
 
 /** Open Bambu Connect (for printer controls), or its download page if missing. */
 void open_app();

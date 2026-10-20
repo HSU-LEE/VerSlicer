@@ -10,6 +10,7 @@
 #include "../Widgets/Label.hpp"
 
 #include <wx/msgdlg.h>
+#include <wx/utils.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 
@@ -135,6 +136,18 @@ void ChatGptAccountBar::finish_sign_in(const std::string& error)
         if (m_cb.notify)
             m_cb.notify(m_cb.format_error ? m_cb.format_error(error) : wxString::FromUTF8(error));
         return;
+    }
+    if (ChatGptAccount::plan_known_unsupported()) {
+        wxMessageDialog dlg(m_parent,
+                            _L("Your ChatGPT account is on the Free plan. The VerSlicer AI assistant needs a ChatGPT Plus or Pro "
+                               "plan, so requests will not work with this account.\n\n"
+                               "Upgrade your plan on chatgpt.com, then sign out and connect again."),
+                            _L("ChatGPT Plus or Pro is required"), wxYES_NO | wxYES_DEFAULT | wxICON_INFORMATION);
+        dlg.SetYesNoLabels(_L("See ChatGPT plans"), _L("OK"));
+        if (dlg.ShowModal() == wxID_YES)
+            wxLaunchDefaultBrowser("https://chatgpt.com/pricing");
+        if (m_cb.notify)
+            m_cb.notify(_L("This ChatGPT account is on the Free plan. The AI assistant needs ChatGPT Plus or Pro."));
     }
     if (m_cb.signed_in)
         m_cb.signed_in();

@@ -194,33 +194,18 @@ strip_attributes "${STAGING}/${APP_NAME}.app"
 
 sign_app_bundle "${STAGING}/${APP_NAME}.app" "${SIGN_ID}"
 
-cat > "${STAGING}/INSTALL.txt" <<EOF
-VerSlicer ${VERSION} for macOS (${ARCH})
-
-Install
-  1. Drag ${APP_NAME}.app to the Applications folder.
-  2. Open Applications and launch ${APP_NAME}.
-  3. If macOS blocks the app (unidentified developer):
-       Right-click the app → Open → Open once.
-     Or in Terminal:
-       xattr -dr com.apple.quarantine /Applications/${APP_NAME}.app
-
-AI assistant
-  Open VerSlicer and use the chat button on the 3D toolbar.
-  Connect a ChatGPT account in the assistant panel. The conversation
-  runs through ChatGPT; no local model is required.
-  In chat, Mode "Apply" changes slicer settings. "Question" is advice only.
-
-System requirements
-  • macOS 11.3 or later
-  • Apple Silicon (${ARCH}) build
-  • Internet for MakerWorld / cloud features (optional)
-
-Support
-  • https://github.com/HSU-LEE/VerSlicer/issues
-EOF
 
 ln -sfn /Applications "${STAGING}/Applications"
+
+
+# Window background: drag arrow plus first-launch steps (scripts/dmg/make_dmg_background.swift).
+BG_DIR="${PROJECT_DIR}/scripts/dmg"
+HAS_BG=0
+if [ -f "${BG_DIR}/background.png" ] && [ -f "${BG_DIR}/background@2x.png" ]; then
+    mkdir -p "${STAGING}/.background"
+    tiffutil -cathidpicheck "${BG_DIR}/background.png" "${BG_DIR}/background@2x.png" \
+        -out "${STAGING}/.background/background.tiff" >/dev/null 2>&1 && HAS_BG=1
+fi
 
 echo "Creating disk image..."
 rm -f "${OUT_DMG}" "${DMG_TMP}"
@@ -228,8 +213,45 @@ hdiutil create \
     -volname "${APP_NAME}" \
     -srcfolder "${STAGING}" \
     -ov \
+    -fs HFS+ \
     -format UDRW \
     "${DMG_TMP}" >/dev/null
+
+# Lay out the Finder window (positions match make_dmg_background.swift).
+# Needs Finder automation; if it is not allowed, the DMG still works unstyled.
+if [ "${HAS_BG}" = "1" ] && [ "${SKIP_DMG_LAYOUT:-}" != "1" ]; then
+    MOUNT_DIR="$(hdiutil attach "${DMG_TMP}" -readwrite -noverify -noautoopen | awk -F'\t' '/\/Volumes\//{print $NF}' | tail -1)"
+    if [ -n "${MOUNT_DIR}" ]; then
+        VOL_NAME="$(basename "${MOUNT_DIR}")"
+        if ! osascript <<APPLESCRIPT
+tell application "Finder"
+    tell disk "${VOL_NAME}"
+        open
+        set current view of container window to icon view
+        set toolbar visible of container window to false
+        set statusbar visible of container window to false
+        set the bounds of container window to {200, 120, 860, 588}
+        set opts to the icon view options of container window
+        set arrangement of opts to not arranged
+        set icon size of opts to 112
+        set text size of opts to 13
+        set background picture of opts to file ".background:background.tiff"
+        set position of item "${APP_NAME}.app" of container window to {180, 190}
+        set position of item "Applications" of container window to {480, 190}
+        update without registering applications
+        delay 1
+        close
+    end tell
+end tell
+APPLESCRIPT
+        then
+            echo "warning: could not style the DMG window (Finder automation not allowed?)" >&2
+        fi
+        chflags hidden "${MOUNT_DIR}/.background" 2>/dev/null || true
+        sync
+        hdiutil detach "${MOUNT_DIR}" -quiet || hdiutil detach "${MOUNT_DIR}" -force -quiet || true
+    fi
+fi
 
 # Compress to read-only UDZO (standard distribution format).
 hdiutil convert "${DMG_TMP}" -format UDZO -o "${OUT_DMG}" >/dev/null

@@ -1,4 +1,5 @@
 #include "Plater.hpp"
+#include "BambuConnect.hpp"
 #include "libslic3r/Config.hpp"
 #include "libslic3r_version.h"
 
@@ -16590,7 +16591,11 @@ void Plater::print_job_finished(wxCommandEvent &evt)
     Slic3r::DeviceManager* dev = Slic3r::GUI::wxGetApp().getDeviceManager();
     if (!dev) return;
 
-    dev->set_selected_machine(evt.GetString().ToStdString());
+    const std::string picked_id = evt.GetString().ToStdString();
+    const bool changed = !dev->get_selected_machine() || dev->get_selected_machine()->get_dev_id() != picked_id;
+    dev->set_selected_machine(picked_id);
+    if (changed)
+        BambuConnect::notify_cloud_printer_selected(this, dev->get_selected_machine());
     p->main_frame->request_select_tab(MainFrame::TabPosition::tpMonitor);
     //jump to monitor and select device status panel
     MonitorPanel* curr_monitor = p->main_frame->m_monitor;

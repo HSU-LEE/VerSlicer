@@ -10,6 +10,9 @@
 #include "slic3r/Utils/Http.hpp"
 
 #include <boost/algorithm/string.hpp>
+
+#include <algorithm>
+#include <cctype>
 #include <boost/log/trivial.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/nowide/fstream.hpp>
@@ -84,8 +87,10 @@ std::string host_id_path()
     return (boost::filesystem::path(data_dir()) / "chatgpt_host_id").string();
 }
 
-// Tokens live in the login Keychain; chatgpt_account.json is only read once
-// to migrate sessions saved by older builds.
+// Tokens live in chatgpt_account.json (owner read/write only). Builds are not
+// Developer ID signed, so a Keychain item is bound to one build's signature and
+// macOS asked for the login password after every update. Sessions saved in the
+// Keychain by older builds are migrated once, without ever showing that prompt.
 constexpr const char* kKeychainService = "com.verslicer.chatgpt";
 constexpr const char* kKeychainAccount = "session";
 
@@ -103,46 +108,44 @@ CFMutableDictionaryRef keychain_query()
     return q;
 }
 
-std::string keychain_read()
+/** Run a Keychain call without letting macOS show its password prompt. */
+template<class Fn> auto without_keychain_prompt(Fn&& fn)
 {
-    CFMutableDictionaryRef q = keychain_query();
-    CFDictionarySetValue(q, kSecReturnData, kCFBooleanTrue);
-    CFDictionarySetValue(q, kSecMatchLimit, kSecMatchLimitOne);
-    CFTypeRef   data = nullptr;
-    std::string out;
-    if (SecItemCopyMatching(q, &data) == errSecSuccess && data) {
-        CFDataRef bytes = static_cast<CFDataRef>(data);
-        out.assign(reinterpret_cast<const char*>(CFDataGetBytePtr(bytes)), static_cast<size_t>(CFDataGetLength(bytes)));
-        CFRelease(data);
-    }
-    CFRelease(q);
-    return out;
+    Boolean was_allowed = true;
+    SecKeychainGetUserInteractionAllowed(&was_allowed);
+    SecKeychainSetUserInteractionAllowed(false);
+    auto result = fn();
+    SecKeychainSetUserInteractionAllowed(was_allowed);
+    return result;
 }
 
-bool keychain_write(const std::string& body)
+std::string legacy_keychain_read()
 {
-    CFDataRef              data = CFDataCreate(nullptr, reinterpret_cast<const UInt8*>(body.data()), static_cast<CFIndex>(body.size()));
-    CFMutableDictionaryRef q    = keychain_query();
-    CFMutableDictionaryRef upd  = CFDictionaryCreateMutable(nullptr, 0, &kCFTypeDictionaryKeyCallBacks,
-                                                            &kCFTypeDictionaryValueCallBacks);
-    CFDictionarySetValue(upd, kSecValueData, data);
-    OSStatus st = SecItemUpdate(q, upd);
-    if (st == errSecItemNotFound) {
-        CFDictionarySetValue(q, kSecValueData, data);
-        CFDictionarySetValue(q, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly);
-        st = SecItemAdd(q, nullptr);
-    }
-    CFRelease(upd);
-    CFRelease(q);
-    CFRelease(data);
-    return st == errSecSuccess;
+    return without_keychain_prompt([]() {
+        CFMutableDictionaryRef q = keychain_query();
+        CFDictionarySetValue(q, kSecReturnData, kCFBooleanTrue);
+        CFDictionarySetValue(q, kSecMatchLimit, kSecMatchLimitOne);
+        CFTypeRef   data = nullptr;
+        std::string out;
+        if (SecItemCopyMatching(q, &data) == errSecSuccess && data) {
+            CFDataRef bytes = static_cast<CFDataRef>(data);
+            out.assign(reinterpret_cast<const char*>(CFDataGetBytePtr(bytes)), static_cast<size_t>(CFDataGetLength(bytes)));
+        }
+        if (data)
+            CFRelease(data);
+        CFRelease(q);
+        return out;
+    });
 }
 
-void keychain_delete()
+void legacy_keychain_delete()
 {
-    CFMutableDictionaryRef q = keychain_query();
-    SecItemDelete(q);
-    CFRelease(q);
+    without_keychain_prompt([]() {
+        CFMutableDictionaryRef q = keychain_query();
+        const OSStatus         st = SecItemDelete(q);
+        CFRelease(q);
+        return st;
+    });
 }
 
 std::string url_encode(const std::string& value)
@@ -251,6 +254,10 @@ bool write_private_file(const std::string& path, const std::string& body)
 {
     const std::string tmp = path + ".tmp";
     {
+        boost::system::error_code perm_ec;
+        boost::filesystem::remove(tmp, perm_ec);
+        { boost::nowide::ofstream touch(tmp, std::ios::binary); }
+        boost::filesystem::permissions(tmp, boost::filesystem::owner_read | boost::filesystem::owner_write, perm_ec);
         boost::nowide::ofstream file(tmp, std::ios::binary | std::ios::trunc);
         if (!file)
             return false;
@@ -296,10 +303,10 @@ void load_session_locked()
         return;
     s.loaded = true;
     s.doc    = nlohmann::json::object();
-    std::string raw = keychain_read();
+    std::string raw = read_file(account_path());
     bool        migrate = false;
     if (raw.empty()) {
-        raw     = read_file(account_path());
+        raw     = legacy_keychain_read();
         migrate = !raw.empty();
     }
     if (raw.empty())
@@ -310,17 +317,12 @@ void load_session_locked()
             s.doc = std::move(parsed);
     } catch (...) {
     }
-    if (migrate && keychain_write(raw)) {
-        boost::system::error_code ec;
-        boost::filesystem::remove(account_path(), ec);
-    }
+    if (migrate && write_private_file(account_path(), raw))
+        legacy_keychain_delete();
 }
 
 bool save_session_locked()
 {
-    if (keychain_write(account_session().doc.dump()))
-        return true;
-    // No usable Keychain (rare, e.g. a locked headless session): keep the owner-only file.
     return write_private_file(account_path(), account_session().doc.dump(2));
 }
 
@@ -447,7 +449,7 @@ bool audience_matches(const nlohmann::json& payload, const std::string& client_i
 }
 
 std::string validate_id_token(const std::string& id_token, const std::string& client_id, const std::string& nonce,
-                              std::string* email_out, std::string* subject_out)
+                              std::string* email_out, std::string* subject_out, std::string* plan_out = nullptr)
 {
     const auto first = id_token.find('.');
     const auto second = first == std::string::npos ? std::string::npos : id_token.find('.', first + 1);
@@ -516,6 +518,13 @@ std::string validate_id_token(const std::string& id_token, const std::string& cl
         *subject_out = subject;
     if (email_out && payload.contains("email") && payload["email"].is_string())
         *email_out = payload["email"].get<std::string>();
+    if (plan_out) {
+        // OpenAI puts the ChatGPT plan ("free", "plus", "pro", "team", ...) in this claim.
+        const auto auth = payload.find("https://api.openai.com/auth");
+        if (auth != payload.end() && auth->is_object() && auth->contains("chatgpt_plan_type")
+            && (*auth)["chatgpt_plan_type"].is_string())
+            *plan_out = (*auth)["chatgpt_plan_type"].get<std::string>();
+    }
     return {};
 }
 
@@ -652,7 +661,8 @@ std::string apply_token_response(const nlohmann::json& token, const std::string&
 
     std::string email;
     std::string subject;
-    const std::string id_error = validate_id_token(id_token, client_id, check_nonce ? nonce : "", &email, &subject);
+    std::string plan;
+    const std::string id_error = validate_id_token(id_token, client_id, check_nonce ? nonce : "", &email, &subject, &plan);
     if (!id_error.empty())
         return id_error;
 
@@ -664,6 +674,7 @@ std::string apply_token_response(const nlohmann::json& token, const std::string&
 
     const int64_t now = static_cast<int64_t>(std::time(nullptr));
     account_session().doc["email"]             = email;
+    account_session().doc["plan_type"]         = plan;
     account_session().doc["issuer"]            = kIssuer;
     account_session().doc["subject"]           = subject;
     account_session().doc["client_id"]         = client_id;
@@ -700,7 +711,7 @@ std::string refresh_locked_account_session()
         BOOST_LOG_TRIVIAL(warning) << "ChatGPT refresh rejected (HTTP " << response.status << "): "
                                    << json_error_message(response.body) << "; clearing saved sign-in";
         account_session().doc = nlohmann::json::object();
-        keychain_delete();
+        legacy_keychain_delete();
         boost::system::error_code ec;
         boost::filesystem::remove(account_path(), ec);
         return "ChatGPT sign-in has expired. Connect again.";
@@ -800,6 +811,8 @@ std::string text_from_output_item(const nlohmann::json& item)
     if (!item.contains("content") || !item["content"].is_array())
         return text;
     for (const auto& part : item["content"]) {
+        if (!part.is_object())
+            continue;
         if (part.value("type", "") == "output_text" && part.contains("text") && part["text"].is_string())
             text += part["text"].get<std::string>();
         else if (part.contains("text") && part["text"].is_string())
@@ -850,9 +863,14 @@ void collect_output(const nlohmann::json& output, SseParse& parsed)
     if (!output.is_array())
         return;
     for (const auto& item : output) {
-        const std::string type = item.value("type", "");
+        if (!item.is_object())
+            continue;
+        const std::string type = item.contains("type") && item["type"].is_string() ? item["type"].get<std::string>() : "";
         if (type == "function_call") {
-            parsed.calls.emplace_back(item.value("name", ""), item.value("arguments", ""));
+            const auto str = [&item](const char* key) {
+                return item.contains(key) && item[key].is_string() ? item[key].get<std::string>() : std::string();
+            };
+            parsed.calls.emplace_back(str("name"), str("arguments"));
         } else if (type == "message") {
             const std::string text = text_from_output_item(item);
             if (!text.empty())
@@ -880,26 +898,38 @@ SseParse parse_responses_sse(const std::string& body, const std::function<void(c
         } catch (...) {
             continue;
         }
-        const std::string type = event.value("type", "");
-        if (type == "response.output_text.delta") {
-            const std::string delta = event.value("delta", "");
-            if (!delta.empty()) {
-                parsed.text += delta;
-                if (on_delta)
-                    on_delta(delta);
+        if (!event.is_object())
+            continue;
+        try {
+            const std::string type = event.value("type", "");
+            if (type == "response.output_text.delta") {
+                const std::string delta = event.contains("delta") && event["delta"].is_string() ? event["delta"].get<std::string>() : "";
+                if (!delta.empty()) {
+                    parsed.text += delta;
+                    if (on_delta)
+                        on_delta(delta);
+                }
+            } else if (type == "response.output_item.done" && event.contains("item")) {
+                collect_output(nlohmann::json::array({event["item"]}), parsed);
+            } else if (type == "response.completed" && event.contains("response")) {
+                parsed.completed = true;
+                // A non-empty final output repeats every item already seen in
+                // output_item.done; it is authoritative, so start over instead of
+                // running each tool call twice. (Streaming often sends it empty.)
+                if (event["response"].is_object() && event["response"].contains("output")
+                    && event["response"]["output"].is_array() && !event["response"]["output"].empty()) {
+                    parsed.calls.clear();
+                    collect_output(event["response"]["output"], parsed);
+                }
+            } else if (type == "response.failed" || type == "response.incomplete" || type == "error") {
+                parsed.error = json_error_message(payload);
+                if (parsed.error.empty() && event.contains("response") && event["response"].contains("error"))
+                    parsed.error = event["response"]["error"].dump();
+                if (parsed.error.empty())
+                    parsed.error = type;
             }
-        } else if (type == "response.output_item.done" && event.contains("item")) {
-            collect_output(nlohmann::json::array({event["item"]}), parsed);
-        } else if (type == "response.completed" && event.contains("response")) {
-            parsed.completed = true;
-            if (event["response"].contains("output"))
-                collect_output(event["response"]["output"], parsed);
-        } else if (type == "response.failed" || type == "response.incomplete" || type == "error") {
-            parsed.error = json_error_message(payload);
-            if (parsed.error.empty() && event.contains("response") && event["response"].contains("error"))
-                parsed.error = event["response"]["error"].dump();
-            if (parsed.error.empty())
-                parsed.error = type;
+        } catch (const std::exception&) {
+            // Unexpected event shape (wrong field types): skip it rather than abort the reply.
         }
     }
     return parsed;
@@ -929,6 +959,21 @@ bool ChatGptAccount::linked()
         && scope_allows_inference(account_session().doc.value("scope", ""));
 }
 
+std::string ChatGptAccount::plan_type()
+{
+    std::lock_guard<std::mutex> lock(session_mutex());
+    load_session_locked();
+    return account_session().doc.value("plan_type", "");
+}
+
+bool ChatGptAccount::plan_known_unsupported()
+{
+    std::string plan = plan_type();
+    std::transform(plan.begin(), plan.end(), plan.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+    // Unknown plan: do not guess. Only the free plan lacks Codex/model access through sign-in.
+    return plan == "free" || plan == "guest";
+}
+
 std::string ChatGptAccount::email()
 {
     std::lock_guard<std::mutex> lock(session_mutex());
@@ -941,7 +986,7 @@ void ChatGptAccount::sign_out()
     std::lock_guard<std::mutex> lock(session_mutex());
     account_session().loaded = true;
     account_session().doc    = nlohmann::json::object();
-    keychain_delete();
+    legacy_keychain_delete();
     boost::system::error_code ec;
     boost::filesystem::remove(account_path(), ec);
 }

@@ -5,7 +5,7 @@ Run on a **Release** build installed from the DMG, on a Mac that has not run Ver
 ## Install and launch
 - [ ] DMG opens; dragging to Applications works; first launch shows no "damaged" or "unidentified developer" warning (signed builds only).
 - [ ] About shows version 3.2.x.
-- [ ] No Keychain password prompt on launch.
+- [ ] No Keychain password prompt on launch, including right after installing an update over a connected 3.2.0.
 
 ## Privacy notice and ChatGPT
 - [ ] Press **Connect ChatGPT** → the data notice appears first; **Cancel** does nothing further.

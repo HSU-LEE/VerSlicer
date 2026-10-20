@@ -63,26 +63,15 @@ Recommended for most users. See [CHANGELOG.md](CHANGELOG.md) for what changed.
 
 ## Mac
 
-1. Download the **DMG** (Apple Silicon, macOS 11.3 or later) from the [releases page](https://github.com/HSU-LEE/VerSlicer/releases/latest).
-2. Drag **VerSlicer.app** to the Applications folder.
-3. Releases are not yet signed with an Apple Developer ID, so macOS blocks the first launch:
+1. Download the **PKG** or **DMG** (Apple Silicon, macOS 11.3 or later) from the [releases page](https://github.com/HSU-LEE/VerSlicer/releases/latest).
+2. **PKG:** right-click it → **Open** (the installer is not signed yet), then follow the steps. **DMG:** open it and drag **VerSlicer.app** to the Applications folder.
+3. Releases are not yet signed with an Apple Developer ID, so macOS may block the first launch. If it says VerSlicer **is damaged** or **can’t be opened**, open **Terminal** (Applications → Utilities), paste this line and press Return:
 
-    <details>
-    <summary>Quarantine</summary>
+    ```bash
+    xattr -dr com.apple.quarantine /Applications/VerSlicer.app
+    ```
 
-    - Option 1 (only once; afterwards the app opens normally):
-      - Step 1: Hold _cmd_ and right-click the app, then choose **Open**.
-      - Step 2: In the warning window, click _Open_.
-
-    - Option 2: Run this command in Terminal:
-
-      ```shell
-      xattr -dr com.apple.quarantine /Applications/VerSlicer.app
-      ```
-
-    - Option 3: Open the app once, then in `System Settings` → `Privacy & Security`, click `Open Anyway`.
-
-    </details>
+    Then open VerSlicer again. You only need to do this once per download. (Alternatively, right-click the app → **Open** → **Open**, or use **Open Anyway** in System Settings → Privacy & Security.)
 
 Windows and Linux builds are not available yet.
 
@@ -113,7 +102,7 @@ Allow Microphone and Speech Recognition when asked. For Korean, put Korean above
 
 - **ChatGPT** — Your requests and plate context (model names, sizes, current settings) go to OpenAI under your ChatGPT account. Model files (STL/3MF) and G-code are never sent.
 - **Consent first** — Nothing goes to OpenAI until you accept the in-app data notice. It is asked once.
-- **Your sign-in stays on this Mac** — Tokens live in the macOS Keychain; **Sign out** removes them. There is no VerSlicer server.
+- **Your sign-in stays on this Mac** — Tokens are kept in a file only your macOS user can read (`~/Library/Application Support/verslicer/chatgpt_account.json`); **Sign out** removes them. There is no VerSlicer server.
 - **Allow-listed actions** — Only registered action types run, with checked parameters and setting keys. Settings, presets, export, save and delete go through a review dialog.
 - **No sending, no modeling** — No AI tool sends to the printer or creates geometry; menu items that print, send or upload are blocked for the AI.
 - **Crash reports stay local** — After a crash, the next launch offers to open a prefilled GitHub issue that you review before submitting.

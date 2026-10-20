@@ -33,6 +33,10 @@ class ChatGptAccount
 public:
     static bool        linked();
     static std::string email();
+    /** ChatGPT plan from the ID token ("free", "plus", "pro", ...); empty if unknown. */
+    static std::string plan_type();
+    /** True when the signed-in account is known to be on a plan without API access (free). */
+    static bool        plan_known_unsupported();
     static void        sign_out();
 
     /** Blocking. Call off the UI thread. Empty string on success. */
