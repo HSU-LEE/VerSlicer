@@ -317,20 +317,9 @@ nlohmann::json build_context_object(bool compact)
         else
             ctx["setting_catalog"] = OllamaSettingRegistry::build_catalog(nullptr, ko);
         ctx["audience"]            = "intermediate";
-        ctx["setting_rules"]       = ko
-            ? "결과 중심: current 값 기준 최소 변경. pro_tips·모델 지식·setting_catalog(고급 키 포함) 활용. 키는 catalog에 있을 때만."
-            : "Outcome-first: use pro_tips, your 3D printing knowledge, and setting_catalog (incl. advanced keys). Catalog keys only.";
+        ctx["setting_rules"]       = "Outcome-first: use pro_tips, your 3D printing knowledge, and setting_catalog (incl. advanced keys). Catalog keys only.";
         nlohmann::json hints = nlohmann::json::object();
-        if (ko) {
-            hints["bed_adhesion"] =
-                "안 붙음/들뜸: 바닥 보조 테두리(브림) 또는 첫 층 — 접착 문제일 때.";
-            hints["overhang"]     = "공중/매달림: 받침 구조 또는 눕히기 — 오버행 문제일 때.";
-            hints["strength"]     = "부서짐/약함: 안쪽 채움·벽 두께 — 구조 문제일 때 (접착과 다름).";
-            hints["warp"]         = "모서리 들뜸: 접착·베드·브림.";
-            hints["stringing"]    = "실 늘어짐: 리트랙션·온도.";
-            hints["speed"]        = "느림: 레이어 두께·채움 — 품질 tradeoff 설명.";
-            hints["surface"]      = "거친 표면: 레이어 두께 감소.";
-        } else {
+        {
             hints["bed_adhesion"] = "Won't stick: helper ring at bottom or first layer — adhesion issue.";
             hints["overhang"]     = "Mid-air print: supports or lay flat — overhang issue.";
             hints["strength"]     = "Breaks easily: tighter fill or thicker walls — structural, not brim.";
@@ -344,11 +333,8 @@ nlohmann::json build_context_object(bool compact)
         if (!menu_ctx.empty())
             ctx["menu_catalog"] = menu_ctx;
     } else {
-        ctx["plain_language_hints"] = ko
-            ? nlohmann::json{{"bed_adhesion", "접착"}, {"overhang", "오버행"}, {"strength", "강도(채움·벽)"},
-                             {"speed", "속도"}, {"surface", "표면"}}
-            : nlohmann::json{{"bed_adhesion", "adhesion"}, {"overhang", "overhang"}, {"strength", "strength"},
-                             {"speed", "speed"}, {"surface", "surface"}};
+        ctx["plain_language_hints"] = nlohmann::json{{"bed_adhesion", "adhesion"}, {"overhang", "overhang"}, {"strength", "strength"},
+                                                     {"speed", "speed"}, {"surface", "surface"}};
     }
 
     ctx["engineering_hints"] = OllamaIntentContext::build_engineering_hints_json();

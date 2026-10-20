@@ -87,10 +87,8 @@ std::string trim_trailing_slash(std::string url)
 std::string normalize_model_tag(std::string model)
 {
     boost::trim(model);
-    if (model.empty())
-        model = kOllamaDefaultModel;
     if (model == "qwen2.5")
-        model = kOllamaDefaultModel;
+        model = "qwen2.5:7b";
     return model;
 }
 

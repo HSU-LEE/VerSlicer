@@ -14794,7 +14794,7 @@ void Plater::ensure_ai_assistant_pane()
     p->ollama_assistant = new OllamaChatPanel(this, /*show_header=*/false);
     p->m_aui_mgr.AddPane(p->ollama_assistant, wxAuiPaneInfo()
                                                   .Name("ai_assistant")
-                                                  .Caption(AiLocale::text(_L("AI Assistant"), "AI 도우미"))
+                                                  .Caption(_L("AI Assistant"))
                                                   .Right()
                                                   .Layer(1)
                                                   .Row(0)

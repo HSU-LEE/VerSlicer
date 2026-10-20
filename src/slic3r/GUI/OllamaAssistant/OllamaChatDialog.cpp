@@ -18,7 +18,7 @@ namespace {
 
 wxString assistant_dialog_title()
 {
-    return AiLocale::text(_L("AI Assistant"), "AI 도우미");
+    return _L("AI Assistant");
 }
 
 } // namespace

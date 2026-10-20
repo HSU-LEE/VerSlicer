@@ -2,6 +2,7 @@
 
 #include "../AICoach/BeginnerJourney.hpp"
 #include "../BambuSmartPrint/BambuSmartPrintService.hpp"
+#include "../BambuConnect.hpp"
 #include "../BambuSmartPrint/PrintReadinessGate.hpp"
 #include "../BambuSmartPrint/SlicePilotSetupHub.hpp"
 #include "libslic3r/BambuSmartPrint/PrintGoalSession.hpp"
@@ -96,7 +97,10 @@ OllamaFlowDispatchResult send_print_flow(Plater* plater)
         return out;
     }
 
-    wxPostEvent(plater, SimpleEvent(EVT_GLTOOLBAR_SEND_GCODE));
+    if (BambuConnect::preferred())
+        BambuConnect::send_current_plate(plater);
+    else
+        plater->send_print_job_for_plate(plater->get_partplate_list().get_curr_plate_index(), true);
     BeginnerJourney::on_sent_or_exported();
     out.handled = true;
     return out;
@@ -155,10 +159,10 @@ nlohmann::json OllamaUserFlow::build_flow_context_json()
     const int done = SlicePilotSetupHub::completed_count();
     if (done < int(SetupHubStep::Count)) {
         flow["suggested_next"] =
-            "Complete Smart Print setup (printer → plugin → connect → model), then prepare, slice, preview, send.";
+            "Complete Smart Print setup (printer → plugin → connect → model), then prepare, slice, preview. The user presses the Print button.";
     } else if (plater && flow.value("has_model", false)) {
         flow["suggested_next"] =
-            "Tune on Prepare if needed → slice → Preview → send to printer or export G-code via actions.";
+            "Tune on Prepare if needed → slice, check the preview, then the user presses the Print button.";
     } else {
         flow["suggested_next"] = "Load a model (local file or MakerWorld), then prepare and slice.";
     }

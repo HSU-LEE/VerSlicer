@@ -1,4 +1,6 @@
 #include "StabilityAnalyzer.hpp"
+#include "libslic3r/I18N.hpp"
+#include <boost/format.hpp>
 
 #include "libslic3r/Model.hpp"
 #include "libslic3r/TriangleMesh.hpp"
@@ -163,18 +165,17 @@ StabilityMetrics StabilityAnalyzer::analyze_mesh(const TriangleMesh& mesh, bool 
     if (!m.com_known) {
         m.summary_en = "Stability estimate limited (mesh not watertight); base contact "
             + std::to_string(int(std::round(m.base_contact_area_mm2))) + " mm2";
-        m.summary_ko = "메시가 완전 밀폐가 아니어서 안정성 추정이 제한됩니다 (바닥 접촉 "
-            + std::to_string(int(std::round(m.base_contact_area_mm2))) + " mm2)";
+        m.summary_ko = (boost::format(_u8L("Stability estimate limited (mesh not watertight); base contact %s mm2"))
+            % int(std::round(m.base_contact_area_mm2))).str();
     } else if (m.stable) {
         m.summary_en = "Stable: tip-over risk " + std::to_string(risk_pct) + "%, base contact "
             + std::to_string(int(std::round(m.base_contact_area_mm2))) + " mm2";
-        m.summary_ko = "안정적: 전도 위험 " + std::to_string(risk_pct) + "%, 바닥 접촉 "
-            + std::to_string(int(std::round(m.base_contact_area_mm2))) + " mm2";
+        m.summary_ko = (boost::format(_u8L("Stable: tip-over risk %1%%%, base contact %2% mm2")) % risk_pct
+            % int(std::round(m.base_contact_area_mm2))).str();
     } else {
         m.summary_en = "Tip-over risk " + std::to_string(risk_pct)
             + "% — consider reorienting or adding a brim/support";
-        m.summary_ko = "전도 위험 " + std::to_string(risk_pct)
-            + "% — 재배치하거나 브림/서포트 추가를 고려하세요";
+        m.summary_ko = (boost::format(_u8L("Tip-over risk %s%% — consider reorienting or adding a brim/support")) % risk_pct).str();
     }
     return m;
 }

@@ -24,7 +24,6 @@ static void expect_true(bool cond, const char* label)
 int main()
 {
     setenv("OLLAMA_AUTO_CATALOG", "1", 1);
-    setenv("OLLAMA_ADAPTIVE_ROUTING", "1", 1);
 
     const auto& scenarios = ollama_benchmark_scenarios();
     expect_true(scenarios.size() >= 25, "benchmark scenario count");
@@ -59,10 +58,6 @@ int main()
     expect_true(!hits.empty(), "search layer height");
 
     expect_true(ollama_auto_catalog_enabled(), "auto catalog default on");
-    expect_true(!ollama_two_hop_enabled(), "two hop default off");
-
-    expect_true(ollama_adaptive_routing_enabled(), "adaptive routing default on");
-
     if (g_failures == 0) {
         std::cout << "ollama_benchmark_test: " << scenarios.size() << " scenarios, catalog=" << catalog.size()
                   << " (tier1=" << tier1 << " tier2=" << tier2 << " tier3=" << tier3 << ")\n";

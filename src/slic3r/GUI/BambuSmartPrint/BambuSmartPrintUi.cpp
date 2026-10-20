@@ -459,7 +459,7 @@ wxPanel* create_readiness_hero(wxWindow* parent, bool compact,
         body = card_body_panel(frame);
 
     auto* cap = new wxStaticText(body, wxID_ANY,
-        smart_print_locale_korean() ? wxString::FromUTF8("출력 준비도") : _L("Print readiness"));
+        _L("Print readiness"));
     style_section_title(cap);
     inner->Add(cap, 0, wxEXPAND | wxBOTTOM, parent->FromDIP(8));
 
@@ -1134,7 +1134,7 @@ wxPanel* create_readiness_meter(wxWindow* parent, int score_percent, const wxStr
     sz->AddSpacer(m);
 
     auto* title = new wxStaticText(card, wxID_ANY,
-        smart_print_locale_korean() ? wxString::FromUTF8("출력 준비도") : _L("Print readiness"));
+        _L("Print readiness"));
     style_section_title(title);
     sz->Add(title, 0, wxLEFT | wxRIGHT, m);
 
@@ -1185,13 +1185,13 @@ wxPanel* add_insight_list(wxPanel* card, wxBoxSizer* card_sz,
         const bool ko = smart_print_locale_korean();
         switch (ins.severity) {
         case BambuSmartPrint::RiskSeverity::High:
-            sev_label = ko ? wxString::FromUTF8("높음") : _L("High");
+            sev_label = _L("High");
             break;
         case BambuSmartPrint::RiskSeverity::Medium:
-            sev_label = ko ? wxString::FromUTF8("중간") : _L("Medium");
+            sev_label = _L("Medium");
             break;
         case BambuSmartPrint::RiskSeverity::Low:
-            sev_label = ko ? wxString::FromUTF8("낮음") : _L("Low");
+            sev_label = _L("Low");
             break;
         default: break;
         }

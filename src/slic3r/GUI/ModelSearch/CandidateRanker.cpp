@@ -1,5 +1,9 @@
 #include "CandidateRanker.hpp"
 
+#include "../OllamaAssistant/AiCatalog.hpp"
+
+#include <boost/format.hpp>
+
 #include "../MakerWorld/MakerWorldSearchCore.hpp"
 #include "../MakerWorld/MakerWorldTypes.hpp"
 
@@ -250,26 +254,25 @@ std::string CandidateRanker::build_recommendation_reason(const ModelCandidate&  
     std::transform(title_lower.begin(), title_lower.end(), title_lower.begin(),
                    [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
     if (!phrase.empty() && title_lower.find(phrase) != std::string::npos)
-        reasons.push_back(korean ? "검색어 정확 일치" : "Exact title match");
+        reasons.push_back(ai_catalog_text("Exact title match"));
 
     if (candidate.downloads >= 1000)
-        reasons.push_back(korean ? ("인기 다운로드 " + format_count(candidate.downloads) + "회")
-                                 : ("Popular (" + format_count(candidate.downloads) + " downloads)"));
+        reasons.push_back((boost::format(ai_catalog_text("Popular (%s downloads)")) % format_count(candidate.downloads)).str());
 
     if (candidate.likes >= 100)
-        reasons.push_back(korean ? ("좋아요 " + format_count(candidate.likes)) : (format_count(candidate.likes) + " likes"));
+        reasons.push_back((boost::format(ai_catalog_text("%s likes")) % format_count(candidate.likes)).str());
 
     if (candidate.update_date.has_value() && normalize_recency(candidate.update_date) >= 0.75)
-        reasons.push_back(korean ? "최근 업데이트" : "Recently updated");
+        reasons.push_back(ai_catalog_text("Recently updated"));
 
     if (normalize_license(candidate.license) >= 0.8 && !candidate.license.empty())
-        reasons.push_back(korean ? "자유로운 라이선스" : "Permissive license");
+        reasons.push_back(ai_catalog_text("Permissive license"));
 
     if (candidate.success_rate >= 0.8)
-        reasons.push_back(korean ? "높은 프린트 성공률" : "High print success rate");
+        reasons.push_back(ai_catalog_text("High print success rate"));
 
     if (reasons.empty())
-        return korean ? "검색 결과 추천" : "Recommended result";
+        return ai_catalog_text("Recommended result");
 
     std::string out;
     const size_t kMaxReasons = 2;

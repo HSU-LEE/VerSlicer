@@ -1,6 +1,7 @@
 #include "BambuErrorCatalog.hpp"
 #include "BambuSmartPrintPaths.hpp"
 
+#include "libslic3r/I18N.hpp"
 #include "libslic3r/Utils.hpp"
 #include "nlohmann/json.hpp"
 
@@ -151,15 +152,15 @@ static void localize_diagnosis(FailureDiagnosis& d, const McErrorEntry& e)
     if (prefer_korean_ui_flag() && !e.title_ko.empty())
         d.title = e.title_ko;
     else if (!e.title.empty())
-        d.title = e.title;
+        d.title = I18N::translate(e.title);
     if (prefer_korean_ui_flag() && !e.description_ko.empty())
         d.description = e.description_ko;
     else if (!e.description.empty())
-        d.description = e.description;
+        d.description = I18N::translate(e.description);
     if (prefer_korean_ui_flag() && !e.action_line_ko.empty())
         d.action_line = e.action_line_ko;
     else if (!e.action_line.empty())
-        d.action_line = e.action_line;
+        d.action_line = I18N::translate(e.action_line);
 }
 
 static void fill_default_action_line(FailureDiagnosis& d)
@@ -168,29 +169,19 @@ static void fill_default_action_line(FailureDiagnosis& d)
         return;
     switch (d.category) {
     case FailureCategory::Adhesion:
-        d.action_line = prefer_korean_ui_flag()
-            ? "베드 온도·브림을 확인한 뒤 Reprint"
-            : "Check bed temp and brim, then Reprint";
+        d.action_line = _u8L("Check bed temp and brim, then Reprint");
         break;
     case FailureCategory::Filament:
-        d.action_line = prefer_korean_ui_flag()
-            ? "AMS 슬롯·필라멘트를 확인한 뒤 Reprint"
-            : "Check AMS slot and filament, then Reprint";
+        d.action_line = _u8L("Check AMS slot and filament, then Reprint");
         break;
     case FailureCategory::Temperature:
-        d.action_line = prefer_korean_ui_flag()
-            ? "노즐·베드 온도를 확인한 뒤 Reprint"
-            : "Verify nozzle and bed temps, then Reprint";
+        d.action_line = _u8L("Verify nozzle and bed temps, then Reprint");
         break;
   case FailureCategory::Network:
-        d.action_line = prefer_korean_ui_flag()
-            ? "네트워크 연결 후 Reprint"
-            : "Restore network connection, then Reprint";
+        d.action_line = _u8L("Restore network connection, then Reprint");
         break;
     default:
-        d.action_line = prefer_korean_ui_flag()
-            ? "조치 후 Reprint"
-            : "Apply fixes, then Reprint";
+        d.action_line = _u8L("Apply fixes, then Reprint");
         break;
     }
 }
@@ -202,56 +193,56 @@ static CatalogData& catalog_data()
     std::call_once(once, []() {
         data.mc_errors[50348044] = { FailureCategory::Filament, "Filament runout",
             "The printer detected that filament ran out during printing.",
-            "필라멘트 소진", "인쇄 중 필라멘트가 떨어졌습니다.",
-            "Reload AMS slot and Reprint", "AMS 슬롯을 확인하고 Reprint" };
+            "", "",
+            "Reload AMS slot and Reprint", "" };
         data.mc_errors[50364417] = { FailureCategory::Adhesion, "First layer issue",
             "The first layer may have failed to adhere to the build plate.",
-            "첫 층 부착 문제", "첫 층이 베드에 잘 붙지 않았을 수 있습니다.",
-            "Clean plate, add brim, Reprint", "베드 청소·브림 추가 후 Reprint" };
+            "", "",
+            "Clean plate, add brim, Reprint", "" };
         data.mc_errors[50364418] = { FailureCategory::Adhesion, "Print detached",
             "The print may have detached from the build plate during printing.",
-            "출력물 분리", "인쇄 중 베드에서 떨어졌을 수 있습니다.",
-            "Check adhesion settings, Reprint", "부착 설정 확인 후 Reprint" };
+            "", "",
+            "Check adhesion settings, Reprint", "" };
         data.mc_errors[50331648] = { FailureCategory::Gcode, "G-code error",
             "The printer reported an error while executing G-code.",
-            "G-code 오류", "G-code 실행 중 오류가 발생했습니다.",
-            "Re-slice and Reprint", "다시 슬라이스 후 Reprint" };
+            "", "",
+            "Re-slice and Reprint", "" };
         data.mc_errors[50397184] = { FailureCategory::Mechanical, "Motion error",
             "A motion or homing related error occurred.",
-            "동작 오류", "이동 또는 홈잉 오류가 발생했습니다.",
-            "Check mechanics, Reprint", "기계 상태 확인 후 Reprint" };
+            "", "",
+            "Check mechanics, Reprint", "" };
         data.mc_errors[50348032] = { FailureCategory::Filament, "Filament entangled",
             "Filament may be tangled on the spool or in the AMS path.",
-            "필라멘트 엉킴", "스풀 또는 AMS 경로에서 엉켰을 수 있습니다.",
-            "Clear AMS path, Reprint", "AMS 경로 정리 후 Reprint" };
+            "", "",
+            "Clear AMS path, Reprint", "" };
         data.mc_errors[50348033] = { FailureCategory::Filament, "Filament stuck",
             "Filament failed to feed — check path and extruder gear.",
-            "필라멘트 걸림", "공급 경로와 기어를 확인하세요.",
-            "Check feed path, Reprint", "공급 경로 확인 후 Reprint" };
+            "", "",
+            "Check feed path, Reprint", "" };
         data.mc_errors[50348049] = { FailureCategory::Filament, "Filament grinding",
             "Extruder may be grinding filament — check tension and temperature.",
-            "필라멘트 갈림", "장력과 온도를 확인하세요.",
-            "Adjust tension/temp, Reprint", "장력·온도 조정 후 Reprint" };
+            "", "",
+            "Adjust tension/temp, Reprint", "" };
         data.mc_errors[50348050] = { FailureCategory::Temperature, "Nozzle temperature fault",
             "Nozzle heating failed or dropped out of range during the print.",
-            "노즐 온도 오류", "노즐 온도가 범위를 벗어났습니다.",
-            "Check hotend, Reprint", "핫엔드 확인 후 Reprint" };
+            "", "",
+            "Check hotend, Reprint", "" };
         data.mc_errors[50348051] = { FailureCategory::Temperature, "Bed temperature fault",
             "Heatbed heating failed or dropped out of range during the print.",
-            "베드 온도 오류", "히트베드 온도가 범위를 벗어났습니다.",
-            "Check heatbed, Reprint", "히트베드 확인 후 Reprint" };
+            "", "",
+            "Check heatbed, Reprint", "" };
         data.mc_errors[50348052] = { FailureCategory::Mechanical, "Toolhead collision",
             "The toolhead may have collided with the part or build plate.",
-            "툴헤드 충돌", "출력물 또는 베드와 충돌했을 수 있습니다.",
-            "Remove obstruction, Reprint", "장애물 제거 후 Reprint" };
+            "", "",
+            "Remove obstruction, Reprint", "" };
         data.mc_errors[50348053] = { FailureCategory::UserCancelled, "Print cancelled",
             "The print job was stopped before completion.",
-            "인쇄 취소", "사용자가 인쇄를 중단했습니다.",
+            "", "",
             "", "" };
         data.mc_errors[50348054] = { FailureCategory::Network, "Cloud / LAN link lost",
             "Connection to the printer or cloud was interrupted during the job.",
-            "연결 끊김", "프린터 또는 클라우드 연결이 끊겼습니다.",
-            "Restore connection, Reprint", "연결 복구 후 Reprint" };
+            "", "",
+            "Restore connection, Reprint", "" };
 
         merge_catalog_json(data, fs::path(resources_dir()) / "bambu_smart_print" / "error_catalog.json");
         merge_catalog_json(data, fs::path(user_error_catalog_path()));

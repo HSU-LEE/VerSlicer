@@ -1,4 +1,5 @@
 #include "OllamaActionWorkflow.hpp"
+#include "AiCatalog.hpp"
 
 #include "OllamaActionExecutor.hpp"
 #include "OllamaExecutionPolicy.hpp"
@@ -100,56 +101,41 @@ std::string describe_action(const nlohmann::json& action, bool ko)
         return oss.str();
     }
     if (type == "rotate") {
-        return ko ? (boost::format("모델 회전 (%1%, %2%, %3%°)")
-                         % action.value("x", 0.0) % action.value("y", 0.0) % action.value("z", 0.0))
-                        .str()
-                  : (boost::format("rotate selection (deg %1%, %2%, %3%)")
-                         % action.value("x", 0.0) % action.value("y", 0.0) % action.value("z", 0.0))
-                        .str();
+        return (boost::format(ai_catalog_text("rotate selection (deg %s, %s, %s)"))
+                % action.value("x", 0.0) % action.value("y", 0.0) % action.value("z", 0.0)).str();
     }
     if (type == "translate") {
-        return ko ? (boost::format("모델 이동 (%1%, %2%, %3% mm)")
-                         % action.value("x", 0.0) % action.value("y", 0.0) % action.value("z", 0.0))
-                        .str()
-                  : (boost::format("move selection (%1%, %2%, %3%) mm")
-                         % action.value("x", 0.0) % action.value("y", 0.0) % action.value("z", 0.0))
-                        .str();
+        return (boost::format(ai_catalog_text("move selection (%s, %s, %s) mm"))
+                % action.value("x", 0.0) % action.value("y", 0.0) % action.value("z", 0.0)).str();
     }
     if (type == "scale") {
-        return ko ? (boost::format("모델 크기 조절 (배율 %1%)") % action.value("factor", 1.0)).str()
-                  : (boost::format("scale selection (factor %1%)") % action.value("factor", 1.0)).str();
+        return (boost::format(ai_catalog_text("scale selection (factor %s)")) % action.value("factor", 1.0)).str();
     }
     if (type == "clone_selection")
-        return ko ? "선택 영역 복제" : "copy (duplicate) selection";
+        return ai_catalog_text("copy (duplicate) selection");
     if (type == "arrange")
-        return ko ? "판 위 객체 자동 배치" : "auto-arrange objects on plate";
+        return ai_catalog_text("auto-arrange objects on plate");
     if (type == "arrange_objects")
-        return ko ? "객체 단위 재배치" : "arrange by object";
+        return ai_catalog_text("arrange by object");
     if (type == "split_object")
-        return ko ? "모델 분할" : "split to objects";
+        return ai_catalog_text("split to objects");
     if (type == "add_plate")
-        return ko ? "플레이트 추가" : "add build plate";
+        return ai_catalog_text("add build plate");
     if (type == "slice")
-        return ko ? (action.value("scope", "plate") == "all" ? "모든 판 슬라이스" : "현재 판 슬라이스")
-                  : (action.value("scope", "plate") == "all" ? "slice all plates" : "slice current plate");
+        return action.value("scope", "plate") == "all" ? ai_catalog_text("slice all plates")
+                                                        : ai_catalog_text("slice current plate");
     if (type == "ui_select_tab") {
         const std::string tab = action.value("tab", "");
-        if (ko) {
-            if (tab == "prepare")
-                return "Prepare 탭으로 이동";
-            if (tab == "preview")
-                return "Preview 탭으로 이동";
-            if (tab == "monitor")
-                return "Device 탭으로 이동";
-            if (tab == "smart_print")
-                return "Smart Print 탭으로 이동";
-        }
+        if (tab == "prepare") return ai_catalog_text("switch tab: Prepare");
+        if (tab == "preview") return ai_catalog_text("switch tab: Preview");
+        if (tab == "monitor") return ai_catalog_text("switch tab: Device");
+        if (tab == "smart_print") return ai_catalog_text("switch tab: Smart Print");
         return "switch tab: " + tab;
     }
     if (type == "menu_item")
         return action.value("menu", "") + " → " + action.value("item", "");
     if (type == "add_model")
-        return ko ? "모델 가져오기: " + action.value("path", "") : "import model: " + action.value("path", "");
+        return (boost::format(ai_catalog_text("import model: %s")) % action.value("path", "")).str();
     return type;
 }
 
@@ -169,12 +155,10 @@ static std::string build_summary_text(const std::string& assistant_msg,
         return assistant_msg;
 
     if (change_count > 0) {
-        if (ko)
-            return (boost::format("Verslicer AI가 설정 %1%건을 조정하려고 합니다.") % change_count).str();
-        return (boost::format("Verslicer AI proposes %1% setting change(s).") % change_count).str();
+        return (boost::format(ai_catalog_text("Verslicer AI proposes %s setting change(s).")) % change_count).str();
     }
 
-    return ko ? "Verslicer AI 제안을 검토해 주세요." : "Review Verslicer AI suggestions.";
+    return ai_catalog_text("Review Verslicer AI suggestions.");
 }
 
 static void prepend_ai_change_insights(SmartPrintWorkflowContent& content,
@@ -184,15 +168,14 @@ static void prepend_ai_change_insights(SmartPrintWorkflowContent& content,
         return;
 
     BambuSmartPrint::PrintInsight header;
-    header.label    = ko ? "AI 조정" : "AI adjustments";
-    header.detail   = ko ? "Verslicer AI가 아래 설정을 바꾸려고 합니다. 적용 전에 확인해 주세요."
-                         : "Verslicer AI proposes the settings below — review before applying.";
+    header.label    = ai_catalog_text("AI adjustments");
+    header.detail   = ai_catalog_text("Verslicer AI proposes the settings below — review before applying.");
     header.severity = BambuSmartPrint::RiskSeverity::Low;
     content.insights.insert(content.insights.begin(), header);
 
     for (const std::string& effect : OllamaSettingDescriptions::expected_effects(config_changes, ko)) {
         BambuSmartPrint::PrintInsight ins;
-        ins.label     = ko ? "예상 효과" : "Expected effect";
+        ins.label     = ai_catalog_text("Expected effect");
         ins.detail    = effect;
         ins.severity  = BambuSmartPrint::RiskSeverity::Info;
         content.insights.insert(content.insights.begin() + 1, ins);
@@ -261,14 +244,11 @@ SmartPrintWorkflowContent build_workflow_content(const nlohmann::json& root)
         content.risk_factors       = prediction.risk_factors;
     } else {
         content.success_rate       = 80.f;
-        content.readiness_headline = ko ? "적용 전 AI 제안을 검토해 주세요." : "Review AI suggestions before applying";
+        content.readiness_headline = ai_catalog_text("Review AI suggestions before applying");
     }
 
     if (!config_changes.empty()) {
-        if (ko)
-            content.readiness_headline = "AI 제안 조정 검토";
-        else
-            content.readiness_headline = "Review AI adjustments";
+        content.readiness_headline = ai_catalog_text("Review AI adjustments");
 
         std::vector<BambuSmartPrint::PrintInsight> filtered_insights;
         filtered_insights.reserve(content.insights.size());

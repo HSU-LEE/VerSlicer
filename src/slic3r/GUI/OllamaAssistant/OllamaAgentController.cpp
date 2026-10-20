@@ -1,4 +1,6 @@
 #include "OllamaAgentController.hpp"
+#include "AiLocale.hpp"
+#include "AiCatalog.hpp"
 
 #include "../UiDispatch.hpp"
 #include "OllamaActionExecutor.hpp"
@@ -51,17 +53,7 @@ void emit_thinking_lines(const OllamaAgentCallbacks& callbacks, const std::strin
 std::string build_assist_loop_system_prompt(bool korean)
 {
     std::string prompt = OllamaActionExecutor::build_system_prompt(true);
-    prompt += korean
-        ? "\n\n## 루프\n"
-          "- 한 응답에 서로 의존하지 않는 actions만 묶으세요.\n"
-          "- 도구 결과를 보기 전에는 done:true 하지 마세요. 요청이 적당히 충족되면 바로 done:true.\n"
-          "- 이미 적용한 뒤 관련 설정을 더 찾거나 상태를 다시 읽지 마세요.\n"
-          "- 같은 호출이 같은 결과로 반복되면 이유를 말하고 멈추세요.\n"
-        : "\n\n## Loop\n"
-          "- Batch only actions that do not depend on each other's results.\n"
-          "- Do not set done:true before you have seen tool results. Set it as soon as the request is reasonably satisfied.\n"
-          "- After a change lands, do not look up more related settings or read state again.\n"
-          "- If the same call returns the same result again, say why and stop.\n";
+    prompt += ai_catalog_text("\n\n## Loop\n- Batch only actions that do not depend on each other's results.\n- Do not set done:true before you have seen tool results. Set it as soon as the request is reasonably satisfied.\n- After a change lands, do not look up more related settings or read state again.\n- If the same call returns the same result again, say why and stop.\n");
     prompt += OllamaToolRegistry::agent_tools_schema_block(korean);
     return prompt;
 }
@@ -296,7 +288,7 @@ void OllamaAgentController::begin_step()
         r.steps_taken   = m_step;
         r.step_tool_results = m_step_tool_results;
         const bool ko   = wxGetApp().current_language_code().StartsWith("ko");
-        r.final_message = ko ? "최대 단계 수에 도달했습니다." : "Reached maximum agent steps.";
+        r.final_message = ai_catalog_text("Reached maximum agent steps.");
         finish(std::move(r));
         return;
     }
@@ -304,8 +296,7 @@ void OllamaAgentController::begin_step()
     ++m_step;
     if (m_step == 1 && m_callbacks.on_thinking) {
         const bool ko = wxGetApp().current_language_code().StartsWith("ko");
-        m_callbacks.on_thinking(ko ? wxString::FromUTF8("어떻게 할지 생각 중입니다.")
-                                   : wxString("Thinking about how to do this."));
+        m_callbacks.on_thinking(AiLocale::text("Thinking about how to do this."));
     }
 
     trim_assist_messages(m_messages);
@@ -383,8 +374,7 @@ void OllamaAgentController::fail_turn_after_exception()
     r.blocked           = true;
     r.steps_taken       = m_step;
     r.step_tool_results = m_step_tool_results;
-    r.final_message     = ko ? std::string("작업을 처리하는 중 오류가 발생했습니다. 다시 시도해 주세요.")
-                             : std::string("Something went wrong while processing that. Please try again.");
+    r.final_message     = ai_catalog_text("Something went wrong while processing that. Please try again.");
     finish(std::move(r));
 }
 
@@ -418,11 +408,7 @@ void OllamaAgentController::dispatch_llm_actions(const std::string& text)
     if (!OllamaActionWorkflow::has_executable_actions(root)) {
         if (m_step < m_max_steps) {
             const bool ko = wxGetApp().current_language_code().StartsWith("ko");
-            std::string nudge = ko
-                ? "실행 가능한 actions JSON이 필요합니다. get_state로 상태를 확인한 뒤 set_config/geometry/mesh 도구를 호출하세요. "
-                  "설명만 하지 말고 JSON actions를 반환하세요.\n\nGoal:\n"
-                : "Reply with executable actions JSON. Call get_state first, then set_config/geometry/mesh tools. "
-                  "Do not only explain — return JSON actions.\n\nGoal:\n";
+            std::string nudge = ai_catalog_text("Reply with executable actions JSON. Call get_state first, then set_config/geometry/mesh tools. Do not only explain — return JSON actions.\n\nGoal:\n");
             nudge += m_user_goal;
             m_messages.push_back({"user", std::move(nudge)});
             begin_step();
@@ -444,8 +430,7 @@ void OllamaAgentController::dispatch_llm_actions(const std::string& text)
         r.completed         = true;
         r.steps_taken       = m_step;
         r.step_tool_results = m_step_tool_results;
-        r.final_message = ko ? "요청한 변경은 이미 플레이트에 적용되어 있습니다."
-                             : "That change is already applied on the plate.";
+        r.final_message = ai_catalog_text("That change is already applied on the plate.");
         finish(std::move(r));
         return;
     }
@@ -527,8 +512,8 @@ void OllamaAgentController::handle_post_apply_verification(const nlohmann::json&
         r.final_message     = pick_user_facing_message(m_step_tool_results, assistant_msg, ko);
         if (r.final_message.empty())
             r.final_message = applied
-                ? (ko ? "요청한 변경을 적용했습니다." : "Applied the requested changes.")
-                : (ko ? "적용된 변경이 없습니다." : "Nothing was applied.");
+                ? (ai_catalog_text("Applied the requested changes."))
+                : (ai_catalog_text("Nothing was applied."));
         finish(std::move(r));
         return;
     }
@@ -622,14 +607,13 @@ void OllamaAgentController::continue_after_slice(bool slice_ok)
         r.blocked           = true;
         r.steps_taken       = m_step;
         r.step_tool_results = m_step_tool_results;
-        r.final_message     = ko ? "슬라이싱에 실패했습니다." : "Slicing failed.";
+        r.final_message     = ai_catalog_text("Slicing failed.");
         finish(std::move(r));
         return;
     }
 
     const bool ko = wxGetApp().current_language_code().StartsWith("ko");
-    m_messages.push_back({"user", ko ? std::string("슬라이싱이 완료되었습니다. get_state로 slice_state를 확인한 뒤 다음 단계를 진행하세요.\n\nGoal:\n") + m_user_goal
-                                   : std::string("Slicing finished. Call get_state to verify slice_state, then continue.\n\nGoal:\n") + m_user_goal});
+    m_messages.push_back({"user", ai_catalog_text("Slicing finished. Call get_state to verify slice_state, then continue.\n\nGoal:\n") + m_user_goal});
     begin_step();
 }
 
@@ -653,11 +637,7 @@ void OllamaAgentController::proceed_after_tool_execution(const nlohmann::json& e
                         filament_cfg = &wxGetApp().preset_bundle->filaments.get_edited_preset().config;
                     }
                     const nlohmann::json found = OllamaSettingSearch::lookup(keys, print_cfg, filament_cfg, ko);
-                    std::string nudge = ko
-                        ? "아직 설정이 바뀌지 않았습니다. 아래 후보의 key, preset, enum_values로 set_config를 호출하세요. "
-                          "켜려면 'no '로 시작하는 값이 아닌 값을 쓰세요. done:true는 바꾼 뒤에만.\n"
-                        : "No setting has changed yet. Call set_config with key, preset, and an enum_values entry from the matches. "
-                          "To turn a feature on, do not pick a value that starts with 'no '. Set done:true only after it changes.\n";
+                    std::string nudge = ai_catalog_text("No setting has changed yet. Call set_config with key, preset, and an enum_values entry from the matches. To turn a feature on, do not pick a value that starts with 'no '. Set done:true only after it changes.\n");
                     nudge += found.dump(2);
                     nudge += "\n\nGoal:\n";
                     nudge += m_user_goal;
@@ -674,7 +654,7 @@ void OllamaAgentController::proceed_after_tool_execution(const nlohmann::json& e
         r.final_message     = pick_user_facing_message(m_step_tool_results, assistant_msg, ko);
         if (r.final_message.empty()) {
             if (!m_step_tool_results.empty())
-                r.final_message = ko ? "적용된 변경이 없습니다." : "Nothing was applied.";
+                r.final_message = ai_catalog_text("Nothing was applied.");
             else
                 r.final_message = assistant_msg.empty() ? raw_text : assistant_msg;
         }
@@ -688,13 +668,7 @@ void OllamaAgentController::proceed_after_tool_execution(const nlohmann::json& e
         if (readonly && !m_readonly_stall_nudged && m_step < m_max_steps) {
             m_readonly_stall_nudged = true;
             const bool ko = wxGetApp().current_language_code().StartsWith("ko");
-            m_messages.push_back({"user", ko
-                ? "같은 조회 결과가 반복되었습니다. get_state, list_objects, select_object, wiki_search, find_setting 은 다시 호출하지 마세요. "
-                  "이미 상태를 알고 있습니다. 지금 set_config 또는 형상 도구로 목표를 적용하세요. "
-                  "적용할 수 없으면 done:true 와 이유만 반환하세요.\n\nGoal:\n" + m_user_goal
-                : "The same read result repeated. Do not call get_state, list_objects, select_object, wiki_search, or find_setting again. "
-                  "You already have the state. Apply the goal now with set_config or a geometry tool. "
-                  "If you cannot, return done:true and the reason only.\n\nGoal:\n" + m_user_goal});
+            m_messages.push_back({"user", ai_catalog_text("The same read result repeated. Do not call get_state, list_objects, select_object, wiki_search, or find_setting again. You already have the state. Apply the goal now with set_config or a geometry tool. If you cannot, return done:true and the reason only.\n\nGoal:\n") + m_user_goal});
             begin_step();
             return;
         }
@@ -704,11 +678,9 @@ void OllamaAgentController::proceed_after_tool_execution(const nlohmann::json& e
         r.steps_taken       = m_step;
         r.step_tool_results = m_step_tool_results;
         if (m_mutations_applied)
-            r.final_message = ko ? "적용할 수 있는 변경은 반영했습니다. 같은 결과가 반복되어 여기서 멈춥니다."
-                                 : "Applied the changes that went through. Stopped because the same result repeated.";
+            r.final_message = ai_catalog_text("Applied the changes that went through. Stopped because the same result repeated.");
         else
-            r.final_message = ko ? "설정을 바꾸지 못했습니다. 상태만 반복 확인해서 멈췄습니다. 원하는 값을 더 구체적으로 말해 주세요."
-                                 : "No setting was changed. Stopped after the same state was read again. Say the value you want more specifically.";
+            r.final_message = ai_catalog_text("No setting was changed. Stopped after the same state was read again. Say the value you want more specifically.");
         finish(std::move(r));
         return;
     }
@@ -723,7 +695,7 @@ void OllamaAgentController::proceed_after_tool_execution(const nlohmann::json& e
         r.step_tool_results = m_step_tool_results;
         r.final_message     = pick_user_facing_message(m_step_tool_results, assistant_msg, ko);
         if (r.final_message.empty())
-            r.final_message = ko ? "요청은 반영했습니다." : "The request is applied.";
+            r.final_message = ai_catalog_text("The request is applied.");
         finish(std::move(r));
         return;
     }

@@ -1,6 +1,7 @@
 #include "PrintEstimateSummary.hpp"
 
 #include "libslic3r/Print.hpp"
+#include "libslic3r/I18N.hpp"
 
 #include <cmath>
 #include <iomanip>
@@ -18,13 +19,13 @@ std::string fmt(double value, int precision)
     return ss.str();
 }
 
-const char* tier_label(ReadinessTier t, bool ko)
+std::string tier_label(ReadinessTier t)
 {
     switch (t) {
-    case ReadinessTier::Excellent: return ko ? "우수" : "Excellent";
-    case ReadinessTier::Good:      return ko ? "양호" : "Good";
-    case ReadinessTier::Fair:      return ko ? "보통" : "Fair";
-    default:                       return ko ? "주의 필요" : "Needs attention";
+    case ReadinessTier::Excellent: return _u8L("Excellent");
+    case ReadinessTier::Good:      return _u8L("Good");
+    case ReadinessTier::Fair:      return _u8L("Fair");
+    default:                       return _u8L("Needs attention");
     }
 }
 
@@ -54,66 +55,40 @@ PrintEstimateSummary PrintEstimateCollector::collect(const PrintStatistics& stat
     return s;
 }
 
-std::string PrintEstimateFormatter::format_compact_line(const PrintEstimateSummary& s, bool korean)
+std::string PrintEstimateFormatter::format_compact_line(const PrintEstimateSummary& s, bool /*korean*/)
 {
     if (!s.valid)
-        return korean ? "예상 정보 없음" : "No estimate available";
+        return _u8L("No estimate available");
 
     std::ostringstream ss;
-    if (korean) {
-        ss << "예상 " << (s.estimated_time.empty() ? "-" : s.estimated_time)
-           << " · " << fmt(s.total_weight_g, 1) << " g"
-           << " · " << fmt(s.total_cost, 2)
-           << " · 성공률 " << int(std::round(s.success_rate)) << "%";
-    } else {
-        ss << "Est. " << (s.estimated_time.empty() ? "-" : s.estimated_time)
-           << " · " << fmt(s.total_weight_g, 1) << " g"
-           << " · " << fmt(s.total_cost, 2)
-           << " · success " << int(std::round(s.success_rate)) << "%";
-    }
+    ss << _u8L("Est.") << " " << (s.estimated_time.empty() ? "-" : s.estimated_time)
+       << " · " << fmt(s.total_weight_g, 1) << " g"
+       << " · " << fmt(s.total_cost, 2)
+       << " · " << _u8L("success") << " " << int(std::round(s.success_rate)) << "%";
     return ss.str();
 }
 
-std::string PrintEstimateFormatter::format_chat_block(const PrintEstimateSummary& s, bool korean)
+std::string PrintEstimateFormatter::format_chat_block(const PrintEstimateSummary& s, bool /*korean*/)
 {
     if (!s.valid)
-        return korean ? "예상 정보를 사용할 수 없습니다." : "No print estimate available.";
+        return _u8L("No print estimate available.");
 
     std::ostringstream ss;
-    if (korean) {
-        ss << "출력 예상\n";
-        ss << "· 예상 시간: " << (s.estimated_time.empty() ? "-" : s.estimated_time) << "\n";
-        ss << "· 필라멘트: " << fmt(s.filament_volume_cm3, 2) << " cm3 (" << fmt(s.total_weight_g, 1) << " g)\n";
-        ss << "· 비용: " << fmt(s.total_cost, 2) << "\n";
-        if (s.toolchanges > 0)
-            ss << "· 도구 교체: " << s.toolchanges << "회\n";
-        ss << "· 성공률: " << int(std::round(s.success_rate)) << "% (" << tier_label(s.readiness_tier, true) << ")\n";
-        if (s.stability_known)
-            ss << "· 전도 위험: " << int(std::round(s.tip_over_risk * 100.0)) << "%\n";
-        if (!s.orientation_hint.empty())
-            ss << "· 방향 제안: " << s.orientation_hint << "\n";
-        if (!s.risk_factors.empty()) {
-            ss << "· 위험 요소:\n";
-            for (const std::string& r : s.risk_factors)
-                ss << "   - " << r << "\n";
-        }
-    } else {
-        ss << "Print estimate\n";
-        ss << "- Estimated time: " << (s.estimated_time.empty() ? "-" : s.estimated_time) << "\n";
-        ss << "- Filament: " << fmt(s.filament_volume_cm3, 2) << " cm3 (" << fmt(s.total_weight_g, 1) << " g)\n";
-        ss << "- Cost: " << fmt(s.total_cost, 2) << "\n";
-        if (s.toolchanges > 0)
-            ss << "- Tool changes: " << s.toolchanges << "\n";
-        ss << "- Success rate: " << int(std::round(s.success_rate)) << "% (" << tier_label(s.readiness_tier, false) << ")\n";
-        if (s.stability_known)
-            ss << "- Tip-over risk: " << int(std::round(s.tip_over_risk * 100.0)) << "%\n";
-        if (!s.orientation_hint.empty())
-            ss << "- Orientation hint: " << s.orientation_hint << "\n";
-        if (!s.risk_factors.empty()) {
-            ss << "- Risk factors:\n";
-            for (const std::string& r : s.risk_factors)
-                ss << "   * " << r << "\n";
-        }
+    ss << _u8L("Print estimate") << "\n";
+    ss << "- " << _u8L("Estimated time:") << " " << (s.estimated_time.empty() ? "-" : s.estimated_time) << "\n";
+    ss << "- " << _u8L("Filament:") << " " << fmt(s.filament_volume_cm3, 2) << " cm3 (" << fmt(s.total_weight_g, 1) << " g)\n";
+    ss << "- " << _u8L("Cost:") << " " << fmt(s.total_cost, 2) << "\n";
+    if (s.toolchanges > 0)
+        ss << "- " << _u8L("Tool changes:") << " " << s.toolchanges << "\n";
+    ss << "- " << _u8L("Success rate:") << " " << int(std::round(s.success_rate)) << "% (" << tier_label(s.readiness_tier) << ")\n";
+    if (s.stability_known)
+        ss << "- " << _u8L("Tip-over risk:") << " " << int(std::round(s.tip_over_risk * 100.0)) << "%\n";
+    if (!s.orientation_hint.empty())
+        ss << "- " << _u8L("Orientation hint:") << " " << s.orientation_hint << "\n";
+    if (!s.risk_factors.empty()) {
+        ss << "- " << _u8L("Risk factors:") << "\n";
+        for (const std::string& r : s.risk_factors)
+            ss << "   * " << r << "\n";
     }
     return ss.str();
 }

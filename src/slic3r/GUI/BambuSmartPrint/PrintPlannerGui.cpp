@@ -77,8 +77,6 @@ static bool is_generic_workflow_summary(const std::string& summary)
         "Suggested settings for your print goal",
         "Estimated success rate:",
         "adjustments are pending",
-        "모델이 잘 붙는지",
-        "오버행 부분을 서포트",
     };
     for (const char* p : patterns) {
         if (summary.find(p) != std::string::npos)
@@ -100,9 +98,7 @@ static std::string workflow_summary_from_changes(const std::vector<SettingChange
     if (!fallback.empty())
         return fallback;
 
-    if (ko)
-        return "추가 설정 변경은 없습니다. 아래 모델 인사이트를 확인해 주세요.";
-    return "No setting changes are pending — review model insights below.";
+    return _u8L("No setting changes are pending — review model insights below.");
 }
 
 } // namespace

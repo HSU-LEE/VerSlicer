@@ -1,6 +1,7 @@
 #include "ChatGptAccount.hpp"
 
 #include "../UiDispatch.hpp"
+#include "../I18N.hpp"
 #include "AiPrivacyConsent.hpp"
 #include "OllamaToolGateway.hpp"
 
@@ -578,14 +579,14 @@ CallbackResult wait_for_callback(int listen_fd)
         request.append(buf, buf + n);
     }
     const bool denied = request.find("error=") != std::string::npos;
-    const char* title = denied ? "연결이 취소되었습니다" : "연결되었습니다";
-    const char* body  = denied
-        ? "브라우저에서 허용을 누르지 않았습니다. 이 창을 닫고 VerSlicer에서 다시 연결해 주세요."
-        : "ChatGPT 계정이 VerSlicer에 연결되었습니다. 이 창을 닫고 앱으로 돌아가 주세요.";
+    const std::string title = denied ? _u8L("Connection cancelled") : _u8L("Connected");
+    const std::string body  = denied
+        ? _u8L("You did not press Allow in the browser. Close this window and connect again from VerSlicer.")
+        : _u8L("Your ChatGPT account is connected to VerSlicer. Close this window and return to the app.");
     const char* mark  = denied ? "!" : "✓";
     const char* tone  = denied ? "#E14747" : "#FF8F4A";
     const std::string html = std::string(
-        "<!doctype html><html lang=\"ko\"><head><meta charset=\"utf-8\">"
+        "<!doctype html><html><head><meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         "<title>VerSlicer</title>"
         "<style>"

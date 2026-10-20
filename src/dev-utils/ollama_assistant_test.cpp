@@ -67,8 +67,11 @@ int main()
 
     const std::vector<std::string> models = {"qwen2.5:3b", "mistral:latest"};
     expect_eq(pick_installed_ollama_model(models, "unknown"), "qwen2.5:3b", "pick fallback first");
+    expect_eq(pick_installed_ollama_model({"mistral:latest", "qwen2.5:7b"}, ""),
+              "mistral:latest", "empty preference picks first account model");
     expect_eq(normalize_ollama_model_tag("qwen2.5"), "qwen2.5:7b", "normalize model tag");
-    expect_eq(normalize_ollama_model_tag("qwen2.5:7b"), "qwen2.5:7b", "keep default 7b tag");
+    expect_eq(normalize_ollama_model_tag("qwen2.5:7b"), "qwen2.5:7b", "keep saved 7b tag");
+    expect_eq(normalize_ollama_model_tag(""), "", "empty model uses account selection");
 
     expect_true(ollama_recommended_brim_width_mm(15.0, 15.0) == 8.0, "small footprint wide brim");
     expect_true(ollama_recommended_brim_width_mm(50.0, 50.0) == 5.0, "medium footprint default brim");

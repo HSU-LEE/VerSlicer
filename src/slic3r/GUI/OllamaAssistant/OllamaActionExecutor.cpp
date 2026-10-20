@@ -108,7 +108,7 @@ std::optional<double> json_number(const nlohmann::json& j, const char* key)
     return std::nullopt;
 }
 
-/** "45도 돌려줘" is a yaw added on the bed. Models send that as z, angle, degrees, yaw, or rotation. */
+/** "Rotate it 45 degrees" is a yaw added on the bed. Models send that as z, angle, degrees, yaw, or rotation. */
 Vec3d rotate_delta_degrees(const nlohmann::json& action)
 {
     const double x = json_number(action, "x").value_or(0.0);
@@ -851,7 +851,7 @@ static SetConfigMutateResult mutate_set_config_on_config(DynamicPrintConfig& cfg
     // Resilient batch apply: a single bad key (blocked / unknown / unparsable)
     // must NOT discard the other valid changes. We skip the offending key,
     // record why, and commit everything that deserialized cleanly. This is what
-    // keeps a hands-free "인필 20%, 브림 켜줘" request working even when the LLM
+    // keeps a hands-free "infill 20%, brim on" request working even when the LLM
     // slips in one stray option.
     for (auto it = options.begin(); it != options.end(); ++it) {
         ++out.attempted;
@@ -1024,7 +1024,7 @@ OllamaActionResult apply_transform(const nlohmann::json& action, const char* typ
         }
         const auto before = measure_selected_instance(plater, sel);
         sel.translate(delta, tt);
-        plater->take_snapshot(AiLocale::korean() ? std::string("AI 도우미: 이동") : std::string(_u8L("AI Assistant: Move")),
+        plater->take_snapshot(_u8L("AI Assistant: Move"),
                               UndoRedo::SnapshotType::GizmoAction);
         canvas->do_move("");
         InstanceMeasure after = before ? measure_instance(plater, before->oi, before->ii) : InstanceMeasure{};
@@ -1048,7 +1048,7 @@ OllamaActionResult apply_transform(const nlohmann::json& action, const char* typ
             result.message += (boost::format(" position_mm is now (%1%, %2%, %3%)")
                                % after.offset.x() % after.offset.y() % after.offset.z()).str();
     } else if (std::string(type_name) == "rotate") {
-        // Degrees are added to the current orientation. "45도 돌려줘" is +45° on the bed, not a no-op
+        // Degrees are added to the current orientation. "Rotate it 45 degrees" is +45° on the bed, not a no-op
         // when the model sends angle/degrees/yaw instead of z.
         Vec3d delta_deg = rotate_delta_degrees(action);
         if (action.value("absolute", false)) {
@@ -1088,7 +1088,7 @@ OllamaActionResult apply_transform(const nlohmann::json& action, const char* typ
             rot_tt.set_independent();
         rot_tt.set_instance();
         sel.rotate(delta_deg * (kPi / 180.0), rot_tt);
-        plater->take_snapshot(AiLocale::korean() ? std::string("AI 도우미: 회전") : std::string(_u8L("AI Assistant: Rotate")),
+        plater->take_snapshot(_u8L("AI Assistant: Rotate"),
                               UndoRedo::SnapshotType::GizmoAction);
         canvas->do_rotate("");
 
@@ -1148,7 +1148,7 @@ OllamaActionResult apply_transform(const nlohmann::json& action, const char* typ
         st.set_relative();
         st.set_joint();
         sel.scale(Vec3d(fx, fy, fz), st);
-        plater->take_snapshot(AiLocale::korean() ? std::string("AI 도우미: 크기") : std::string(_u8L("AI Assistant: Scale")),
+        plater->take_snapshot(_u8L("AI Assistant: Scale"),
                               UndoRedo::SnapshotType::GizmoAction);
         canvas->do_scale("");
         InstanceMeasure after = before ? measure_instance(plater, before->oi, before->ii) : InstanceMeasure{};
@@ -1843,7 +1843,7 @@ std::vector<OllamaActionResult> OllamaActionExecutor::execute(const nlohmann::js
     }
     if (needs_batch_snapshot) {
         if (Plater* plater = wxGetApp().plater())
-            plater->take_snapshot(AiLocale::korean() ? std::string("AI 도우미") : std::string(_u8L("AI Assistant")),
+            plater->take_snapshot(_u8L("AI Assistant"),
                                   UndoRedo::SnapshotType::Action);
     }
 

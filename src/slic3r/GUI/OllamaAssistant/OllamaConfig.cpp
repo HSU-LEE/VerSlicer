@@ -51,8 +51,6 @@ bool pipeline_flag(const char* config_key, const char* env_key, bool default_val
 std::string normalize_ollama_model_tag(std::string model)
 {
     boost::trim(model);
-    if (model.empty())
-        model = kOllamaDefaultModel;
     if (model == "qwen2.5")
         model = "qwen2.5:7b";
     return model;
@@ -67,7 +65,7 @@ std::string ollama_host_from_config()
             return host;
     }
 #endif
-    return kOllamaDefaultHost;
+    return "chatgpt";
 }
 
 std::string ollama_model_from_config()
@@ -87,24 +85,9 @@ bool ollama_auto_catalog_enabled()
     return pipeline_flag(kOllamaAutoCatalogKey, "OLLAMA_AUTO_CATALOG", true);
 }
 
-bool ollama_two_hop_enabled()
-{
-    return pipeline_flag(kOllamaTwoHopKey, "OLLAMA_TWO_HOP", false);
-}
-
-bool ollama_adaptive_routing_enabled()
-{
-    return pipeline_flag(kOllamaAdaptiveRouteKey, "OLLAMA_ADAPTIVE_ROUTING", true);
-}
-
 bool ollama_wiki_search_enabled()
 {
     return pipeline_flag(kOllamaWikiSearchKey, "OLLAMA_WIKI_SEARCH", true);
-}
-
-bool ollama_critic_enabled()
-{
-    return pipeline_flag(kOllamaCriticKey, "OLLAMA_CRITIC", false);
 }
 
 bool ollama_mcp_server_enabled()

@@ -116,12 +116,8 @@ void AIGuiOrchestrator::on_slice_completed(Plater* plater, const Print* print, b
         return;
 
     if (!success && plater) {
-        const bool ko = wxGetApp().current_language_code().StartsWith("ko");
-        const std::string summary =
-            ko ? "슬라이싱에 실패했습니다. 모델 배치, 서포트, 벽 두께를 확인해 보세요."
-               : "Slicing failed. Check model placement, supports, and wall settings.";
-        nlohmann::json apply_root = OllamaActionPipeline::build_symptom_fallback_root(
-            ko ? "슬라이싱 실패 서포트 브림" : "slicing failed support brim", false);
+        const std::string summary = _u8L("Slicing failed. Check model placement, supports, and wall settings.");
+        nlohmann::json apply_root = OllamaActionPipeline::build_symptom_fallback_root("slicing failed support brim", false);
         AICoachController::instance().on_print_failure_hint(plater, summary, apply_root);
     }
     if (!plater || !success) {

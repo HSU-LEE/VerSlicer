@@ -1,4 +1,6 @@
 #include "PrintIntentClarifier.hpp"
+#include "libslic3r/I18N.hpp"
+#include <boost/format.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -110,7 +112,7 @@ std::optional<ClarifyingQuestion> PrintIntentClarifier::next_question(const Prin
     if (intent.has_blocking_slot(PrintIntentSlot::Material)) {
         ClarifyingQuestion q;
         q.slot          = PrintIntentSlot::Material;
-        q.question_ko   = "이 모델을 어떤 필라멘트로 출력할까요? (예: PLA, PETG, ABS, TPU)";
+        q.question_ko   = _u8L("Which filament should I print this with? (e.g. PLA, PETG, ABS, TPU)");
         q.question_en   = "Which filament should I print this with? (e.g. PLA, PETG, ABS, TPU)";
         q.blocks_config = true;
         return q;
@@ -118,7 +120,7 @@ std::optional<ClarifyingQuestion> PrintIntentClarifier::next_question(const Prin
     if (intent.has_blocking_slot(PrintIntentSlot::Priority)) {
         ClarifyingQuestion q;
         q.slot          = PrintIntentSlot::Priority;
-        q.question_ko   = "무엇을 가장 우선할까요? 강도, 속도, 표면 품질 중에서 골라 주세요.";
+        q.question_ko   = _u8L("What matters most for this print — strength, speed, or surface quality?");
         q.question_en   = "What matters most for this print — strength, speed, or surface quality?";
         q.blocks_config = true;
         return q;

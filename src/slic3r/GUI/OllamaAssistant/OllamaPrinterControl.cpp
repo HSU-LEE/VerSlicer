@@ -1,4 +1,5 @@
 #include "OllamaPrinterControl.hpp"
+#include "AiCatalog.hpp"
 
 #include "OllamaConfig.hpp"
 
@@ -16,6 +17,7 @@
 #endif
 
 #include <boost/algorithm/string.hpp>
+#include <boost/format.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -173,20 +175,19 @@ std::optional<PrinterControlRequest> OllamaPrinterControl::validate(const nlohma
 std::string OllamaPrinterControl::describe(const PrinterControlRequest& req, bool korean)
 {
     static const char* kSpeedEn[] = {"", "silent", "standard", "sport", "ludicrous"};
-    static const char* kSpeedKo[] = {"", "저소음", "표준", "스포츠", "루디크러스"};
     const std::string v = std::to_string(req.value);
     switch (req.target) {
     case PrinterControlTarget::NozzleTemp:
-        return req.value == 0 ? (korean ? "노즐 히터 끄기" : "nozzle heater off")
-                              : (korean ? "노즐 온도 " + v + "°C" : "nozzle temperature " + v + " °C");
+        return req.value == 0 ? ai_catalog_text("nozzle heater off")
+                              : (boost::format(ai_catalog_text("nozzle temperature %s °C")) % v).str();
     case PrinterControlTarget::BedTemp:
-        return req.value == 0 ? (korean ? "베드 히터 끄기" : "bed heater off")
-                              : (korean ? "베드 온도 " + v + "°C" : "bed temperature " + v + " °C");
+        return req.value == 0 ? ai_catalog_text("bed heater off")
+                              : (boost::format(ai_catalog_text("bed temperature %s °C")) % v).str();
     case PrinterControlTarget::ChamberTemp:
-        return req.value == 0 ? (korean ? "챔버 히터 끄기" : "chamber heater off")
-                              : (korean ? "챔버 온도 " + v + "°C" : "chamber temperature " + v + " °C");
+        return req.value == 0 ? ai_catalog_text("chamber heater off")
+                              : (boost::format(ai_catalog_text("chamber temperature %s °C")) % v).str();
     case PrinterControlTarget::PrintSpeed:
-        return korean ? std::string("출력 속도 ") + kSpeedKo[req.value] : std::string("print speed ") + kSpeedEn[req.value];
+        return (boost::format(ai_catalog_text("print speed %s")) % ai_catalog_text(kSpeedEn[req.value])).str();
     }
     return {};
 }
@@ -217,24 +218,10 @@ bool OllamaPrinterControl::ensure_consent(wxWindow* parent)
     if (enabled())
         return true;
     const bool ko = AiLocale::korean();
-    const wxString body = ko
-        ? wxString::FromUTF8(
-              "AI 도우미가 연결된 프린터의 다음 값을 직접 바꾸도록 허용할까요?\n\n"
-              "• 노즐·베드·챔버 목표 온도 (프린터가 허용하는 범위 안에서만)\n"
-              "• 출력 중 속도 단계 (저소음·표준·스포츠·루디크러스)\n\n"
-              "AI는 출력을 시작·중지하거나, 축을 움직이거나, 파일을 프린터로 보낼 수 없습니다. "
-              "바꾼 내용은 대화창에 표시됩니다.\n\n"
-              "나중에 「Smart Print」 메뉴의 「AI 프린터 제어 허용」에서 끌 수 있습니다.")
-        : wxString(
-              "Allow the AI assistant to change these values on your connected printer?\n\n"
-              "• Nozzle, bed and chamber target temperature (only within the printer's limits)\n"
-              "• Print speed level while printing (silent, standard, sport, ludicrous)\n\n"
-              "The AI cannot start or stop prints, move axes, or send files to the printer. "
-              "Every change is shown in the chat.\n\n"
-              "You can turn this off later in Smart Print > Allow AI printer control.");
-    wxMessageDialog dlg(parent, body, ko ? wxString::FromUTF8("AI 프린터 제어") : wxString("AI printer control"),
+    const wxString body = AiLocale::text("Allow the AI assistant to change these values on your connected printer?\n\n• Nozzle, bed and chamber target temperature (only within the printer's limits)\n• Print speed level while printing (silent, standard, sport, ludicrous)\n\nThe AI cannot start or stop prints, move axes, or send files to the printer. Every change is shown in the chat.\n\nYou can turn this off later in Smart Print > Allow AI printer control.");
+    wxMessageDialog dlg(parent, body, AiLocale::text("AI printer control"),
                         wxYES_NO | wxNO_DEFAULT | wxICON_WARNING);
-    dlg.SetYesNoLabels(ko ? wxString::FromUTF8("허용") : wxString("Allow"), ko ? wxString::FromUTF8("허용 안 함") : wxString("Don't allow"));
+    dlg.SetYesNoLabels(AiLocale::text("Allow"), AiLocale::text("Don't allow"));
     if (dlg.ShowModal() != wxID_YES)
         return false;
     set_enabled(true);
@@ -300,12 +287,11 @@ OllamaActionResult OllamaPrinterControl::apply(const nlohmann::json& action)
     }
     result.success          = true;
     result.effective_change = true;
-    result.message          = (ko ? "프린터 설정 변경: " : "Printer set: ") + describe(*req, ko);
+    result.message          = (boost::format(ai_catalog_text("Printer set: %s")) % describe(*req, ko)).str();
     if (!obj->is_lan_mode_printer())
         // Authorization Control firmware ignores control commands from other
         // slicers over the cloud; say so instead of claiming success.
-        result.message += ko ? " (명령을 보냈습니다. 최신 펌웨어는 다른 슬라이서의 클라우드 제어를 무시할 수 있으니 프린터 화면에서 확인하세요. 안 바뀌면 Bambu Connect에서 바꾸세요.)"
-                             : " (Command sent. Bambu firmware with Authorization Control may ignore control from other slicers over the cloud; check the printer, and use Bambu Connect if it did not change.)";
+        result.message += ai_catalog_text(" (Command sent. Bambu firmware with Authorization Control may ignore control from other slicers over the cloud; check the printer, and use Bambu Connect if it did not change.)");
     return result;
 }
 

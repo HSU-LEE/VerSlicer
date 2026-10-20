@@ -1,4 +1,6 @@
 #include "OrientationOptimizer.hpp"
+#include "libslic3r/I18N.hpp"
+#include <boost/format.hpp>
 #include "StabilityAnalyzer.hpp"
 #include "ConfigOptionRead.hpp"
 
@@ -163,15 +165,14 @@ OrientationResult OrientationOptimizer::optimize_mesh(const TriangleMesh& mesh,
     const bool is_identity = best.rotation.isApprox(Matrix3d::Identity(), 1e-6);
     if (is_identity && !result.stability_improved) {
         result.summary_en = "Current orientation is already support-optimal";
-        result.summary_ko = "현재 방향이 이미 서포트에 최적입니다";
+        result.summary_ko = _u8L("Current orientation is already support-optimal");
     } else if (result.stability_improved) {
         result.summary_en = "Reorient for stability (tip-over risk " + std::to_string(risk_pct)
             + "% after reorientation)";
-        result.summary_ko = "안정성을 위해 재배치 권장 (재배치 후 전도 위험 "
-            + std::to_string(risk_pct) + "%)";
+        result.summary_ko = (boost::format(_u8L("Reorient for stability (tip-over risk %s%% after reorientation)")) % risk_pct).str();
     } else {
         result.summary_en = "Reorient to reduce supports and overhangs";
-        result.summary_ko = "서포트와 오버행을 줄이도록 재배치 권장";
+        result.summary_ko = _u8L("Reorient to reduce supports and overhangs");
     }
     return result;
 }

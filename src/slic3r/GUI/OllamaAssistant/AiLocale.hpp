@@ -12,11 +12,6 @@ namespace Slic3r { namespace GUI { namespace AiLocale {
  * Single locale predicate shared by all AI surfaces (Ollama chat, AI pipeline,
  * MakerWorld dialogs, Smart Print planner glue). Delegates to the design-system
  * check so there is exactly one definition of "the UI is Korean".
- *
- * Rationale: the ko_KR gettext catalog does not yet carry the AI-assistant
- * strings, so these surfaces keep a bilingual dual path. English msgids still
- * go through wxGetTranslation so a future catalog pass picks them up without
- * code changes.
  */
 bool korean();
 

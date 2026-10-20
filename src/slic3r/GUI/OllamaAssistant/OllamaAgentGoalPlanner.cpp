@@ -1,4 +1,5 @@
 #include "OllamaAgentGoalPlanner.hpp"
+#include "AiCatalog.hpp"
 
 namespace Slic3r { namespace GUI {
 
@@ -23,11 +24,9 @@ nlohmann::json OllamaAgentGoalPlanner::build_plan_hint(const std::string& /*user
     return {
         {"multi_step", false},
         {"suggested_steps",
-         nlohmann::json::array({korean ? "요청에 맞는 변경을 확인하고 적용합니다"
-                                       : "Review context and apply the needed changes"})},
+         nlohmann::json::array({ai_catalog_text("Review context and apply the needed changes")})},
         {"hint",
-         korean ? "상태를 읽고 필요한 도구를 직접 고르세요. 결과가 목표를 충족하면 done:true."
-                : "Read state and choose tools yourself. Set done:true when the results meet the goal."},
+         ai_catalog_text("Read state and choose tools yourself. Set done:true when the results meet the goal.")},
     };
 }
 

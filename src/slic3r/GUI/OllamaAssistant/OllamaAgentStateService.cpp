@@ -1,4 +1,5 @@
 #include "OllamaAgentStateService.hpp"
+#include "AiCatalog.hpp"
 #include "OllamaMeshOps.hpp"
 
 #include "OllamaActionExecutor.hpp"
@@ -286,21 +287,19 @@ OllamaConfigVerifyReport OllamaAgentStateService::verify_set_config_actions(cons
 
 std::string OllamaAgentStateService::build_verify_retry_nudge(const OllamaConfigVerifyReport& report, bool korean)
 {
-    std::string fb = korean
-        ? "verify_config 실패. config_digest와 mismatches를 확인한 뒤 set_config를 다시 호출하세요.\n"
-        : "verify_config failed. Review config_digest and mismatches, then call set_config again.\n";
+    std::string fb = ai_catalog_text("verify_config failed. Review config_digest and mismatches, then call set_config again.\n");
 
     if (!report.mismatches.empty()) {
-        fb += korean ? "\nMismatches:\n" : "\nMismatches:\n";
+        fb += ai_catalog_text("\nMismatches:\n");
         for (const std::string& m : report.mismatches)
             fb += "- " + m + "\n";
     }
     if (!report.config_digest.empty()) {
-        fb += korean ? "\nConfig digest (JSON):\n" : "\nConfig digest (JSON):\n";
+        fb += ai_catalog_text("\nConfig digest (JSON):\n");
         fb += report.config_digest.dump(2);
         fb += "\n";
     }
-    fb += korean ? "\nGoal:\n" : "\nGoal:\n";
+    fb += ai_catalog_text("\nGoal:\n");
     return fb;
 }
 

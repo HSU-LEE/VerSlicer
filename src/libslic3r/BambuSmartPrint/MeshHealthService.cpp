@@ -1,4 +1,6 @@
 #include "MeshHealthService.hpp"
+#include "libslic3r/I18N.hpp"
+#include <boost/format.hpp>
 #include "ConfigOptionRead.hpp"
 
 #include "libslic3r/Model.hpp"
@@ -141,15 +143,15 @@ MeshHealthPlateReport MeshHealthService::analyze_objects(const std::vector<Model
 
     if (plate.total_volumes == 0) {
         plate.summary_en = "No printable volumes to check";
-        plate.summary_ko = "검사할 출력 가능한 볼륨이 없습니다";
+        plate.summary_ko = _u8L("No printable volumes to check");
     } else if (!plate.any_needs_repair && !plate.any_needs_user_action) {
         plate.summary_en = "All " + std::to_string(plate.total_volumes) + " volume(s) look healthy";
-        plate.summary_ko = "모든 볼륨(" + std::to_string(plate.total_volumes) + "개)이 정상입니다";
+        plate.summary_ko = (boost::format(_u8L("All %s volume(s) look healthy")) % plate.total_volumes).str();
     } else {
         plate.summary_en = std::to_string(plate.volumes_needing_repair) + " volume(s) need repair, "
             + std::to_string(plate.volumes_needing_user_action) + " need attention";
-        plate.summary_ko = "복구가 필요한 볼륨 " + std::to_string(plate.volumes_needing_repair)
-            + "개, 확인이 필요한 볼륨 " + std::to_string(plate.volumes_needing_user_action) + "개";
+        plate.summary_ko = (boost::format(_u8L("%1% volume(s) need repair, %2% need attention")) % plate.volumes_needing_repair
+            % plate.volumes_needing_user_action).str();
     }
     return plate;
 }

@@ -50,7 +50,7 @@ wxBitmap placeholder_bitmap(wxWindow* ref)
 MakerWorldPrintOfferDialog::MakerWorldPrintOfferDialog(wxWindow* parent,
                                                        const std::vector<MakerWorldCandidate>& candidates)
     : DPIDialog(parent, wxID_ANY,
-                AiLocale::text(_L("MakerWorld print"), "MakerWorld 출력"),
+                _L("MakerWorld print"),
                 wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
     , m_candidates(candidates)
     , m_alive(std::make_shared<std::atomic<bool>>(true))
@@ -59,9 +59,8 @@ MakerWorldPrintOfferDialog::MakerWorldPrintOfferDialog(wxWindow* parent,
 
     auto* root = new wxBoxSizer(wxVERTICAL);
     root->Add(SlicePilotUi::create_header(this,
-        AiLocale::text(_L("Choose a model to print"), "출력할 모델을 선택하세요"),
-        AiLocale::text(_L("Models found on MakerWorld. The highlighted model prints automatically when the timer ends."),
-                       "MakerWorld에서 찾은 모델입니다. 시간이 지나면 선택된 모델로 자동 진행됩니다.")),
+        _L("Choose a model to print"),
+        _L("Models found on MakerWorld. The highlighted model prints automatically when the timer ends.")),
         0, wxEXPAND);
 
     const int pad = FromDIP(12);
@@ -77,7 +76,7 @@ MakerWorldPrintOfferDialog::MakerWorldPrintOfferDialog(wxWindow* parent,
     auto* buttons = new DialogButtons(this, {"cancel", "ok"});
     m_confirm_btn = buttons->GetOK();
     if (Button* cancel = buttons->GetCANCEL()) {
-        cancel->SetLabel(AiLocale::text(_L("Cancel"), "취소"));
+        cancel->SetLabel(_L("Cancel"));
         cancel->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
             m_timer.Stop();
             m_selected_index = -1;
@@ -247,15 +246,11 @@ void MakerWorldPrintOfferDialog::update_confirm_label()
         title = elide(wxString::FromUTF8(m_candidates[static_cast<size_t>(m_selected_index)].title), 24);
     wxString label;
     if (title.IsEmpty())
-        label = AiLocale::text(_L("Start print"), "출력 시작");
+        label = _L("Start print");
     else if (m_seconds_left > 0)
-        label = AiLocale::korean()
-            ? wxString::Format(wxString::FromUTF8("'%s' 출력 (%d초)"), title, m_seconds_left)
-            : wxString::Format(_L("Print \"%s\" (%ds)"), title, m_seconds_left);
+        label = wxString::Format(_L("Print \"%s\" (%ds)"), title, m_seconds_left);
     else
-        label = AiLocale::korean()
-            ? wxString::Format(wxString::FromUTF8("'%s' 출력"), title)
-            : wxString::Format(_L("Print \"%s\""), title);
+        label = wxString::Format(_L("Print \"%s\""), title);
     m_confirm_btn->SetLabel(label);
     if (wxWindow* parent = m_confirm_btn->GetParent())
         parent->Layout();

@@ -61,7 +61,7 @@ private:
 // Waiting-state deadlines: import waits on Plater's download/import hook,
 // slicing waits on the SliceDone event — both can silently never arrive.
 // Search waits on a detached worker (Ollama translation + MakerWorld HTTP) and
-// can also hang without a deadline, leaving the UI stuck on "1/6 검색".
+// can also hang without a deadline, leaving the UI stuck on "1/6 Search".
 constexpr int kSearchTimeoutMs = 60 * 1000;
 constexpr int kImportTimeoutMs = 120 * 1000;
 constexpr int kSliceTimeoutMs  = 300 * 1000;
@@ -203,7 +203,7 @@ bool PrintJobOrchestrator::start(const std::string& user_utterance, wxWindow* pa
     m_last_terminal          = PrintJobState::Idle;
 
     // Suppress preset/substitution modals for the entire job so the user never
-    // has to click through a dialog after "~~ 뽑아줘". Balanced in finish_common().
+    // has to click through a dialog after "print me a dragon". Balanced in finish_common().
     push_ai_automation_scope();
     m_automation_scope_active = true;
 

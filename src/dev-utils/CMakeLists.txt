@@ -52,7 +52,7 @@ if (ORCA_TOOLS)
         ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
     )
     target_link_libraries(model_search_ranker_test libslic3r boost_headeronly)
-    target_compile_definitions(model_search_ranker_test PRIVATE -DBOOST_ALL_NO_LIB)
+    target_compile_definitions(model_search_ranker_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST)
 
     add_executable(ollama_assistant_test
         ollama_assistant_test.cpp

@@ -9,28 +9,20 @@ namespace Slic3r { namespace GUI {
 
 namespace {
 
-// MakerWorldSearchService composes its search errors with _u8L, but the ko_KR
-// catalog does not yet carry the AI-surface strings (see AiLocale.hpp), so a
-// Korean UI would show them in English. Map the known messages onto the
-// bilingual dual path here, at the provider boundary, so every ModelSearch
-// consumer benefits. If a string is unknown — or arrives already translated by
-// a future catalog — it passes through untouched.
+// Translate the known MakerWorld search errors through the catalog at the
+// provider boundary, so every ModelSearch consumer benefits. Unknown strings
+// pass through untouched.
 std::string localize_search_error(const std::string& err)
 {
-    struct Entry { const char* en; const char* ko; };
-    static const Entry kKnown[] = {
-        {"No models found on MakerWorld. Try different keywords or paste a model link.",
-         "MakerWorld에서 모델을 찾지 못했습니다. 다른 검색어로 시도하거나 모델 링크를 붙여넣어 주세요."},
-        {"Sign in to Bambu Cloud to search MakerWorld, or paste a model link.",
-         "MakerWorld를 검색하려면 Bambu Cloud에 로그인하거나 모델 링크를 붙여넣어 주세요."},
-        {"Enter a search term or paste a MakerWorld link.",
-         "검색어를 입력하거나 MakerWorld 링크를 붙여넣어 주세요."},
-        {"Please describe the model more specifically (e.g. size, articulated, vase).",
-         "모델을 좀 더 구체적으로 설명해 주세요 (예: 크기, 관절형, 화병)."},
+    static const char* kKnown[] = {
+        "No models found on MakerWorld. Try different keywords or paste a model link.",
+        "Sign in to Bambu Cloud to search MakerWorld, or paste a model link.",
+        "Enter a search term or paste a MakerWorld link.",
+        "Please describe the model more specifically (e.g. size, articulated, vase).",
     };
-    for (const Entry& e : kKnown) {
-        if (err == e.en)
-            return AiLocale::text(e.en, e.ko).utf8_string();
+    for (const char* en : kKnown) {
+        if (err == en)
+            return AiLocale::text(en).utf8_string();
     }
     return err;
 }

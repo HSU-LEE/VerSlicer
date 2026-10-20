@@ -13,10 +13,6 @@ namespace Slic3r { namespace GUI {
 inline std::string pick_installed_ollama_model(const std::vector<std::string>& models, std::string want)
 {
     boost::trim(want);
-    if (want.empty())
-        want = kOllamaDefaultModel;
-    if (want == "qwen2.5")
-        want = kOllamaDefaultModel;
 
     auto exact = [&](const std::string& n) { return n == want; };
     auto prefix = [&](const std::string& n) { return n.rfind(want + ":", 0) == 0; };
@@ -27,14 +23,6 @@ inline std::string pick_installed_ollama_model(const std::vector<std::string>& m
     }
     for (const auto& n : models) {
         if (prefix(n))
-            return n;
-    }
-    for (const auto& n : models) {
-        if (n.rfind("qwen2.5", 0) == 0)
-            return n;
-    }
-    for (const auto& n : models) {
-        if (n.find("qwen") != std::string::npos)
             return n;
     }
     if (!models.empty())

@@ -74,11 +74,8 @@ std::string OllamaAssistContextBuilder::build_initial_user_block(const std::stri
 
     (void) plan_hint;
     const std::string header =
-        korean
-            ? "목표와 현재 슬라이서 상태입니다. 시나리오를 따르지 말고, 상태를 읽은 뒤 도구를 고르세요. "
-              "독립적인 변경은 한 번에 묶고, 목표를 충족하면 done:true.\n\n"
-            : "Goal and current slicer state. Do not follow a script. Read the state, then choose tools. "
-              "Batch independent changes in one reply. Set done:true when the goal is met.\n\n";
+        "Goal and current slicer state. Do not follow a script. Read the state, then choose tools. "
+        "Batch independent changes in one reply. Set done:true when the goal is met.\n\n";
 
     std::string body = block.dump(2);
     body             = OllamaActionExecutor::fit_context_json_to_limit(std::move(body), 48000);

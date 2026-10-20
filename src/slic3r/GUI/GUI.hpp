@@ -56,7 +56,7 @@ void show_substitutions_info(const PresetsConfigSubstitutions& presets_config_su
 void show_substitutions_info(const ConfigSubstitutions& config_substitutions, const std::string& filename);
 
 // --- AI automation dialog suppression -------------------------------------
-// While an AI-driven job (e.g. "~~ 뽑아줘") is running the user must not be
+// While an AI-driven job (e.g. "print me a dragon") is running the user must not be
 // forced to click through modal prompts. Within an active scope:
 //   * config-substitution info popups are skipped (auto-OK), and
 //   * unsaved-preset-change prompts auto-resolve to "Discard".

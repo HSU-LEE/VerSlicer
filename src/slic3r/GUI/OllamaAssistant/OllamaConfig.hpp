@@ -5,21 +5,18 @@
 
 namespace Slic3r { namespace GUI {
 
+// The "ollama" section is a legacy name; keep it so existing verslicer.conf settings continue to load.
 constexpr const char* kOllamaConfigSection = "ollama";
 constexpr const char* kOllamaHostKey       = "host";
 constexpr const char* kOllamaModelKey      = "model";
-constexpr const char* kOllamaDefaultHost   = "http://127.0.0.1:11434";
-constexpr const char* kOllamaDefaultModel  = "qwen2.5:7b";
+constexpr const char* kOllamaDefaultModel  = "";
 /** Inference tuning — smaller ctx/predict = faster replies on Apple Silicon. */
 constexpr int         kOllamaNumCtx        = 8192;
 constexpr int         kOllamaNumPredict    = 768;
 constexpr const char* kOllamaKeepAlive     = "30m";
 
 constexpr const char* kOllamaAutoCatalogKey    = "auto_catalog";
-constexpr const char* kOllamaTwoHopKey         = "two_hop";
-constexpr const char* kOllamaAdaptiveRouteKey  = "adaptive_routing";
 constexpr const char* kOllamaWikiSearchKey     = "wiki_search";
-constexpr const char* kOllamaCriticKey         = "critic";
 constexpr const char* kOllamaMcpServerKey      = "mcp_server";
 constexpr const char* kOllamaAssistLoopKey     = "assist_loop";
 constexpr const char* kOllamaAssistMaxStepsKey = "assist_max_steps";
@@ -30,10 +27,7 @@ std::string normalize_ollama_model_tag(std::string model);
 
 /** Feature flags for Ollama assistant pipeline (app config + env override). */
 bool ollama_auto_catalog_enabled();
-bool ollama_two_hop_enabled();
-bool ollama_adaptive_routing_enabled();
 bool ollama_wiki_search_enabled();
-bool ollama_critic_enabled();
 /** Local MCP server for external agents (Cursor etc.). Off unless opted in. */
 bool ollama_mcp_server_enabled();
 bool ollama_assist_loop_enabled();

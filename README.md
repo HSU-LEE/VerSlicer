@@ -176,7 +176,7 @@ Settings live in `~/Library/Application Support/verslicer/verslicer.conf` under 
 | Printer control | off until you allow it | Smart Print → Allow AI printer control |
 | MCP server | off | Local agents (Cursor etc.) |
 
-Environment overrides: `OLLAMA_ASSIST_LOOP`, `OLLAMA_ASSIST_MAX_STEPS`, `OLLAMA_ADAPTIVE_ROUTING`, `OLLAMA_TWO_HOP`, `OLLAMA_KEYWORD_INJECT`, `OLLAMA_WIKI_SEARCH`, `OLLAMA_CRITIC`, `VERSLICER_MCP_SERVER`.
+Environment overrides: `OLLAMA_ASSIST_LOOP`, `OLLAMA_ASSIST_MAX_STEPS`, `OLLAMA_WIKI_SEARCH`, `VERSLICER_MCP_SERVER`.
 
 </details>
 

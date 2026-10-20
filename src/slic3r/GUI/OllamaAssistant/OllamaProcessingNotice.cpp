@@ -41,12 +41,12 @@ void OllamaProcessingNotice::hide(Plater* plater)
 
 void OllamaProcessingNotice::show_thinking(Plater* plater)
 {
-    show(plater, AiLocale::korean() ? std::string("요청을 처리하고 있습니다…") : std::string(_u8L("Working on your request…")));
+    show(plater, _u8L("Working on your request…"));
 }
 
 void OllamaProcessingNotice::show_starting(Plater* plater)
 {
-    show(plater, AiLocale::korean() ? std::string("AI를 시작하는 중…") : std::string(_u8L("Starting AI…")));
+    show(plater, _u8L("Starting AI…"));
 }
 
 }} // namespace

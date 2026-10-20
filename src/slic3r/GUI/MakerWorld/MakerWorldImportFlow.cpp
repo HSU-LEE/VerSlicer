@@ -481,8 +481,7 @@ void MakerWorldImportFlow::run_search_and_offer_print(wxWindow* parent, const st
                 chat_lines += wxString::Format(" — %s", wxString::FromUTF8(c.author));
             chat_lines += "\n";
         }
-        chat_notify(callbacks, ko ? wxString::FromUTF8("MakerWorld 검색 결과:\n") + chat_lines
-                                 : _L("MakerWorld results:\n") + chat_lines);
+        chat_notify(callbacks, _L("MakerWorld results:\n") + chat_lines);
 
         if (!p) {
             end_model_chooser();

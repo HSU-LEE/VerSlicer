@@ -1,9 +1,11 @@
 #include "OllamaSettingDescriptions.hpp"
+#include "AiCatalog.hpp"
 
 #include "OllamaSettingRegistry.hpp"
 #include "../I18N.hpp"
 
 #include <boost/algorithm/string.hpp>
+#include <boost/format.hpp>
 
 #include <cmath>
 #include <sstream>
@@ -63,13 +65,13 @@ std::string format_brim_type(const std::string& raw, bool ko)
     std::string v = raw;
     boost::algorithm::to_lower(v);
     if (v == "no_brim" || v == "none" || v == "0")
-        return ko ? "끔" : "Off";
+        return ai_catalog_text("Off");
     if (v == "outer_only" || v == "outeronly")
-        return ko ? "바깥 테두리만" : "Outer only";
+        return ai_catalog_text("Outer only");
     if (v == "auto_brim" || v == "autobrim")
-        return ko ? "자동" : "Auto";
+        return ai_catalog_text("Auto");
     if (v == "inner_only")
-        return ko ? "안쪽 테두리만" : "Inner only";
+        return ai_catalog_text("Inner only");
     return raw;
 }
 
@@ -100,29 +102,24 @@ std::string reason_for_brim_width(const BambuSmartPrint::SettingChange& ch, bool
     const double old_v = parse_number(ch.old_value);
     const double new_v = parse_number(ch.new_value);
     if (new_v <= 0.0 || is_falsy(ch.new_value))
-        return ko ? "바닥 테두리(brim)를 끄고 베드 접착 보조를 줄입니다."
-                  : "Turn off the brim to reduce extra material around the base.";
+        return ai_catalog_text("Turn off the brim to reduce extra material around the base.");
     if (new_v > old_v)
-        return ko ? "바닥 가장자리에 플라스틱을 더 깔아 베드에 잘 달라붙게 합니다."
-                  : "Add extra plastic around the base so the first layer grips the bed better.";
-    return ko ? "브림 너비를 줄여 출력 시간과 필라멘트 사용량을 낮춥니다."
-              : "Narrow the brim to save time and filament.";
+        return ai_catalog_text("Add extra plastic around the base so the first layer grips the bed better.");
+    return ai_catalog_text("Narrow the brim to save time and filament.");
 }
 
 std::string reason_for_brim_type(const BambuSmartPrint::SettingChange& ch, bool ko)
 {
     if (is_falsy(ch.new_value) || ch.new_value == "no_brim")
-        return ko ? "브림을 끕니다." : "Disable brim.";
-    return ko ? "브림 방식을 바꿔 베드 접착과 모델 형태에 맞춥니다."
-              : "Adjust brim style for bed adhesion and model shape.";
+        return ai_catalog_text("Disable brim.");
+    return ai_catalog_text("Adjust brim style for bed adhesion and model shape.");
 }
 
 std::string reason_for_enable_support(const BambuSmartPrint::SettingChange& ch, bool ko)
 {
     if (is_truthy(ch.new_value))
-        return ko ? "공중으로 나오는 부분을 받쳐 줄 서포트를 켭니다."
-                  : "Enable supports to hold overhanging sections during printing.";
-    return ko ? "서포트를 끄고 출력 후처리를 줄입니다." : "Turn off supports to reduce material and cleanup.";
+        return ai_catalog_text("Enable supports to hold overhanging sections during printing.");
+    return ai_catalog_text("Turn off supports to reduce material and cleanup.");
 }
 
 std::string reason_for_infill(const BambuSmartPrint::SettingChange& ch, bool ko)
@@ -130,10 +127,8 @@ std::string reason_for_infill(const BambuSmartPrint::SettingChange& ch, bool ko)
     const double old_v = parse_number(ch.old_value);
     const double new_v = parse_number(ch.new_value);
     if (new_v > old_v)
-        return ko ? "안쪽을 더 꽉 채워 부품을 단단하게 만듭니다."
-                  : "Increase infill so the part is stronger and less brittle.";
-    return ko ? "안쪽 채움을 줄여 출력 시간과 필라멘트를 절약합니다."
-              : "Lower infill to reduce print time and filament use.";
+        return ai_catalog_text("Increase infill so the part is stronger and less brittle.");
+    return ai_catalog_text("Lower infill to reduce print time and filament use.");
 }
 
 std::string reason_for_walls(const BambuSmartPrint::SettingChange& ch, bool ko)
@@ -141,9 +136,8 @@ std::string reason_for_walls(const BambuSmartPrint::SettingChange& ch, bool ko)
     const double old_v = parse_number(ch.old_value);
     const double new_v = parse_number(ch.new_value);
     if (new_v > old_v)
-        return ko ? "벽을 한 겹 더 두껍게 해 힘을 더 잘 받게 합니다."
-                  : "Add an extra wall so the part handles stress better.";
-    return ko ? "벽 겹 수를 줄여 출력 시간을 단축합니다." : "Use fewer walls to shorten print time.";
+        return ai_catalog_text("Add an extra wall so the part handles stress better.");
+    return ai_catalog_text("Use fewer walls to shorten print time.");
 }
 
 std::string reason_for_layer_height(const BambuSmartPrint::SettingChange& ch, bool ko)
@@ -151,10 +145,8 @@ std::string reason_for_layer_height(const BambuSmartPrint::SettingChange& ch, bo
     const double old_v = parse_number(ch.old_value);
     const double new_v = parse_number(ch.new_value);
     if (new_v > old_v)
-        return ko ? "층 높이를 키워 같은 높이를 더 빨리 출력합니다."
-                  : "Use thicker layers to print the same height faster.";
-    return ko ? "층 높이를 낮춰 표면을 더 매끈하게 만듭니다."
-              : "Use thinner layers for smoother surfaces.";
+        return ai_catalog_text("Use thicker layers to print the same height faster.");
+    return ai_catalog_text("Use thinner layers for smoother surfaces.");
 }
 
 std::string reason_for_speed(const BambuSmartPrint::SettingChange& ch, bool ko)
@@ -162,8 +154,8 @@ std::string reason_for_speed(const BambuSmartPrint::SettingChange& ch, bool ko)
     const double old_v = parse_number(ch.old_value);
     const double new_v = parse_number(ch.new_value);
     if (new_v < old_v)
-        return ko ? "속도를 낮춰 품질과 안정성을 높입니다." : "Slow down printing for better quality and reliability.";
-    return ko ? "속도를 올려 출력 시간을 줄입니다." : "Increase speed to shorten print time.";
+        return ai_catalog_text("Slow down printing for better quality and reliability.");
+    return ai_catalog_text("Increase speed to shorten print time.");
 }
 
 std::string reason_for_temperature(const BambuSmartPrint::SettingChange& ch, bool ko)
@@ -172,14 +164,12 @@ std::string reason_for_temperature(const BambuSmartPrint::SettingChange& ch, boo
     const double new_v = parse_number(ch.new_value);
     if (ch.key.find("bed") != std::string::npos) {
         if (new_v > old_v)
-            return ko ? "베드 온도를 올려 첫 층 접착을 돕습니다."
-                      : "Raise bed temperature to improve first-layer adhesion.";
-        return ko ? "베드 온도를 낮춰 warping 위험을 줄입니다." : "Lower bed temperature to reduce warping risk.";
+            return ai_catalog_text("Raise bed temperature to improve first-layer adhesion.");
+        return ai_catalog_text("Lower bed temperature to reduce warping risk.");
     }
     if (new_v > old_v)
-        return ko ? "노zzle 온도를 올려 층 간 접착을 강화합니다."
-                  : "Raise nozzle temperature for better layer bonding.";
-    return ko ? "노zzle 온도를 낮춰 stringing을 줄입니다." : "Lower nozzle temperature to reduce stringing.";
+        return ai_catalog_text("Raise nozzle temperature for better layer bonding.");
+    return ai_catalog_text("Lower nozzle temperature to reduce stringing.");
 }
 
 std::string reason_for_retraction(const BambuSmartPrint::SettingChange& ch, bool ko)
@@ -187,9 +177,8 @@ std::string reason_for_retraction(const BambuSmartPrint::SettingChange& ch, bool
     const double old_v = parse_number(ch.old_value);
     const double new_v = parse_number(ch.new_value);
     if (new_v > old_v)
-        return ko ? "리트랙션을 늘려 실(stringing)을 줄입니다."
-                  : "Increase retraction to reduce stringing between moves.";
-    return ko ? "리트랙션을 줄여 필라멘트 마모를 낮춥니다." : "Reduce retraction to limit filament grinding.";
+        return ai_catalog_text("Increase retraction to reduce stringing between moves.");
+    return ai_catalog_text("Reduce retraction to limit filament grinding.");
 }
 
 } // namespace
@@ -197,14 +186,14 @@ std::string reason_for_retraction(const BambuSmartPrint::SettingChange& ch, bool
 std::string OllamaSettingDescriptions::setting_label(const std::string& key, bool korean)
 {
     if (const OllamaSettingSpec* sp = OllamaSettingRegistry::find_spec(key))
-        return korean ? _u8L(sp->desc_en) : sp->desc_en;
+        return ai_catalog_text(sp->desc_en);
     return key;
 }
 
 std::string OllamaSettingDescriptions::format_value(const std::string& key, const std::string& raw, bool korean)
 {
     if (key == "enable_support" || key == "enable_brim" || key == "support_on_build_plate_only")
-        return is_truthy(raw) ? (korean ? "켬" : "On") : (korean ? "끔" : "Off");
+        return is_truthy(raw) ? (ai_catalog_text("On")) : (ai_catalog_text("Off"));
     if (key == "brim_type")
         return format_brim_type(raw, korean);
 
@@ -245,11 +234,9 @@ std::string OllamaSettingDescriptions::change_reason(const BambuSmartPrint::Sett
     if (key.find("support") != std::string::npos)
         return reason_for_enable_support(change, korean);
 
-    if (korean)
-        return setting_label(key, true) + " 값을 " + format_value(key, change.old_value, true) + "에서 "
-             + format_value(key, change.new_value, true) + "로 바꿉니다.";
-    return "Change " + setting_label(key, false) + " from " + format_value(key, change.old_value, false) + " to "
-         + format_value(key, change.new_value, false) + ".";
+    return (boost::format(ai_catalog_text("Change %s from %s to %s."))
+            % setting_label(key, korean) % format_value(key, change.old_value, korean)
+            % format_value(key, change.new_value, korean)).str();
 }
 
 std::string OllamaSettingDescriptions::preview_line(const BambuSmartPrint::SettingChange& change, bool korean)
@@ -273,18 +260,10 @@ std::string OllamaSettingDescriptions::build_summary(const std::vector<BambuSmar
         return assistant_message;
 
     std::ostringstream oss;
-    if (korean) {
-        for (size_t i = 0; i < changes.size(); ++i) {
-            if (i > 0)
-                oss << (i + 1 == changes.size() ? " 또한 " : ", ");
-            oss << change_reason(changes[i], true);
-        }
-    } else {
-        for (size_t i = 0; i < changes.size(); ++i) {
-            if (i > 0)
-                oss << (i + 1 == changes.size() ? " Also, " : " ");
-            oss << change_reason(changes[i], false);
-        }
+    for (size_t i = 0; i < changes.size(); ++i) {
+        if (i > 0)
+            oss << (i + 1 == changes.size() ? ai_catalog_text(" Also, ") : ", ");
+        oss << change_reason(changes[i], korean);
     }
     const std::string synthesized = oss.str();
 
@@ -330,16 +309,15 @@ std::vector<std::string> OllamaSettingDescriptions::expected_effects(
     }
 
     if (better_stick)
-        out.push_back(korean ? "첫 층이 베드에 더 잘 붙을 가능성이 높습니다."
-                             : "The first layer should stick to the bed more reliably.");
+        out.push_back(ai_catalog_text("The first layer should stick to the bed more reliably."));
     if (stronger)
-        out.push_back(korean ? "부품이 더 단단해질 수 있습니다." : "The part should be stronger and less brittle.");
+        out.push_back(ai_catalog_text("The part should be stronger and less brittle."));
     if (faster)
-        out.push_back(korean ? "출력 시간이 다소 줄어들 수 있습니다." : "Print time may be slightly shorter.");
+        out.push_back(ai_catalog_text("Print time may be slightly shorter."));
     if (adds_time && !faster)
-        out.push_back(korean ? "출력 시간이 조금 늘어날 수 있습니다." : "Print time may be slightly longer.");
+        out.push_back(ai_catalog_text("Print time may be slightly longer."));
     if (adds_material)
-        out.push_back(korean ? "필라멘트 사용량이 조금 늘어날 수 있습니다." : "Filament use may increase slightly.");
+        out.push_back(ai_catalog_text("Filament use may increase slightly."));
 
     return out;
 }
