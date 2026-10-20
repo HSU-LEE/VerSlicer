@@ -77,6 +77,8 @@ Windows and Linux builds are not available yet.
 
 # How to use
 
+📘 **Full user guide (Korean, with screenshots):** [VerSlicer 사용 설명서 (.docx)](docs/VerSlicer-User-Guide-ko.docx) — installation, first-launch fixes, setup wizard, slicing, printing and the AI assistant.
+
 ### 1. Connect ChatGPT
 
 Open the **AI assistant** on the 3D view toolbar and press **Connect ChatGPT**. A one-time notice explains what is sent to OpenAI; after you agree, the browser opens. Sign in and allow VerSlicer. A ChatGPT Plus or Pro plan is required.
