@@ -1,4 +1,5 @@
 #include "BambuSmartPrintCompareDialog.hpp"
+#include "libslic3r/BambuSmartPrint/ChangeEffects.hpp"
 #include "BambuSmartPrintUi.hpp"
 
 #include "../I18N.hpp"
@@ -41,10 +42,13 @@ BambuSmartPrintCompareDialog::BambuSmartPrintCompareDialog(wxWindow* parent,
     }
 
     auto* root = new wxBoxSizer(wxVERTICAL);
-    root->Add(create_header(this, _L("Setting changes"),
-        changes.empty() ? _L("No differences between before and after")
-                        : wxString::Format(_L("%zu parameters will be updated"), changes.size())),
-        0, wxEXPAND);
+    // Predicted effect of the whole change set, before anything is sliced.
+    const std::string effects = BambuSmartPrint::ChangeEffects::estimate(changes).summary();
+    wxString subtitle = changes.empty() ? _L("No differences between before and after")
+                                        : wxString::Format(_L("%zu parameters will be updated"), changes.size());
+    if (!effects.empty())
+        subtitle << "\n" << _L("Expected effect:") << " " << wxString::FromUTF8(effects);
+    root->Add(create_header(this, _L("Setting changes"), subtitle), 0, wxEXPAND);
 
     wxBoxSizer* body = nullptr;
     auto* scroll = create_scroll_body(this, &body);

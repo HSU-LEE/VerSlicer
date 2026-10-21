@@ -86,8 +86,8 @@ class HMSQuery;
 class ModelMallDialog;
 class PingCodeBindDialog;
 class NetworkErrorDialog;
-class OllamaChatDialog;
-class OllamaVoiceInput;
+class AssistantChatDialog;
+class AssistantVoiceInput;
 
 
 enum FileType
@@ -683,8 +683,8 @@ public:
     PresetBundle*   preset_bundle{ nullptr };
     PresetUpdater*  preset_updater{ nullptr };
     MainFrame*      mainframe{ nullptr };
-    OllamaChatDialog* ollama_chat_dialog{ nullptr };
-    std::unique_ptr<OllamaVoiceInput> ollama_voice_input;
+    AssistantChatDialog* assistant_chat_dialog{ nullptr };
+    std::unique_ptr<AssistantVoiceInput> assistant_voice_input;
     Plater*         plater_{ nullptr };
 
 	PresetUpdater*  get_preset_updater() { return preset_updater; }
@@ -781,7 +781,7 @@ private:
     bool            window_pos_restore(wxTopLevelWindow* window, const std::string &name, bool default_maximized = false);
     void            window_pos_sanitize(wxTopLevelWindow* window);
     void            window_pos_center(wxTopLevelWindow *window);
-    void            cleanup_ollama_assistant();
+    void            cleanup_assistant_assistant();
     bool            select_language();
 
     bool            config_wizard_startup();

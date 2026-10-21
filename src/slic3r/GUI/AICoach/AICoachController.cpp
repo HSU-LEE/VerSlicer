@@ -14,12 +14,12 @@
 #include "../GLCanvas3D.hpp"
 #include "../GUI_App.hpp"
 #include "../MainFrame.hpp"
-#include "../OllamaAssistant/OllamaActionExecutor.hpp"
-#include "../OllamaAssistant/OllamaActionPipeline.hpp"
-#include "../OllamaAssistant/OllamaActionValidator.hpp"
-#include "../OllamaAssistant/OllamaActionWorkflow.hpp"
-#include "../OllamaAssistant/OllamaExecutionPolicy.hpp"
-#include "../OllamaAssistant/OllamaUserFlow.hpp"
+#include "../Assistant/AssistantActionExecutor.hpp"
+#include "../Assistant/AssistantActionPipeline.hpp"
+#include "../Assistant/AssistantActionValidator.hpp"
+#include "../Assistant/AssistantActionWorkflow.hpp"
+#include "../Assistant/AssistantExecutionPolicy.hpp"
+#include "../Assistant/AssistantUserFlow.hpp"
 #include "../GLToolbar.hpp"
 #include "../NotificationManager.hpp"
 #include "../Plater.hpp"
@@ -37,7 +37,7 @@ namespace {
 constexpr const char* kEnabledKey     = "ai_coach_enabled";
 constexpr const char* kBedHintsKey    = "ai_coach_show_bed_hints";
 
-bool workflow_had_effective_change(const OllamaWorkflowRun& workflow)
+bool workflow_had_effective_change(const AssistantWorkflowRun& workflow)
 {
     for (const auto& r : workflow.results) {
         if (r.success && r.effective_change)
@@ -166,7 +166,7 @@ void AICoachController::handle_button(Plater* plater, const AICoachButton& btn, 
     if (btn.action_id == "arrange" || btn.action_id == "preview_tab" || btn.action_id == "send_print"
         || btn.action_id == "export_gcode" || btn.action_id == "open_settings" || btn.action_id == "open_setup"
         || btn.action_id == "open_smart_print" || btn.action_id == "undo_apply") {
-        const OllamaFlowDispatchResult flow = OllamaUserFlow::dispatch_coach_action(btn.action_id, plater);
+        const AssistantFlowDispatchResult flow = AssistantUserFlow::dispatch_coach_action(btn.action_id, plater);
         if (flow.handled) {
             if (flow.setup_blocked) {
                 AICoachCard err;
@@ -251,18 +251,18 @@ void AICoachController::apply_card_actions(Plater* plater, const AICoachCard& ca
         return;
 
     nlohmann::json root = card.apply_root;
-    OllamaPipelineOptions opt;
+    AssistantPipelineOptions opt;
     opt.apply_mode         = true;
     opt.include_makerworld = false;
     opt.user_request       = card.body;
-    OllamaActionPipeline::process_actions(root, opt);
+    AssistantActionPipeline::process_actions(root, opt);
 
     if (!root.contains("actions") || !root["actions"].is_array() || root["actions"].empty())
         return;
 
     AIGuiOrchestrator::instance().on_chat_apply_begin();
-    const OllamaWorkflowRun workflow =
-        OllamaActionWorkflow::execute_with_policy(root, nullptr, ollama_execution_policy_for_assist_mode());
+    const AssistantWorkflowRun workflow =
+        AssistantActionWorkflow::execute_with_policy(root, nullptr, assistant_execution_policy_for_assist_mode());
     const bool applied               = workflow_had_effective_change(workflow);
     AIGuiOrchestrator::instance().on_chat_apply_end(applied, root, nullptr);
 

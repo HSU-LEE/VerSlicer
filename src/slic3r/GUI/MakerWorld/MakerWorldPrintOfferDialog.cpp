@@ -4,7 +4,7 @@
 #include "../BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
-#include "../OllamaAssistant/AiLocale.hpp"
+#include "../Assistant/AiLocale.hpp"
 #include "../Widgets/DialogButtons.hpp"
 #include "../Widgets/Label.hpp"
 

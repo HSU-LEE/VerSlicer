@@ -209,7 +209,7 @@ BambuSmartPrintPrivacyDialog::BambuSmartPrintPrivacyDialog(wxWindow* parent)
     wxPanel* privacy_body = nullptr;
     auto* privacy_card = create_card(m_scroll, &privacy_inner, &privacy_body, 12);
     add_card_section_title(privacy_body, privacy_inner, _L("What stays local"),
-                           _L("Everything below is stored under your Verslicer data folder"));
+                           _L("Everything below is stored under your VerSlicer data folder"));
     add_privacy_pillar(privacy_body, privacy_inner, m_wrap_labels,
         _L("Print failures & diagnoses"),
         _L("Error codes, suggested fixes, and your helpful / not helpful feedback."));

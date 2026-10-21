@@ -26,6 +26,11 @@ public:
     void record_failure(const std::string& printer_id, FailureCategory category, const DynamicPrintConfig& config,
                         bool apply_bias_immediately = true);
     void record_success(const std::string& printer_id);
+    /** The user's verdict on a print the printer reported as finished: "good",
+     *  or a PrintFeedback issue id. An issue turns that recorded success into a
+     *  failure of the issue's category and learns from it. False on unknown id. */
+    bool record_print_feedback(const std::string& printer_id, const std::string& issue_id,
+                               const DynamicPrintConfig& config);
     void record_diagnosis_feedback(const std::string& printer_id, FailureCategory category, const std::string& feedback);
     void record_applied_suggestion(const std::string& printer_id);
     void record_applied_suggestion(const std::string& printer_id, const std::vector<std::string>& setting_keys);

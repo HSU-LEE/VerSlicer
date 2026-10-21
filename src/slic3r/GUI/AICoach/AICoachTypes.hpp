@@ -93,7 +93,7 @@ struct AICoachCard {
     AICoachTrustBrief             trust;
     AICoachFinishingBrief         finishing;
     std::vector<AICoachButton>    buttons;
-    nlohmann::json                apply_root; // Ollama-style { message, actions }
+    nlohmann::json                apply_root; // Assistant-style { message, actions }
     int                           auto_dismiss_ms{ 10000 };
 };
 

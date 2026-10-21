@@ -1,5 +1,7 @@
 #include "BambuConnect.hpp"
-#include "OllamaAssistant/OllamaPrinterControl.hpp"
+#include "Assistant/AssistantPrinterControl.hpp"
+#include "Assistant/AssistantUserFlow.hpp"
+#include "Assistant/AssistantLearningSummary.hpp"
 #include "MainFrame.hpp"
 
 #include <wx/panel.h>
@@ -2620,7 +2622,7 @@ static wxMenu* generate_help_menu()
         });
 
     // Report a bug
-    //append_menu_item(helpMenu, wxID_ANY, _L("Report Bug(TODO)"), _L("Report a bug of Verslicer"),
+    //append_menu_item(helpMenu, wxID_ANY, _L("Report Bug(TODO)"), _L("Report a bug of VerSlicer"),
     //    [](wxCommandEvent&) {
     //        //TODO
     //    });
@@ -3614,8 +3616,21 @@ void MainFrame::init_menubar_as_editor()
     smart_print_menu->AppendSeparator();
     append_menu_check_item(smart_print_menu, wxID_ANY, _L("Allow AI printer control"),
         _L("Let the AI assistant set nozzle, bed and chamber temperature and print speed on the connected printer"),
-        [](wxCommandEvent&) { OllamaPrinterControl::set_enabled(!OllamaPrinterControl::enabled()); },
-        this, []() { return true; }, []() { return OllamaPrinterControl::enabled(); }, this);
+        [](wxCommandEvent&) { AssistantPrinterControl::set_enabled(!AssistantPrinterControl::enabled()); },
+        this, []() { return true; }, []() { return AssistantPrinterControl::enabled(); }, this);
+    append_menu_item(smart_print_menu, wxID_ANY, _L("Undo last AI change"),
+        _L("Put back the settings from before the assistant's last change"),
+        [](wxCommandEvent&) {
+            const auto r = AssistantUserFlow::apply_flow_action({{"type", "rollback_apply"}}, wxGetApp().plater());
+            wxMessageBox(r.success ? _L("The settings from before the last AI change are back.")
+                                   : _L("There is no AI change to undo."),
+                         _L("Undo last AI change"), wxOK | wxICON_INFORMATION, wxGetApp().plater());
+        },
+        "", nullptr, []() { return true; }, this);
+    append_menu_item(smart_print_menu, wxID_ANY, _L("What VerSlicer learned…"),
+        _L("See what Smart Print learned about this printer from past prints"),
+        [](wxCommandEvent&) { AssistantLearningSummary::show_dialog(wxGetApp().plater()); },
+        "", nullptr, []() { return true; }, this);
     append_menu_item(smart_print_menu, wxID_ANY, _L("View failure history"), _L("Browse recorded print failures and feedback"),
         [](wxCommandEvent&) { BambuSmartPrintService::instance().show_history_dialog(wxGetApp().plater()); },
         "", nullptr, []() { return true; }, this);

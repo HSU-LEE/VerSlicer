@@ -11,7 +11,7 @@ namespace Slic3r { namespace GUI { namespace AIPipeline {
 
 /**
  * Header-only bridge between the legacy Phase 1 MakerWorldFlowUiCallbacks and the
- * Phase 3 PrintJobUiCallbacks. Lets the orchestrator reuse OllamaChatPanel's
+ * Phase 3 PrintJobUiCallbacks. Lets the orchestrator reuse AssistantChatPanel's
  * existing chat/busy/status plumbing (makerworld_flow_callbacks()) unchanged.
  *
  * Both callback sets are invoked only on the wx main thread by their producers,

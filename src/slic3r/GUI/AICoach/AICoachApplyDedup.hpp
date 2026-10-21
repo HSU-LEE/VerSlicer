@@ -9,7 +9,7 @@
 
 namespace Slic3r { namespace GUI {
 
-/** Tracks set_config actions applied via Coach or Ollama to suppress duplicate Coach cards. */
+/** Tracks set_config actions applied via Coach or Assistant to suppress duplicate Coach cards. */
 class AICoachApplyDedup
 {
 public:

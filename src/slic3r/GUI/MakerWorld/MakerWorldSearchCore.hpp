@@ -16,7 +16,7 @@ std::string normalize_makerworld_search_query(const std::string& user_text);
 
 std::vector<MakerWorldCandidate> parse_hits_json(const std::string& body);
 std::vector<MakerWorldCandidate> filter_by_query(const std::vector<MakerWorldCandidate>& in, const std::string& query);
-/** Build search keyword variants; optional translated_english from Ollama translation. */
+/** Build search keyword variants; optional translated_english from Assistant translation. */
 std::vector<std::string> search_query_variants(const std::string& query,
                                                const std::string& translated_english = {});
 

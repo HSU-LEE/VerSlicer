@@ -1696,9 +1696,9 @@ void NotificationManager::PrintHostUploadNotification::render_cancel_button(ImGu
 	}
 	ImGui::PopStyleColor(5);
 }
-//------OllamaProcessingNotification-------
+//------AssistantProcessingNotification-------
 namespace {
-void render_ollama_spinner(ImDrawList* draw_list, const ImVec2& center, float radius, float thickness,
+void render_assistant_spinner(ImDrawList* draw_list, const ImVec2& center, float radius, float thickness,
                            ImU32 color, float anim01)
 {
     constexpr float kTwoPi = 6.28318530718f;
@@ -1710,13 +1710,13 @@ void render_ollama_spinner(ImDrawList* draw_list, const ImVec2& center, float ra
 }
 } // namespace
 
-void NotificationManager::OllamaProcessingNotification::init()
+void NotificationManager::AssistantProcessingNotification::init()
 {
     PopNotification::init();
     m_state = EState::NotFading;
 }
 
-void NotificationManager::OllamaProcessingNotification::count_spaces()
+void NotificationManager::AssistantProcessingNotification::count_spaces()
 {
     PopNotification::count_spaces();
     m_spinner_size      = m_line_height * 1.15f;
@@ -1724,7 +1724,7 @@ void NotificationManager::OllamaProcessingNotification::count_spaces()
     m_window_width_offset = m_left_indentation + m_line_height * 3.f;
 }
 
-bool NotificationManager::OllamaProcessingNotification::update_state(bool paused, const int64_t delta)
+bool NotificationManager::AssistantProcessingNotification::update_state(bool paused, const int64_t delta)
 {
     PopNotification::update_state(paused, delta);
     if (m_state == EState::Finished || m_state == EState::ClosePending || m_state == EState::Hidden)
@@ -1740,7 +1740,7 @@ bool NotificationManager::OllamaProcessingNotification::update_state(bool paused
     return true;
 }
 
-void NotificationManager::OllamaProcessingNotification::render_text(ImGuiWrapper& imgui,
+void NotificationManager::AssistantProcessingNotification::render_text(ImGuiWrapper& imgui,
                                                                   const float win_size_x, const float win_size_y,
                                                                   const float /*win_pos_x*/, const float /*win_pos_y*/)
 {
@@ -1755,7 +1755,7 @@ void NotificationManager::OllamaProcessingNotification::render_text(ImGuiWrapper
     const float   anim   = float((now_ms % 1200) / 1200.0);
     ImU32 spinner_clr = ImGui::GetColorU32(ImVec4(m_CurrentColor.x, m_CurrentColor.y, m_CurrentColor.z,
                                                  m_current_fade_opacity));
-    render_ollama_spinner(ImGui::GetWindowDrawList(), center, radius, thickness, spinner_clr, anim);
+    render_assistant_spinner(ImGui::GetWindowDrawList(), center, radius, thickness, spinner_clr, anim);
 
     PopNotification::render_text(imgui, win_size_x, win_size_y, 0.f, 0.f);
 }
@@ -3192,7 +3192,7 @@ void NotificationManager::set_in_preview(bool preview)
             notification->hide(!preview);
         if (notification->get_type() == NotificationType::BBLObjectInfo)
             notification->hide(preview);
-        if (notification->get_type() == NotificationType::BBLOllamaProcessing)
+        if (notification->get_type() == NotificationType::BBLAssistantProcessing)
             notification->hide(preview);
         if (notification->get_type() == NotificationType::BBLSeqPrintInfo)
             notification->hide(preview);
@@ -3357,25 +3357,25 @@ void NotificationManager::bbl_close_objectsinfo_notification()
         if (notification->get_type() == NotificationType::BBLObjectInfo) { notification->close(); }
 }
 
-void NotificationManager::bbl_show_ollama_processing_notification(const std::string& text)
+void NotificationManager::bbl_show_assistant_processing_notification(const std::string& text)
 {
-    NotificationData data{ NotificationType::BBLOllamaProcessing, NotificationLevel::PrintInfoNotificationLevel, 0, text };
+    NotificationData data{ NotificationType::BBLAssistantProcessing, NotificationLevel::PrintInfoNotificationLevel, 0, text };
     for (std::unique_ptr<PopNotification>& notification : m_pop_notifications) {
-        if (notification->get_type() == NotificationType::BBLOllamaProcessing) {
+        if (notification->get_type() == NotificationType::BBLAssistantProcessing) {
             notification->update(data);
             notification->set_Multiline(text.find('\n') != std::string::npos);
             return;
         }
     }
-    auto notification = std::make_unique<OllamaProcessingNotification>(data, m_id_provider, m_evt_handler);
+    auto notification = std::make_unique<AssistantProcessingNotification>(data, m_id_provider, m_evt_handler);
     notification->set_Multiline(text.find('\n') != std::string::npos);
     push_notification_data(std::move(notification), 0);
 }
 
-void NotificationManager::bbl_close_ollama_processing_notification()
+void NotificationManager::bbl_close_assistant_processing_notification()
 {
     for (std::unique_ptr<PopNotification>& notification : m_pop_notifications)
-        if (notification->get_type() == NotificationType::BBLOllamaProcessing)
+        if (notification->get_type() == NotificationType::BBLAssistantProcessing)
             notification->close();
 }
 

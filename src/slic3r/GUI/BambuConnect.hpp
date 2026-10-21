@@ -39,6 +39,11 @@ bool installed();
  *  fails, or Bambu Connect is missing (with a link to download it). */
 bool send_current_plate(Plater* plater);
 
+/** Set once the "Network Plug-in Restriction" (Developer Mode) notice has been
+ *  shown this session; the LAN mode notice then stays quiet so the user is not
+ *  told the same thing twice. */
+extern bool g_network_restriction_notice_shown;
+
 /** The user picked a printer that is linked through the Bambu cloud (not LAN
  *  mode): tell them to turn on LAN Only mode and Developer Mode on the printer. */
 void notify_cloud_printer_selected(wxWindow* parent, MachineObject* obj);

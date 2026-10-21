@@ -1460,7 +1460,7 @@ void PreferencesDialog::create_items()
     //// GENERAL > Preset
     g_sizer->Add(create_item_title(_L("Preset")), 1, wxEXPAND);
 
-    auto item_remember_printer = create_item_checkbox(_L("Remember printer configuration"), _L("If enabled, Verslicer will remember and switch filament/process configuration for each printer automatically."), "remember_printer_config");
+    auto item_remember_printer = create_item_checkbox(_L("Remember printer configuration"), _L("If enabled, VerSlicer will remember and switch filament/process configuration for each printer automatically."), "remember_printer_config");
     g_sizer->Add(item_remember_printer);
 
     auto item_filament_preset_grouping = create_item_combobox(_L("Group user filament presets"), _L("Group user filament presets based on selection"),
@@ -1500,6 +1500,12 @@ void PreferencesDialog::create_items()
         _L("Suggest auto-arrange when the build plate has a lot of free space (Advanced mode)."),
         "ai_coach_show_bed_hints");
     g_sizer->Add(item_ai_coach_bed);
+
+    auto item_bambu_connect_update = create_item_checkbox(
+        _L("Keep Bambu Connect up to date"),
+        _L("Check Bambu Lab's update server at launch and install new Bambu Connect versions automatically."),
+        "bambu_connect_auto_update");
+    g_sizer->Add(item_bambu_connect_update);
 
 #if 0
     g_sizer->Add(create_item_title(_L("Filament Grouping")), 1, wxEXPAND);

@@ -9,7 +9,7 @@
 #include "Gizmos/GLGizmoBase.hpp"
 #include "Camera.hpp"
 #include "Plater.hpp"
-#include "OllamaAssistant/OllamaActionExecutor.hpp"
+#include "Assistant/AssistantActionExecutor.hpp"
 #include "slic3r/Utils/UndoRedo.hpp"
 
 #include "libslic3r/LocalesUtils.hpp"
@@ -46,7 +46,7 @@ void notify_ai_assistant_selection_changed(const std::set<unsigned int>& current
         return;
     previous = current;
     if (wxGetApp().plater())
-        OllamaActionExecutor::notify_plater_context_changed(false);
+        AssistantActionExecutor::notify_plater_context_changed(false);
 }
 
 } // namespace

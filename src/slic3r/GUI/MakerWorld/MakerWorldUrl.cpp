@@ -1,6 +1,6 @@
 #include "MakerWorldUrl.hpp"
 
-#ifndef OLLAMA_HEADLESS_TEST
+#ifndef ASSISTANT_HEADLESS_TEST
 #include "../GUI_App.hpp"
 #endif
 
@@ -71,7 +71,7 @@ std::string absolute_makerworld_browser_url(const std::string& url_or_path)
     if (url_or_path.find("https://") == 0 || url_or_path.find("http://") == 0)
         return url_or_path;
 
-#ifdef OLLAMA_HEADLESS_TEST
+#ifdef ASSISTANT_HEADLESS_TEST
     const std::string host = "https://makerworld.com/";
 #else
     const std::string host = wxGetApp().get_model_http_url(

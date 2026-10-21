@@ -399,6 +399,9 @@ void AppConfig::set_defaults()
         set_bool("show_canvas_zoom_button", true);
     }
 
+    if (get("bambu_connect_auto_update").empty())
+        set_bool("bambu_connect_auto_update", true);
+
     if (get("remember_printer_config").empty()) {
         set_bool("remember_printer_config", true);
     }
@@ -570,7 +573,7 @@ void AppConfig::set_defaults()
 
     if (get("installed_networking").empty()) {
         // Verslicer depends on Bambu networking; stock Orca defaults off.
-        const bool verslicer = std::string(SLIC3R_APP_FULL_NAME) == "Verslicer";
+        const bool verslicer = std::string(SLIC3R_APP_FULL_NAME) == "VerSlicer";
         set_bool("installed_networking", verslicer);
     }
 

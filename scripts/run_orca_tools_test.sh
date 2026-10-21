@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build and run ORCA_TOOLS dev-utils tests (Ollama, MakerWorld, mesh, planner).
+# Build and run ORCA_TOOLS dev-utils tests (Assistant, MakerWorld, mesh, planner).
 #
 # Usage:
 #   ./scripts/run_orca_tools_test.sh stop          # stop running builds, clean PCH tmp
@@ -34,10 +34,10 @@ fi
 JOBS="${JOBS:-$(macos_default_build_jobs)}"
 
 TEST_TARGETS=(
-    ollama_assistant_test
-    ollama_pipeline_test
-    ollama_apply_golden_test
-    ollama_benchmark_test
+    assistant_test
+    assistant_pipeline_test
+    assistant_apply_golden_test
+    assistant_benchmark_test
     bambu_wiki_search_test
     makerworld_search_test
     model_search_ranker_test

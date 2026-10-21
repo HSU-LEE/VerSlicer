@@ -4,9 +4,9 @@
 #include "AICoachController.hpp"
 #include "AICoachRulesEngine.hpp"
 
-#include "../OllamaAssistant/OllamaActionPipeline.hpp"
-#include "../OllamaAssistant/OllamaAgentEventBus.hpp"
-#include "../OllamaAssistant/OllamaModelLoadAdvisor.hpp"
+#include "../Assistant/AssistantActionPipeline.hpp"
+#include "../Assistant/AssistantAgentEventBus.hpp"
+#include "../Assistant/AssistantModelLoadAdvisor.hpp"
 #include "../AIPipeline/PrintJobOrchestrator.hpp"
 
 #include "../I18N.hpp"
@@ -25,7 +25,7 @@ namespace Slic3r { namespace GUI {
 
 namespace {
 
-bool ollama_assist_active()
+bool assistant_assist_active()
 {
     if (!wxGetApp().app_config)
         return false;
@@ -95,8 +95,8 @@ bool AIGuiOrchestrator::should_enqueue_beginner_tour() const
 
 void AIGuiOrchestrator::on_model_loaded(Plater* plater)
 {
-    if (plater && ollama_assist_active())
-        OllamaModelLoadAdvisor::schedule_after_model_load(plater);
+    if (plater && assistant_assist_active())
+        AssistantModelLoadAdvisor::schedule_after_model_load(plater);
     PrintPlannerGui::dispatch_model_loaded(plater);
 }
 
@@ -110,14 +110,14 @@ void AIGuiOrchestrator::on_slice_completed(Plater* plater, const Print* print, b
         const std::string slicing_job_id = AIPipeline::PrintJobOrchestrator::current_slicing_job_id();
         if (!slicing_job_id.empty())
             payload["job_id"] = slicing_job_id;
-        OllamaAgentEventBus::instance().publish(OllamaAgentEventKind::SliceDone, std::move(payload));
+        AssistantAgentEventBus::instance().publish(AssistantAgentEventKind::SliceDone, std::move(payload));
     }
     if (!AICoachController::is_enabled_for_current_mode())
         return;
 
     if (!success && plater) {
         const std::string summary = _u8L("Slicing failed. Check model placement, supports, and wall settings.");
-        nlohmann::json apply_root = OllamaActionPipeline::build_symptom_fallback_root("slicing failed support brim", false);
+        nlohmann::json apply_root = AssistantActionPipeline::build_symptom_fallback_root("slicing failed support brim", false);
         AICoachController::instance().on_print_failure_hint(plater, summary, apply_root);
     }
     if (!plater || !success) {

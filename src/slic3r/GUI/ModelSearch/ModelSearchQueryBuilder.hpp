@@ -16,7 +16,7 @@ public:
     // Build a query from user text.
     //
     // allow_translation controls whether translate_search_query_to_english() is
-    // invoked. That helper performs a BLOCKING network (Ollama) call, so it must
+    // invoked. That helper performs a BLOCKING network (Assistant) call, so it must
     // only run on a worker thread. Callers on the main thread must pass false.
     static ModelSearchQuery build_query(const std::string& user_text, bool allow_translation = false);
 };

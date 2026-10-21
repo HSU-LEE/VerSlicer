@@ -162,8 +162,8 @@ enum class NotificationType
     BBLMixUsePLAAndPETG,
 	BBLNozzleFilamentIncompatible,
     OrcaSharedProfilesAvailable,
-	// Verslicer AI (Ollama) busy indicator on the 3D canvas
-	BBLOllamaProcessing,
+	// Verslicer AI (Assistant) busy indicator on the 3D canvas
+	BBLAssistantProcessing,
     NotificationTypeCount
 
 };
@@ -357,9 +357,9 @@ public:
 	void bbl_show_objectsinfo_notification(const std::string &text, bool is_warning, bool is_hidden);
     void bbl_close_objectsinfo_notification();
 
-	// Verslicer AI — orange-bar toast with spinning indicator while Ollama is working
-	void bbl_show_ollama_processing_notification(const std::string& text);
-	void bbl_close_ollama_processing_notification();
+	// Verslicer AI — orange-bar toast with spinning indicator while Assistant is working
+	void bbl_show_assistant_processing_notification(const std::string& text);
+	void bbl_close_assistant_processing_notification();
 
     void bbl_show_seqprintinfo_notification(const std::string &text);
     void bbl_close_seqprintinfo_notification();
@@ -772,10 +772,10 @@ private:
 		UploadJobState		m_uj_state{ UploadJobState::PB_PROGRESS };
 	};
 
-	class OllamaProcessingNotification : public PopNotification
+	class AssistantProcessingNotification : public PopNotification
 	{
 	public:
-		OllamaProcessingNotification(const NotificationData& n, NotificationIDProvider& id_provider, wxEvtHandler* evt_handler)
+		AssistantProcessingNotification(const NotificationData& n, NotificationIDProvider& id_provider, wxEvtHandler* evt_handler)
 			: PopNotification(n, id_provider, evt_handler)
 		{}
 	protected:

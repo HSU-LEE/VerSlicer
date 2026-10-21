@@ -1,6 +1,6 @@
 #include "libslic3r/libslic3r.h"
 #include "GLCanvas3D.hpp"
-#include "OllamaAssistant/OllamaVoiceInput.hpp"
+#include "Assistant/AssistantVoiceInput.hpp"
 
 #include <igl/unproject.h>
 
@@ -8744,7 +8744,7 @@ void GLCanvas3D::_render_canvas_toolbar()
         }
     }
  
-    // Ollama chat toggle (KakaoTalk-like floating chat window)
+    // Assistant chat toggle (KakaoTalk-like floating chat window)
     ImGui::Dummy({ 0, spacing.y});
 
     ImTextureID c_normal_id = m_gizmos.get_icon_texture_id(m_is_dark ? GLGizmosManager::MENU_ICON_NAME::IC_CANVAS_CHAT_DARK       : GLGizmosManager::MENU_ICON_NAME::IC_CANVAS_CHAT);
@@ -8777,10 +8777,10 @@ void GLCanvas3D::_render_canvas_toolbar()
                 if (app.is_closing() || app.mainframe == nullptr)
                     return;
 
-                if (!app.ollama_voice_input) {
-                    app.ollama_voice_input = create_ollama_voice_input();
-                    if (app.ollama_voice_input) {
-                        app.ollama_voice_input->set_on_error([](const std::string& err) {
+                if (!app.assistant_voice_input) {
+                    app.assistant_voice_input = create_assistant_voice_input();
+                    if (app.assistant_voice_input) {
+                        app.assistant_voice_input->set_on_error([](const std::string& err) {
                             wxGetApp().CallAfter([err] {
                                 if (wxGetApp().is_closing())
                                     return;
@@ -8793,7 +8793,7 @@ void GLCanvas3D::_render_canvas_toolbar()
                                 }
                             });
                         });
-                        app.ollama_voice_input->set_on_final_text([](const std::string& text) {
+                        app.assistant_voice_input->set_on_final_text([](const std::string& text) {
                             if (text.empty())
                                 return;
                             wxGetApp().CallAfter([text] {
@@ -8806,16 +8806,16 @@ void GLCanvas3D::_render_canvas_toolbar()
                     }
                 }
 
-                if (app.ollama_voice_input) {
-                    if (app.ollama_voice_input->is_listening())
-                        app.ollama_voice_input->stop();
+                if (app.assistant_voice_input) {
+                    if (app.assistant_voice_input->is_listening())
+                        app.assistant_voice_input->stop();
                     else
-                        app.ollama_voice_input->start();
+                        app.assistant_voice_input->start();
                     if (app.plater() && app.plater()->get_notification_manager()) {
                         app.plater()->get_notification_manager()->push_notification(
                             NotificationType::CustomNotification,
                             NotificationManager::NotificationLevel::RegularNotificationLevel,
-                            app.ollama_voice_input->is_listening()
+                            app.assistant_voice_input->is_listening()
                                 ? _u8L("Listening… Tap mic again when done speaking.")
                                 : _u8L("Processing voice…")
                         );

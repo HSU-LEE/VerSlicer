@@ -89,6 +89,7 @@ public:
     void    OnPaint(wxPaintEvent&);
     void    OnMotion(wxMouseEvent& event);
     void    OnLeftDown(wxMouseEvent& event);
+    void    OnRightDown(wxMouseEvent& event); // VerSlicer: "Explain with AI"
     void    OnLeaveWin(wxMouseEvent& event);
 
     void    init_ctrl_lines();

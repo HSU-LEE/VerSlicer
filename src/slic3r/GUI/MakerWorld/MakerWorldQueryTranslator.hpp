@@ -9,8 +9,8 @@ namespace Slic3r { namespace GUI {
 bool search_text_contains_cjk(const std::string& text);
 
 /**
- * Translate a MakerWorld search query to concise English keywords via Ollama.
- * Returns empty on failure, when Ollama is unavailable, or when translation is unnecessary.
+ * Translate a MakerWorld search query to concise English keywords via Assistant.
+ * Returns empty on failure, when Assistant is unavailable, or when translation is unnecessary.
  */
 std::string translate_search_query_to_english(const std::string& query);
 

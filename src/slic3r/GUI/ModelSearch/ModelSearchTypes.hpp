@@ -84,7 +84,7 @@ struct ModelSearchQuery
 {
     std::string              raw_text;          // user text as received
     std::string              normalized_text;   // boilerplate stripped keywords
-    std::string              translated_english; // optional Ollama translation (may be empty)
+    std::string              translated_english; // optional Assistant translation (may be empty)
     std::vector<std::string> variants;          // includes normalized_text at index 0 when non-empty
     bool                     contains_cjk{false};
 

@@ -189,7 +189,7 @@ GuideFrame::GuideFrame(GUI_App *pGUI, long style)
     // Bind(wxEVT_CLOSE_WINDOW, &GuideFrame::OnClose, this);
 
     // UI — load the real wizard page directly (never guide/0 "Loading……").
-    if (std::string(SLIC3R_APP_FULL_NAME) == std::string("Verslicer"))
+    if (std::string(SLIC3R_APP_FULL_NAME) == std::string("VerSlicer"))
         SetStartPage(BBL_WELCOME, true);
     else
         SetStartPage(BBL_REGION);
@@ -637,7 +637,7 @@ void GuideFrame::OnScriptMessage(wxWebViewEvent &evt)
 
             this->EndModal(wxID_OK);
 
-            if (InstallNetplugin && std::string(SLIC3R_APP_FULL_NAME) != std::string("Verslicer"))
+            if (InstallNetplugin && std::string(SLIC3R_APP_FULL_NAME) != std::string("VerSlicer"))
                 GUI::wxGetApp().CallAfter([] { GUI::wxGetApp().ShowDownNetPluginDlg(); });
         }
         else if (strCmd == "user_guide_create_printer") {
@@ -1141,7 +1141,7 @@ bool GuideFrame::run()
         if (app.preset_bundle->printers.only_default_printers()) {
             bool apply_keeped_changes = false;
             Plater* plater = app.plater();
-            if (std::string(SLIC3R_APP_FULL_NAME) == std::string("Verslicer")) {
+            if (std::string(SLIC3R_APP_FULL_NAME) == std::string("VerSlicer")) {
                 if (!BambuSmartPrintService::try_activate_bbl_printer_profile(plater)) {
                     for (const Preset& preset : app.preset_bundle->printers) {
                         if (!SlicePilot::is_bbl_printer_preset(preset, app.preset_bundle))

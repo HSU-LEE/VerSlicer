@@ -1,0 +1,35 @@
+#ifndef slic3r_AssistantModelPick_hpp_
+#define slic3r_AssistantModelPick_hpp_
+
+#include "AssistantConfig.hpp"
+
+#include <boost/algorithm/string.hpp>
+
+#include <string>
+#include <vector>
+
+namespace Slic3r { namespace GUI {
+
+inline std::string pick_installed_assistant_model(const std::vector<std::string>& models, std::string want)
+{
+    boost::trim(want);
+
+    auto exact = [&](const std::string& n) { return n == want; };
+    auto prefix = [&](const std::string& n) { return n.rfind(want + ":", 0) == 0; };
+
+    for (const auto& n : models) {
+        if (exact(n))
+            return n;
+    }
+    for (const auto& n : models) {
+        if (prefix(n))
+            return n;
+    }
+    if (!models.empty())
+        return models.front();
+    return want;
+}
+
+}} // namespace
+
+#endif

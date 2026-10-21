@@ -1,6 +1,6 @@
 #include "AICoachApplyDedup.hpp"
 
-#include "../OllamaAssistant/OllamaActionExecutor.hpp"
+#include "../Assistant/AssistantActionExecutor.hpp"
 
 #include <algorithm>
 #include <vector>
@@ -21,7 +21,7 @@ std::string AICoachApplyDedup::fingerprint_set_config(const nlohmann::json& acti
         return {};
 
     nlohmann::json options = action["options"];
-    OllamaActionExecutor::normalize_set_config_options(options);
+    AssistantActionExecutor::normalize_set_config_options(options);
 
     const std::string preset = action.value("preset", "print");
     std::vector<std::string> keys;

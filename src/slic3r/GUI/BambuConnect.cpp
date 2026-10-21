@@ -1,4 +1,5 @@
 #include "BambuConnect.hpp"
+#include "BambuConnectUpdater.hpp"
 
 #include "libslic3r/Format/bbs_3mf.hpp"
 #include "libslic3r/PresetBundle.hpp"
@@ -7,6 +8,7 @@
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "I18N.hpp"
+#include "MainFrame.hpp"
 #include "PartPlate.hpp"
 #include "Plater.hpp"
 #include "DeviceManager.hpp"
@@ -15,12 +17,18 @@
 #include <boost/log/trivial.hpp>
 
 #include <wx/msgdlg.h>
+#include <wx/richmsgdlg.h>
 #include <wx/utils.h>
 
 #include <cctype>
 #include <cstdio>
+#include <ctime>
 
 namespace Slic3r { namespace GUI { namespace BambuConnect {
+
+namespace { constexpr const char* kLanNoticeDismissedKey = "bambu_lan_mode_notice_dismissed"; }
+
+bool g_network_restriction_notice_shown = false;
 
 std::string encode_uri_component(const std::string& s)
 {
@@ -98,7 +106,11 @@ bool send_current_plate(Plater* plater)
         return false;
     }
     if (!installed()) {
-        offer_download(parent);
+        // Install it (with consent), then carry on with this print.
+        offer_install(parent, [plater](bool ok) {
+            if (ok)
+                send_current_plate(plater);
+        });
         return false;
     }
 
@@ -106,6 +118,14 @@ bool send_current_plate(Plater* plater)
     const fs::path dir = fs::path(data_dir()) / "bambu_connect";
     boost::system::error_code ec;
     fs::create_directories(dir, ec);
+    // Each print leaves a sliced copy for Bambu Connect to read; drop the ones
+    // older than a day so the folder does not grow without bound.
+    const std::time_t day_ago = std::time(nullptr) - 24 * 3600;
+    for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
+        boost::system::error_code ignore;
+        if (fs::is_regular_file(it->path(), ignore) && fs::last_write_time(it->path(), ignore) < day_ago)
+            fs::remove(it->path(), ignore);
+    }
 
     std::string name = plater->get_project_name().utf8_string();
     const int   plate_idx = plater->get_partplate_list().get_curr_plate_index();
@@ -133,26 +153,35 @@ bool send_current_plate(Plater* plater)
 
 void notify_cloud_printer_selected(wxWindow* parent, MachineObject* obj)
 {
-    if (!obj || obj->is_lan_mode_printer())
+    if (!obj || obj->is_lan_mode_printer() || g_network_restriction_notice_shown)
         return;
-    wxMessageDialog dlg(parent,
-                        wxString::Format(_L("\"%s\" is connected through your Bambu Lab account, not in LAN mode.\n\n"
-                                            "To print and control it directly from VerSlicer, on the printer's screen:\n"
-                                            "1. Open Settings > Network (WLAN) and turn on LAN Only mode.\n"
-                                            "2. Turn on Developer Mode.\n"
-                                            "3. Note the IP address and access code, then add the printer here in LAN mode.\n\n"
-                                            "Without this, print with Bambu Connect instead."),
-                                         wxString::FromUTF8(obj->get_dev_name())),
-                        _L("Turn on LAN mode and Developer Mode"), wxOK | wxICON_INFORMATION);
+    AppConfig* cfg = wxGetApp().app_config;
+    if (cfg && cfg->get_bool(kLanNoticeDismissedKey))
+        return;
+    wxRichMessageDialog dlg(parent,
+                            wxString::Format(_L("\"%s\" is connected through your Bambu Lab account, not in LAN mode.\n\n"
+                                                "To print and control it directly from VerSlicer, on the printer's screen:\n"
+                                                "1. Open Settings > Network (WLAN) and turn on LAN Only mode.\n"
+                                                "2. Turn on Developer Mode.\n"
+                                                "3. Note the IP address and access code, then add the printer here in LAN mode.\n\n"
+                                                "Without this, print with Bambu Connect instead."),
+                                             wxString::FromUTF8(obj->get_dev_name())),
+                            _L("Turn on LAN mode and Developer Mode"), wxOK | wxICON_INFORMATION);
+    dlg.ShowCheckBox(_L("Don't show this again"));
     dlg.ShowModal();
+    if (cfg && dlg.IsCheckBoxChecked()) {
+        cfg->set_bool(kLanNoticeDismissedKey, true);
+        cfg->save();
+    }
 }
 
 void open_app()
 {
-    if (installed())
-        wxExecute("open -a \"Bambu Connect\"", wxEXEC_ASYNC);
-    else
-        wxLaunchDefaultBrowser(kDownloadUrl);
+    if (!launch_installed())
+        offer_install(wxGetApp().mainframe, [](bool ok) {
+            if (ok)
+                launch_installed();
+        });
 }
 
 }}} // namespace Slic3r::GUI::BambuConnect

@@ -10,8 +10,8 @@
 #include "../GUI_App.hpp"
 #include "../GLToolbar.hpp"
 #include "../I18N.hpp"
-#include "../OllamaAssistant/OllamaAgentEventBus.hpp"
-#include "../OllamaAssistant/OllamaUserFlow.hpp"
+#include "../Assistant/AssistantAgentEventBus.hpp"
+#include "../Assistant/AssistantUserFlow.hpp"
 #include "../Plater.hpp"
 
 #include "slic3r/Utils/ICloudServiceAgent.hpp"
@@ -121,16 +121,16 @@ void schedule_slice(MakerWorldFlowUiCallbacks cb)
     }
 
     auto done   = std::make_shared<std::atomic<bool>>(false);
-    auto sub_id = std::make_shared<OllamaSubscriptionId>(0);
+    auto sub_id = std::make_shared<AssistantSubscriptionId>(0);
 
-    *sub_id = OllamaAgentEventBus::instance().subscribe([done, sub_id, cb](const OllamaAgentEvent& evt) {
-        if (evt.kind != OllamaAgentEventKind::SliceDone)
+    *sub_id = AssistantAgentEventBus::instance().subscribe([done, sub_id, cb](const AssistantAgentEvent& evt) {
+        if (evt.kind != AssistantAgentEventKind::SliceDone)
             return;
         // One-shot: guard against double-fire, then detach from the bus so this
         // handler never runs for unrelated future slices.
         if (done->exchange(true))
             return;
-        OllamaAgentEventBus::instance().unsubscribe(*sub_id);
+        AssistantAgentEventBus::instance().unsubscribe(*sub_id);
 
         const bool ok = evt.payload.value("success", false);
         post_to_ui([ok, cb]() {

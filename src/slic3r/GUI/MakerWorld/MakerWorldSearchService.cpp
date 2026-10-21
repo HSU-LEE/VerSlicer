@@ -7,7 +7,7 @@
 
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
-#include "../OllamaAssistant/AiLocale.hpp"
+#include "../Assistant/AiLocale.hpp"
 
 #include "slic3r/Utils/BBLCloudServiceAgent.hpp"
 #include "slic3r/Utils/BBLNetworkPlugin.hpp"

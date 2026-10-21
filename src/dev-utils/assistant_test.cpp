@@ -1,0 +1,170 @@
+#include "../slic3r/GUI/Assistant/AssistantActionRegistry.hpp"
+#include "../slic3r/GUI/Assistant/AssistantConfig.hpp"
+#include "../slic3r/GUI/Assistant/AssistantIntentContext.hpp"
+#include "../slic3r/GUI/Assistant/AssistantModelPick.hpp"
+#include "../slic3r/GUI/Assistant/AssistantPurposeProfiles.hpp"
+#include "../slic3r/GUI/Assistant/AssistantWeakSpots.hpp"
+#include "../slic3r/GUI/Assistant/AssistantLearningSummary.hpp"
+#include "libslic3r/BambuSmartPrint/PrintFeedback.hpp"
+#include "../slic3r/GUI/Assistant/AssistantSettingRegistry.hpp"
+#include "../slic3r/GUI/Assistant/AssistantSettingCatalogBuilder.hpp"
+
+#include <nlohmann/json.hpp>
+
+#include <cstdlib>
+#include <iostream>
+#include <string>
+#include <vector>
+
+using namespace Slic3r::GUI;
+
+static int g_failures = 0;
+
+static void expect_true(bool cond, const char* label)
+{
+    if (!cond) {
+        std::cerr << "FAIL: " << label << '\n';
+        ++g_failures;
+    }
+}
+
+static void expect_eq(const std::string& got, const std::string& want, const char* label)
+{
+    if (got != want) {
+        std::cerr << "FAIL: " << label << " got='" << got << "' want='" << want << "'\n";
+        ++g_failures;
+    }
+}
+
+int main()
+{
+    setenv("OLLAMA_AUTO_CATALOG", "1", 1);
+
+    expect_true(AssistantSettingRegistry::is_allowed_key("brim_width"), "allowed brim_width");
+    expect_true(AssistantSettingRegistry::is_allowed_key("enable_support"), "allowed enable_support");
+    expect_true(!AssistantSettingRegistry::is_allowed_key("machine_start_gcode"), "block tier3 gcode");
+    expect_true(AssistantSettingRegistry::is_allowed_key("brim_width", "print"), "brim_width print scope");
+    expect_true(!AssistantSettingRegistry::is_allowed_key("brim_width", "filament"), "brim_width not filament");
+    expect_true(AssistantSettingRegistry::is_allowed_key("retraction_length", "filament"), "retraction filament");
+    expect_true(!AssistantSettingRegistry::is_allowed_key("retraction_length", "print"), "retraction not print");
+    expect_true(AssistantSettingRegistry::is_virtual_key("enable_brim"), "enable_brim virtual");
+    expect_true(AssistantSettingCatalogBuilder::all().size() >= 80, "auto catalog size");
+
+    // Purpose profiles: every key must pass the same checks set_config does,
+    // or the review dialog would silently drop part of the profile.
+    expect_true(AssistantPurposeProfiles::all().size() >= 6, "purpose profiles present");
+    for (const auto& p : AssistantPurposeProfiles::all()) {
+        for (auto it = p.options.begin(); it != p.options.end(); ++it) {
+            const std::string label = "purpose " + p.id + " key " + it.key();
+            expect_true(AssistantSettingRegistry::is_allowed_key(it.key(), "print"), (label + " allowed").c_str());
+            expect_true(!AssistantSettingCatalogBuilder::is_restricted_key(it.key()), (label + " not restricted").c_str());
+        }
+        const auto action = AssistantPurposeProfiles::to_set_config(p.id);
+        expect_true(action && (*action)["type"] == "set_config" && (*action)["preset"] == "print",
+                    ("purpose " + p.id + " -> set_config").c_str());
+    }
+    expect_true(AssistantPurposeProfiles::find(" Functional ").has_value(), "purpose lookup trims and lowercases");
+    expect_true(!AssistantPurposeProfiles::to_set_config("spaceship").has_value(), "unknown purpose rejected");
+
+    // Weak spots: plain findings, worst first, each with a tool the model can call.
+    {
+        Slic3r::BambuSmartPrint::ModelAnalysis a;
+        a.overhang_face_ratio       = 0.4;
+        a.first_layer_contact_ratio = 0.2;
+        a.thin_feature_risk         = true;
+        const auto spots = AssistantWeakSpots::describe(a);
+        expect_true(spots.size() == 3, "weak spots: overhang, small base, thin parts");
+        expect_true(spots.size() >= 1 && spots[0]["severity"] == "high", "weak spots sorted worst first");
+        for (const auto& s : spots)
+            expect_true(s.contains("fix_tool") && s["fix_tool"].contains("tool"), "weak spot has a fix tool");
+        Slic3r::BambuSmartPrint::ModelAnalysis fine;
+        expect_true(AssistantWeakSpots::describe(fine).empty(), "no weak spots on a plain model");
+        fine.fits_bed = false; fine.bed_scale_factor = 0.5;
+        const auto big = AssistantWeakSpots::describe(fine);
+        expect_true(big.size() == 1 && big[0]["id"] == "too_big", "too big reported");
+    }
+
+    // Learning summary in plain words.
+    {
+        Slic3r::BambuSmartPrint::PrinterLearningProfile p;
+        expect_true(AssistantLearningSummary::describe(p)["empty"].get<bool>(), "empty learning");
+        p.total_prints = 10; p.successful_prints = 7; p.failed_prints = 3;
+        p.failures_by_category["adhesion"] = 2; p.failures_by_category["filament"] = 1;
+        p.setting_adjustments["bed_temperature"] = 3.f;
+        p.setting_adjustments["initial_layer_speed"] = -5.f;
+        const auto s = AssistantLearningSummary::describe(p);
+        expect_true(s["success_rate"].get<long>() == 70, "learning success rate");
+        expect_true(s["facts"].size() >= 2, "learning facts");
+        expect_true(s["facts"][1].get<std::string>().find("first layer") != std::string::npos, "top cause is adhesion");
+        expect_true(s["adjustments"].size() == 2, "learning adjustments listed");
+        expect_eq(s["adjustments"][0]["change"].get<std::string>(), "+3 °C", "bed temp change text");
+        expect_true(s["adjustments"][1]["because"].get<std::string>().find("2 time") != std::string::npos,
+                    "learned first-layer speed says why");
+        p.user_feedback["warping"] = 1; p.user_feedback["good"] = 4;
+        bool reported = false;
+        const auto with_reports = AssistantLearningSummary::describe(p);
+        for (const auto& f : with_reports["facts"])
+            reported = reported || f.get<std::string>().find("reported 1 problem") != std::string::npos;
+        expect_true(reported, "user-reported problems counted");
+    }
+
+    // Post-print feedback maps to the failure category it teaches.
+    {
+        using Slic3r::BambuSmartPrint::PrintFeedback;
+        using Slic3r::BambuSmartPrint::FailureCategory;
+        expect_true(PrintFeedback::find("warping") && PrintFeedback::find("warping")->category == FailureCategory::Adhesion,
+                    "warping is adhesion");
+        expect_true(PrintFeedback::find("stringing")->category == FailureCategory::Filament, "stringing is filament");
+        expect_true(PrintFeedback::find("other")->category == FailureCategory::Unknown, "other changes nothing");
+        expect_true(!PrintFeedback::find("good") && !PrintFeedback::find("bogus"), "good/bogus are not issues");
+        Slic3r::BambuSmartPrint::PrinterLearningProfile q;
+        expect_true(PrintFeedback::reason_for(q, "brim_width").empty(), "no reason without history");
+        expect_true(PrintFeedback::reason_for(q, "wall_loops").empty(), "unlearned key has no reason");
+        q.failures_by_category["filament"] = 3;
+        expect_true(PrintFeedback::reason_for(q, "retraction_length").find("3 time") != std::string::npos, "retraction reason");
+    }
+
+    nlohmann::json layer = 0.8;
+    expect_true(AssistantSettingRegistry::clamp_json_value("layer_height", layer), "clamp layer_height high");
+    expect_true(layer.get<double>() <= 0.6, "layer_height clamped max");
+
+    nlohmann::json density = 120;
+    AssistantSettingRegistry::clamp_json_value("sparse_infill_density", density);
+    expect_true(density.is_string() && density.get<std::string>().find('%') != std::string::npos,
+                "density clamp to percent string");
+
+    nlohmann::json temp = 400;
+    AssistantSettingRegistry::clamp_json_value("nozzle_temperature", temp);
+    expect_true(temp.is_number_integer() && temp.get<int>() <= 300, "nozzle temp clamped");
+
+    const nlohmann::json priority = AssistantSettingRegistry::build_priority_catalog(nullptr, false, 5);
+    expect_true(priority.is_array() && priority.size() == 5, "priority catalog top 5");
+
+    expect_true(AssistantActionRegistry::is_allowed_in_advisor("set_config"), "advisor set_config");
+    expect_true(!AssistantActionRegistry::is_allowed_in_advisor("scale"), "advisor blocks scale");
+
+    const std::vector<std::string> models = {"qwen2.5:3b", "mistral:latest"};
+    expect_eq(pick_installed_assistant_model(models, "unknown"), "qwen2.5:3b", "pick fallback first");
+    expect_eq(pick_installed_assistant_model({"mistral:latest", "qwen2.5:7b"}, ""),
+              "mistral:latest", "empty preference picks first account model");
+    expect_eq(normalize_assistant_model_tag("qwen2.5"), "qwen2.5:7b", "normalize model tag");
+    expect_eq(normalize_assistant_model_tag("qwen2.5:7b"), "qwen2.5:7b", "keep saved 7b tag");
+    expect_eq(normalize_assistant_model_tag(""), "", "empty model uses account selection");
+
+    expect_true(assistant_recommended_brim_width_mm(15.0, 15.0) == 8.0, "small footprint wide brim");
+    expect_true(assistant_recommended_brim_width_mm(50.0, 50.0) == 5.0, "medium footprint default brim");
+    expect_true(assistant_recommended_brim_width_mm(100.0, 100.0) == 3.0, "large footprint narrow brim");
+
+    expect_true(assistant_selection_is_tall_narrow(10.0, 10.0, 35.0), "tall narrow ratio");
+    expect_true(!assistant_selection_is_tall_narrow(50.0, 50.0, 80.0), "not tall narrow");
+
+    expect_true(AssistantIntentContext::clamp_filament_index(-1, 4) == 0, "filament idx clamp low");
+    expect_true(AssistantIntentContext::clamp_filament_index(9, 4) == 3, "filament idx clamp high");
+
+    if (g_failures == 0) {
+        std::cout << "ollama_assistant_test: all passed\n";
+        return EXIT_SUCCESS;
+    }
+    std::cerr << "ollama_assistant_test: " << g_failures << " failure(s)\n";
+    return EXIT_FAILURE;
+}

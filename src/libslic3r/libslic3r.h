@@ -2,8 +2,8 @@
 #define _libslic3r_h_
 
 #include "libslic3r_version.h"
-#define SLIC3R_APP_FULL_NAME "Verslicer"
-#define GCODEVIEWER_APP_NAME "Verslicer G-code Viewer"
+#define SLIC3R_APP_FULL_NAME "VerSlicer"
+#define GCODEVIEWER_APP_NAME "VerSlicer G-code Viewer"
 #define GCODEVIEWER_APP_KEY  "VerslicerGcodeViewer"
 #define GCODEVIEWER_BUILD_ID std::string(SLIC3R_APP_NAME) + std::string(" G-code Viewer-") + std::string(SLIC3R_VERSION) + std::string("-RC")
 
