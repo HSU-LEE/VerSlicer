@@ -71,6 +71,13 @@ const std::vector<nlohmann::json>& tool_defs()
                  "common failure cause, settings it adjusted). Use it when the user asks what VerSlicer knows about "
                  "their printer, or why a suggestion changed.",
                  obj_schema({})),
+        tool_def("report_print_result",
+                 "Record how the last finished print came out when the user tells you (good, or what went wrong), "
+                 "so Smart Print learns from it for this printer. Only when the user describes a real print result.",
+                 obj_schema({{"result", {{"type", "string"},
+                                         {"enum", {"good", "first_layer_lifted", "warping", "stringing", "layer_shift",
+                                                   "rough_walls", "other"}}}}},
+                            nlohmann::json::array({"result"}))),
         tool_def("set_purpose",
                  "Set the print up for what it is for, when the user describes the use instead of settings "
                  "(a toy, a bracket, a vase, a quick fit test, a gift). Applies a fixed, reviewed set of print "
@@ -180,6 +187,13 @@ AssistantNormalizedTool AssistantToolGateway::normalize(const std::string& name,
             out.action["enable"] = args["enable"];
     } else if (name == "what_was_learned") {
         out.action = {{"type", "what_was_learned"}};
+    } else if (name == "report_print_result") {
+        const std::string result = args.value("result", "");
+        if (result.empty()) {
+            out.error = "report_print_result requires result";
+            return out;
+        }
+        out.action = {{"type", "report_print_result"}, {"result", result}};
     } else if (name == "show_weak_spots") {
         out.action = {{"type", "show_weak_spots"}};
     } else if (name == "set_purpose") {

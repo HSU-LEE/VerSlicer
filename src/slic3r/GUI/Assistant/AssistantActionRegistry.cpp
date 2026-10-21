@@ -19,6 +19,7 @@ const AssistantActionTypeSpec kActionTypes[] = {
     {"set_config", true, true, true, "Change print/filament/printer preset options"},
     {"camera_watch", true, false, false, "Report or turn on the printer's camera failure checks (user must allow)"},
     {"what_was_learned", true, true, true, "Read what Smart Print learned about the current printer"},
+    {"report_print_result", true, false, false, "Record how a finished print came out, for learning"},
     {"show_weak_spots", true, true, true, "Show where the models are likely to fail, on the 3D view"},
     {"translate", true, true, true, "Move selection on the bed"},
     {"rotate", true, true, true, "Rotate selection"},

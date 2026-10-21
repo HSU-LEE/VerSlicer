@@ -1790,6 +1790,7 @@ const std::unordered_map<std::string, ActionHandler>& action_handlers()
         h["show_weak_spots"]  = AssistantWeakSpots::apply;
         h["what_was_learned"] = AssistantLearningSummary::apply;
         h["camera_watch"]     = AssistantCameraWatch::apply;
+        h["report_print_result"] = AssistantLearningSummary::report_result;
         h["ui_select_tab"]    = apply_ui_select_tab;
         h["open_calibration"] = [](const nlohmann::json&) { return apply_open_calibration(); };
         h["delete_selection"] = [](const nlohmann::json&) { return apply_delete_selection(); };

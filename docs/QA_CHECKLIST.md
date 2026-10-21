@@ -56,3 +56,38 @@ Run on a **Release** build installed from the DMG, on a Mac that has not run Ver
 ## Local MCP server (optional)
 - [ ] Off by default: nothing listening on 127.0.0.1:8765.
 - [ ] With `"mcp_server": "true"`: `~/Library/Application Support/verslicer/mcp.json` is `-rw-------`.
+
+## Smart Print tools via chat (needs ChatGPT)
+- [ ] Load a model. "아이가 가지고 놀 장난감 뽑을래" → review dialog headed "Expected effect: …", reason mentions the toy purpose; **Apply** changes walls/infill.
+- [ ] "이거 잘 뽑힐까?" → overhangs turn red on the 3D view, the worst model is selected, the reply lists problems with a fix for each.
+- [ ] "내 프린터에 대해 뭘 배웠어?" → success rate and adjustments, each adjustment with "because …"; nothing changes.
+- [ ] Right-click a setting label in the Process tab → **Explain with AI** → the chat explains that setting.
+- [ ] Smart Print menu → **Undo last AI change** → the last applied change is reverted.
+
+## Camera watch (needs a Bambu printer with a camera)
+- [ ] "카메라 감시 켜져 있어?" → lists each check as on/off/not supported; nothing changes, no consent dialog.
+- [ ] LAN + Developer Mode: "출력 중에 카메라로 감시해줘" → consent dialog → **Allow** → within ~15 s the chat says the printer confirmed. Device tab → camera settings show the checks on.
+- [ ] Cloud printer: same request → after ~15 s the chat explains the cloud ignores it (no false "done").
+
+## Learning from print results (needs a print that finishes)
+- [ ] Print finishes → notification "Print finished. Tell VerSlicer how it came out…" with **How did it come out?**
+- [ ] Click it → choose **It came out well** → "Recorded as a good print".
+- [ ] Next print: choose **Corners lifted or warped** → notification names what changes next time (e.g. slower first layer, warmer bed, wider brim).
+- [ ] Smart Print → **What VerSlicer learned…** → success rate dropped by one print; "You reported 1 problem(s)…"; adjustments show "because the first layer came loose 1 time(s)".
+- [ ] Smart Print quick apply on a new plate → the review lists the learned change with "Learned from this printer: …".
+- [ ] In chat: "아까 출력 실이 엄청 늘어졌어" → the AI records it (stringing) and says retraction will go up.
+
+## Live AI accuracy (needs ChatGPT; ~20 minutes)
+The golden cases in `src/dev-utils/eval/assistant_cases.json` say which tool each request must use. To measure the real model:
+
+```bash
+./scripts/assistant_live_eval.sh start
+```
+
+This writes the requests to `build/assistant_eval_requests.txt` and starts the dev build with `VERSLICER_EVAL_LOG` set. With a model on the plate, paste each request into the chat in **Apply** mode, pressing **New chat** between requests and **Cancel** on every review dialog. Then:
+
+```bash
+./scripts/assistant_live_eval.sh grade
+```
+
+It prints the pass rate per model and each failed case with the reason. Record the result in the release notes; investigate any case that fails twice in a row.

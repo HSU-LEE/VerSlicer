@@ -1,6 +1,7 @@
 #include "PrinterLearningStore.hpp"
 #include "BambuSmartPrintPaths.hpp"
 #include "ConfigOptionRead.hpp"
+#include "PrintFeedback.hpp"
 
 #include "nlohmann/json.hpp"
 
@@ -132,6 +133,10 @@ void PrinterLearningStore::load(std::vector<std::string>* load_errors)
             if (v.contains("failures_by_category"))
                 for (auto fc = v["failures_by_category"].begin(); fc != v["failures_by_category"].end(); ++fc)
                     p.failures_by_category[fc.key()] = fc.value().get<int>();
+            if (v.contains("user_feedback") && v["user_feedback"].is_object())
+                for (auto uf = v["user_feedback"].begin(); uf != v["user_feedback"].end(); ++uf)
+                    if (uf.value().is_number_integer())
+                        p.user_feedback[uf.key()] = uf.value().get<int>();
             if (v.contains("setting_adjustments"))
                 for (auto sa = v["setting_adjustments"].begin(); sa != v["setting_adjustments"].end(); ++sa)
                     p.setting_adjustments[sa.key()] = sa.value().get<float>();
@@ -196,6 +201,7 @@ bool PrinterLearningStore::save()
         v["last_failure_ms"]   = p.last_failure_ms;
         v["last_success_ms"]   = p.last_success_ms;
         v["failures_by_category"] = p.failures_by_category;
+        v["user_feedback"]        = p.user_feedback;
         v["setting_adjustments"]  = p.setting_adjustments;
         v["category_bias_paused"] = p.category_bias_paused;
         v["applied_learning_count"] = p.applied_learning_count;
@@ -442,6 +448,35 @@ void PrinterLearningStore::record_success(const std::string& printer_id)
         p.last_applied_setting_keys.clear();
     }
     save();
+}
+
+bool PrinterLearningStore::record_print_feedback(const std::string& printer_id, const std::string& issue_id,
+                                                 const DynamicPrintConfig& config)
+{
+    const PrintFeedbackIssue* issue = issue_id == "good" ? nullptr : PrintFeedback::find(issue_id);
+    if (issue_id != "good" && !issue)
+        return false;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        PrinterLearningProfile& p = m_profiles[printer_id];
+        p.printer_id = printer_id;
+        ++p.user_feedback[issue_id];
+        if (issue) {
+            // The printer counted it as a success; the user says otherwise.
+            if (p.successful_prints > 0) {
+                --p.successful_prints;
+                ++p.failed_prints;
+            }
+            if (issue->category != FailureCategory::Unknown) {
+                ++p.failures_by_category[category_key(issue->category)];
+                p.last_failure_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::system_clock::now().time_since_epoch()).count();
+                apply_category_bias(p, issue->category, config);
+            }
+        }
+    }
+    save();
+    return true;
 }
 
 static bool category_paused(const PrinterLearningProfile& p, FailureCategory cat)

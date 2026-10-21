@@ -193,6 +193,7 @@ struct PrinterLearningProfile {
     int successful_prints{ 0 };
     int failed_prints{ 0 };
     std::map<std::string, int> failures_by_category;
+    std::map<std::string, int> user_feedback; // issue id (or "good") -> times the user reported it
     std::map<std::string, float> setting_adjustments; // key -> bias offset
     std::map<std::string, bool> category_bias_paused;   // category_key -> skip bias bumps
     std::map<std::string, int> setting_attribution_positive;

@@ -21,6 +21,9 @@ class AssistantLearningSummary
 public:
     /** Pure. {"prints", "succeeded", "success_rate", "facts": [..],
      *  "adjustments": [{key, what, change}], "empty": bool} — English text. */
+    /** {"type":"report_print_result","result":"good"|issue id}: the user's verdict on the last print. */
+    static AssistantActionResult report_result(const nlohmann::json& action);
+
     static nlohmann::json describe(const BambuSmartPrint::PrinterLearningProfile& p);
 
     /** Printer the learning applies to now (selected device, or "local"). */

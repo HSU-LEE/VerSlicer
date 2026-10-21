@@ -35,6 +35,8 @@ std::vector<AssistantEvalCase> AssistantEvalGrader::parse_cases(const nlohmann::
         c.expect_actions = string_list(j, "expect_actions");
         c.expect_keys    = string_list(j, "expect_keys");
         c.forbid_actions = string_list(j, "forbid_actions");
+        if (j.contains("expect_fields") && j["expect_fields"].is_object())
+            c.expect_fields = j["expect_fields"];
         if (!c.id.empty() && !c.request.empty())
             cases.push_back(std::move(c));
     }
@@ -69,6 +71,23 @@ AssistantEvalVerdict AssistantEvalGrader::grade(const AssistantEvalCase& c, cons
     for (const std::string& k : c.expect_keys)
         if (!keys.count(k))
             return {false, "missing set_config key " + k};
+    if (!c.expect_fields.empty()) {
+        bool found = false;
+        if (root.contains("actions") && root["actions"].is_array())
+            for (const auto& a : root["actions"]) {
+                if (!a.is_object())
+                    continue;
+                bool all = true;
+                for (auto it = c.expect_fields.begin(); it != c.expect_fields.end() && all; ++it)
+                    all = a.contains(it.key()) && a[it.key()] == it.value();
+                if (all) {
+                    found = true;
+                    break;
+                }
+            }
+        if (!found)
+            return {false, "no action with " + c.expect_fields.dump()};
+    }
     for (const std::string& t : c.forbid_actions)
         if (types.count(t))
             return {false, "forbidden action " + t};

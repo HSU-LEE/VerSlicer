@@ -3,6 +3,7 @@
 #include "../UiDispatch.hpp"
 #include "BambuSmartPrintPanel.hpp"
 #include "FirstPrintExperience.hpp"
+#include "PrintFeedbackPrompt.hpp"
 #include "PrintReadinessGate.hpp"
 #include "SlicePilotNetworkSetup.hpp"
 #include "SlicePilotOnboardingCoordinator.hpp"
@@ -51,6 +52,7 @@
 #include "libslic3r/BambuSmartPrint/PlateBatchPlanner.hpp"
 #include "libslic3r/BambuSmartPrint/SmartPrintReportExporter.hpp"
 #include "libslic3r/BambuSmartPrint/PrinterLearningStore.hpp"
+#include "libslic3r/BambuSmartPrint/PrintFeedback.hpp"
 #include "libslic3r/BambuSmartPrint/SliceGeometryAnalyzer.hpp"
 #include "libslic3r/BambuSmartPrint/BambuSmartPrintPaths.hpp"
 #include "libslic3r/BambuSmartPrint/SafeModeGuard.hpp"
@@ -70,6 +72,7 @@
 #include <wx/msgdlg.h>
 #include <wx/filedlg.h>
 #include <algorithm>
+#include <boost/format.hpp>
 #include <chrono>
 #include <atomic>
 #include <boost/log/trivial.hpp>
@@ -141,6 +144,25 @@ bool prepare_plate_workflow(Plater* plater, PresetBundle* bundle, PreparedPlateW
     out.prediction = BambuSmartPrint::SuccessPredictor::predict(
         out.printer_id, out.mesh, out.proposed, learning, slice_ptr);
     out.change_count = BambuSmartPrint::ConfigSnapshot::diff(out.base, out.proposed).size();
+
+    // Say why a learned adjustment is there, so the review shows "the first
+    // layer came loose 2 times" next to the slower first layer.
+    for (const char* key : {"initial_layer_speed", "bed_temperature", "brim_width", "retraction_length", "outer_wall_speed"}) {
+        const std::string why = BambuSmartPrint::PrintFeedback::reason_for(learning, key);
+        if (why.empty() || !out.base.has(key) || !out.proposed.has(key))
+            continue;
+        const std::string before = out.base.opt_serialize(key);
+        const std::string after  = out.proposed.opt_serialize(key);
+        if (before == after)
+            continue;
+        const std::string line = (boost::format(_u8L("Learned from this printer: %1%.")) % why).str();
+        auto it = std::find_if(out.auto_result.changes.begin(), out.auto_result.changes.end(),
+                               [key](const BambuSmartPrint::SettingChange& c) { return c.key == key; });
+        if (it == out.auto_result.changes.end())
+            out.auto_result.changes.push_back({key, before, after, line});
+        else
+            it->reason = it->reason.empty() ? line : it->reason + " " + line;
+    }
     return true;
 }
 
@@ -1838,14 +1860,10 @@ void BambuSmartPrintService::handle_print_success(MachineObject* obj)
     refresh_all_panels();
 
     Plater* plater = wxGetApp().plater();
-    if (plater && plater->get_notification_manager()) {
-        wxString name = obj->get_dev_name().empty() ? wxString::FromUTF8(obj->get_dev_id())
-                                                    : wxString::FromUTF8(obj->get_dev_name());
-        plater->get_notification_manager()->push_notification(
-            NotificationType::CustomNotification,
-            NotificationManager::NotificationLevel::RegularNotificationLevel,
-            std::string(wxString::Format(
-                _L("Print finished successfully on %s — recorded for Smart Print learning."), name).utf8_str()));
+    {
+        const std::string printer_id = obj->get_dev_id();
+        const std::string job        = obj->subtask_name.empty() ? obj->m_gcode_file : obj->subtask_name;
+        post_to_ui([printer_id, job, cfg]() { PrintFeedbackPrompt::offer(printer_id, job, cfg); });
     }
 
     if (plater && AICoachController::is_enabled_for_current_mode()) {

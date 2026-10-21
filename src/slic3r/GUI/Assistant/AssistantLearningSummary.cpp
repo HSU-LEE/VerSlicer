@@ -1,6 +1,8 @@
 #include "AssistantLearningSummary.hpp"
 #include "AiCatalog.hpp"
 
+#include "libslic3r/BambuSmartPrint/PrintFeedback.hpp"
+
 #ifndef ASSISTANT_HEADLESS_TEST
 #include "libslic3r/BambuSmartPrint/PrinterLearningStore.hpp"
 
@@ -81,6 +83,12 @@ nlohmann::json AssistantLearningSummary::describe(const BambuSmartPrint::Printer
     if (!p.pending_learning.empty())
         facts.push_back((boost::format(ai_catalog_text("%1% lesson(s) are waiting for your approval in Smart Print.")) %
                          p.pending_learning.size()).str());
+    int reported = 0;
+    for (const auto& [id, n] : p.user_feedback)
+        if (id != "good")
+            reported += n;
+    if (reported > 0)
+        facts.push_back((boost::format(ai_catalog_text("You reported %1% problem(s) after prints finished.")) % reported).str());
     if (p.helpful_learning_count > 0)
         facts.push_back((boost::format(ai_catalog_text("You marked %1% suggestion(s) as helpful.")) % p.helpful_learning_count).str());
     out["facts"] = facts;
@@ -92,7 +100,8 @@ nlohmann::json AssistantLearningSummary::describe(const BambuSmartPrint::Printer
             continue;
         adjustments.push_back({{"key", k.key}, {"what", ai_catalog_text(k.what)},
                                {"change", k.key == std::string("brim_width") ? (boost::format("%.0f mm") % it->second).str()
-                                                                             : signed_value(it->second, k.unit)}});
+                                                                             : signed_value(it->second, k.unit)},
+                               {"because", BambuSmartPrint::PrintFeedback::reason_for(p, k.key)}});
     }
     out["adjustments"] = adjustments;
     return out;
@@ -124,7 +133,11 @@ void AssistantLearningSummary::show_dialog(wxWindow* parent)
             text << "\n" << _L("Adjusted for this printer:") << "\n";
             for (const auto& a : s["adjustments"])
                 text << "• " << wxString::FromUTF8(a["what"].get<std::string>()) << ": "
-                     << wxString::FromUTF8(a["change"].get<std::string>()) << "\n";
+                     << wxString::FromUTF8(a["change"].get<std::string>())
+                     << (a["because"].get<std::string>().empty()
+                             ? wxString()
+                             : " (" + wxString::Format(_L("because %s"), wxString::FromUTF8(a["because"].get<std::string>())) + ")")
+                     << "\n";
         }
         text << "\n" << _L("These are applied to Smart Print suggestions for this printer. Clear them in Smart Print → Privacy and data.");
     }
@@ -138,6 +151,21 @@ AssistantActionResult AssistantLearningSummary::apply(const nlohmann::json& /*ac
     AssistantActionResult r;
     r.success = true;
     r.message = describe(profile).dump();
+    return r;
+}
+
+AssistantActionResult AssistantLearningSummary::report_result(const nlohmann::json& action)
+{
+    AssistantActionResult r;
+    const std::string result = action.value("result", "");
+    const std::string printer = current_printer_id();
+    auto& store = BambuSmartPrint::PrinterLearningStore::instance();
+    if (!store.record_print_feedback(printer, result, DynamicPrintConfig())) {
+        r.message = "Unknown result. Use good, first_layer_lifted, warping, stringing, layer_shift, rough_walls or other.";
+        return r;
+    }
+    r.success = true;
+    r.message = nlohmann::json{{"recorded", result}, {"learning_now", describe(store.get_profile(printer))}}.dump();
     return r;
 }
 

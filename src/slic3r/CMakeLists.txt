@@ -46,6 +46,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/BBLStatusBarSend.hpp
     GUI/BBLTopbar.cpp
     GUI/BBLTopbar.hpp
+    GUI/BambuSmartPrint/PrintFeedbackPrompt.cpp
+    GUI/BambuSmartPrint/PrintFeedbackPrompt.hpp
     GUI/BambuSmartPrint/BambuSmartPrintCompareDialog.cpp
     GUI/BambuSmartPrint/BambuSmartPrintCompareDialog.hpp
     GUI/BambuSmartPrint/BambuSmartPrintDeviceSummary.cpp

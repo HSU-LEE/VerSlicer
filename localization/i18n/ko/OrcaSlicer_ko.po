@@ -29481,3 +29481,84 @@ msgstr "거칠어짐"
 
 msgid "better"
 msgstr "좋아짐"
+
+msgid "The first layer came loose"
+msgstr "첫 층이 떨어졌어요"
+
+msgid "Corners lifted or warped"
+msgstr "모서리가 들뜨거나 휘었어요"
+
+msgid "Strings or blobs between parts"
+msgstr "실이 늘어지거나 덩어리가 생겼어요"
+
+msgid "Layers shifted sideways"
+msgstr "층이 옆으로 밀렸어요"
+
+msgid "Rough or wavy walls"
+msgstr "벽면이 거칠거나 울퉁불퉁해요"
+
+msgid "Something else"
+msgstr "기타 문제"
+
+msgid "the printer reported temperature faults %1% time(s)"
+msgstr "프린터가 온도 오류를 %1%번 보고했기"
+
+msgid "the first layer came loose %1% time(s)"
+msgstr "첫 층이 %1%번 떨어졌기"
+
+msgid "there was stringing or a filament problem %1% time(s)"
+msgstr "실 늘어짐이나 필라멘트 문제가 %1%번 있었기"
+
+msgid "layers shifted or walls came out rough %1% time(s)"
+msgstr "층 밀림이나 거친 벽면이 %1%번 있었기"
+
+msgid "Learned from this printer: %1%."
+msgstr "이 프린터에서 배운 점: %1% 때문입니다."
+
+msgid "slower first layer"
+msgstr "더 느린 첫 층"
+
+msgid "warmer bed"
+msgstr "더 높은 베드 온도"
+
+msgid "wider brim"
+msgstr "더 넓은 브림"
+
+msgid "more retraction"
+msgstr "더 긴 리트랙션"
+
+msgid "slower outer walls"
+msgstr "더 느린 외벽"
+
+msgid "Print finished. Tell VerSlicer how it came out so the next one is better."
+msgstr "출력이 끝났습니다. 결과를 알려주시면 다음 출력이 더 좋아집니다."
+
+msgid "How did it come out?"
+msgstr "결과가 어땠나요?"
+
+msgid "It came out well"
+msgstr "잘 나왔어요"
+
+msgid "How did the print come out?"
+msgstr "출력 결과가 어땠나요?"
+
+msgid "How did \"%s\" come out?"
+msgstr "\"%s\" 출력 결과가 어땠나요?"
+
+msgid "Print result"
+msgstr "출력 결과"
+
+msgid "Thanks. Recorded as a good print for this printer."
+msgstr "감사합니다. 이 프린터의 성공한 출력으로 기록했습니다."
+
+msgid "Recorded. Next time Smart Print will suggest a %s for this printer, and the review will say it was learned from this print."
+msgstr "기록했습니다. 다음부터 Smart Print가 이 프린터에 %s 설정을 제안하고, 검토 창에 이번 출력에서 배운 것이라고 표시합니다."
+
+msgid "Recorded. This problem does not change settings by itself; it counts toward this printer's history, which the assistant reads."
+msgstr "기록했습니다. 이 문제는 설정을 직접 바꾸지는 않지만, 어시스턴트가 참고하는 이 프린터의 기록에 반영됩니다."
+
+msgid "You reported %1% problem(s) after prints finished."
+msgstr "출력이 끝난 뒤 문제를 %1%번 알려주셨습니다."
+
+msgid "because %s"
+msgstr "%s 때문"

@@ -622,6 +622,327 @@
     "printer_control"
    ],
    "expect_keys": []
+  },
+  {
+   "id": "purpose_toy_ko",
+   "request": "아이가 가지고 놀 장난감 뽑을래",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "purpose": "toy"
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "purpose_toy_en",
+   "request": "This is a toy for my kid",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "purpose": "toy"
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "purpose_functional_ko",
+   "request": "선반 받침대로 쓸 부품이야, 튼튼해야 해",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "purpose": "functional"
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "purpose_functional_en",
+   "request": "It's a bracket that has to hold weight",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "purpose": "functional"
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "purpose_vase_ko",
+   "request": "꽃병으로 쓸 거야",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "purpose": "vase"
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "purpose_vase_en",
+   "request": "Print this as a vase",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "purpose": "vase"
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "purpose_prototype_ko",
+   "request": "크기만 맞는지 빨리 확인하고 싶어",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "purpose": "prototype"
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "purpose_prototype_en",
+   "request": "Just a quick fit test, speed matters",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "purpose": "prototype"
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "purpose_gift_ko",
+   "request": "친구 선물이라 예쁘게 나와야 해",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "purpose": "gift"
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "purpose_decorative_en",
+   "request": "It's a decorative figure for my shelf",
+   "expect_actions": [
+    "set_config"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "purpose": "decorative"
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "weak_spots_ko",
+   "request": "이거 잘 뽑힐까?",
+   "expect_actions": [
+    "show_weak_spots"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "send_print",
+    "set_config"
+   ]
+  },
+  {
+   "id": "weak_spots_en",
+   "request": "Will this print well?",
+   "expect_actions": [
+    "show_weak_spots"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "send_print",
+    "set_config"
+   ]
+  },
+  {
+   "id": "weak_spots_where_ko",
+   "request": "어디가 실패할 것 같아?",
+   "expect_actions": [
+    "show_weak_spots"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "learned_ko",
+   "request": "내 프린터에 대해 뭘 배웠어?",
+   "expect_actions": [
+    "what_was_learned"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "send_print",
+    "set_config"
+   ]
+  },
+  {
+   "id": "learned_en",
+   "request": "What has VerSlicer learned about my printer?",
+   "expect_actions": [
+    "what_was_learned"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "send_print",
+    "set_config"
+   ]
+  },
+  {
+   "id": "learned_why_ko",
+   "request": "왜 첫 층 속도가 바뀌었어?",
+   "expect_actions": [
+    "what_was_learned"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "camera_status_ko",
+   "request": "카메라 감시 켜져 있어?",
+   "expect_actions": [
+    "camera_watch"
+   ],
+   "expect_keys": [],
+   "forbid_actions": [
+    "send_print",
+    "printer_control"
+   ]
+  },
+  {
+   "id": "camera_on_ko",
+   "request": "출력 중에 카메라로 감시해줘",
+   "expect_actions": [
+    "camera_watch"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "enable": true
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "camera_on_en",
+   "request": "Watch the print with the camera and alert me if it fails",
+   "expect_actions": [
+    "camera_watch"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "enable": true
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "feedback_lifted_ko",
+   "request": "아까 출력 첫 층이 떨어졌어",
+   "expect_actions": [
+    "report_print_result"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "result": "first_layer_lifted"
+   },
+   "forbid_actions": [
+    "send_print",
+    "printer_control"
+   ]
+  },
+  {
+   "id": "feedback_warping_en",
+   "request": "The last print's corners warped up",
+   "expect_actions": [
+    "report_print_result"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "result": "warping"
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "feedback_stringing_ko",
+   "request": "방금 뽑은 거 실이 엄청 늘어졌어",
+   "expect_actions": [
+    "report_print_result"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "result": "stringing"
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "feedback_good_ko",
+   "request": "지난 출력 완벽하게 나왔어",
+   "expect_actions": [
+    "report_print_result"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "result": "good"
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
+  },
+  {
+   "id": "feedback_shift_en",
+   "request": "My last print had a layer shift halfway",
+   "expect_actions": [
+    "report_print_result"
+   ],
+   "expect_keys": [],
+   "expect_fields": {
+    "result": "layer_shift"
+   },
+   "forbid_actions": [
+    "send_print"
+   ]
   }
  ]
 }

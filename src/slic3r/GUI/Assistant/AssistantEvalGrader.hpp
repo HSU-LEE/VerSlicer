@@ -17,6 +17,7 @@ struct AssistantEvalCase
     std::vector<std::string> expect_actions;  // every listed type must appear
     std::vector<std::string> expect_keys;     // every listed set_config option key must appear
     std::vector<std::string> forbid_actions;  // none of these types may appear
+    nlohmann::json           expect_fields = nlohmann::json::object(); // one action must carry all these fields
 };
 
 struct AssistantEvalVerdict

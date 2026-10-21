@@ -71,6 +71,13 @@ int main()
                 "grade forbidden action");
     expect_true(!AssistantEvalGrader::grade(infill, "I changed the infill for you.").pass, "grade prose only");
 
+    AssistantEvalCase toy{"toy", "toy", {"set_config"}, {}, {}};
+    toy.expect_fields = {{"purpose", "toy"}};
+    expect_true(AssistantEvalGrader::grade(toy, R"({"actions":[{"type":"set_config","purpose":"toy","options":{"wall_loops":3}}]})").pass,
+                "grade expect_fields pass");
+    expect_true(!AssistantEvalGrader::grade(toy, R"({"actions":[{"type":"set_config","purpose":"vase","options":{"wall_loops":3}}]})").pass,
+                "grade expect_fields wrong value");
+
     AssistantEvalCase brim{"b", "brim", {}, {}, {}};
     AssistantEvalCase no_brim{"nb", "no brim", {}, {}, {}};
     const std::vector<AssistantEvalCase> overlap{brim, no_brim};
@@ -144,6 +151,13 @@ int main()
     expect_true(AssistantFailureDoctor::area_for_code("0500-4001").setting_keys.empty(), "doctor mainboard has no settings");
     expect_true(AssistantFailureDoctor::area_for_code("").area == "unknown", "doctor empty code");
     expect_true(AssistantFailureDoctor::printer_diagnostics_json().is_object(), "doctor headless json");
+
+    // ASSISTANT_EVAL_LIST=1: print the requests to type into the app for a live run.
+    if (std::getenv("ASSISTANT_EVAL_LIST")) {
+        for (const auto& c : cases)
+            std::cout << c.request << '\n';
+        return EXIT_SUCCESS;
+    }
 
     if (const char* log_path = std::getenv("ASSISTANT_EVAL_LOG")) {
         std::ifstream log(log_path);

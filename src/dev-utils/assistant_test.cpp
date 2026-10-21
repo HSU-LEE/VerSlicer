@@ -5,6 +5,7 @@
 #include "../slic3r/GUI/Assistant/AssistantPurposeProfiles.hpp"
 #include "../slic3r/GUI/Assistant/AssistantWeakSpots.hpp"
 #include "../slic3r/GUI/Assistant/AssistantLearningSummary.hpp"
+#include "libslic3r/BambuSmartPrint/PrintFeedback.hpp"
 #include "../slic3r/GUI/Assistant/AssistantSettingRegistry.hpp"
 #include "../slic3r/GUI/Assistant/AssistantSettingCatalogBuilder.hpp"
 
@@ -97,6 +98,30 @@ int main()
         expect_true(s["facts"][1].get<std::string>().find("first layer") != std::string::npos, "top cause is adhesion");
         expect_true(s["adjustments"].size() == 2, "learning adjustments listed");
         expect_eq(s["adjustments"][0]["change"].get<std::string>(), "+3 °C", "bed temp change text");
+        expect_true(s["adjustments"][1]["because"].get<std::string>().find("2 time") != std::string::npos,
+                    "learned first-layer speed says why");
+        p.user_feedback["warping"] = 1; p.user_feedback["good"] = 4;
+        bool reported = false;
+        const auto with_reports = AssistantLearningSummary::describe(p);
+        for (const auto& f : with_reports["facts"])
+            reported = reported || f.get<std::string>().find("reported 1 problem") != std::string::npos;
+        expect_true(reported, "user-reported problems counted");
+    }
+
+    // Post-print feedback maps to the failure category it teaches.
+    {
+        using Slic3r::BambuSmartPrint::PrintFeedback;
+        using Slic3r::BambuSmartPrint::FailureCategory;
+        expect_true(PrintFeedback::find("warping") && PrintFeedback::find("warping")->category == FailureCategory::Adhesion,
+                    "warping is adhesion");
+        expect_true(PrintFeedback::find("stringing")->category == FailureCategory::Filament, "stringing is filament");
+        expect_true(PrintFeedback::find("other")->category == FailureCategory::Unknown, "other changes nothing");
+        expect_true(!PrintFeedback::find("good") && !PrintFeedback::find("bogus"), "good/bogus are not issues");
+        Slic3r::BambuSmartPrint::PrinterLearningProfile q;
+        expect_true(PrintFeedback::reason_for(q, "brim_width").empty(), "no reason without history");
+        expect_true(PrintFeedback::reason_for(q, "wall_loops").empty(), "unlearned key has no reason");
+        q.failures_by_category["filament"] = 3;
+        expect_true(PrintFeedback::reason_for(q, "retraction_length").find("3 time") != std::string::npos, "retraction reason");
     }
 
     nlohmann::json layer = 0.8;
