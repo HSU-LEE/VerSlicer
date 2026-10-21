@@ -1,4 +1,5 @@
 #include "libslic3r/BambuSmartPrint/PrintGoalParser.hpp"
+#include "libslic3r/BambuSmartPrint/ChangeEffects.hpp"
 #include "libslic3r/BambuSmartPrint/PrintPlanner.hpp"
 #include "libslic3r/PrintConfig.hpp"
 
@@ -33,6 +34,18 @@ static PlateContext minimal_plate_context()
 
 int main()
 {
+    {
+        using Slic3r::BambuSmartPrint::ChangeEffects;
+        using Slic3r::BambuSmartPrint::SettingChange;
+        const auto stronger = ChangeEffects::estimate({{"wall_loops", "2", "4", ""}, {"sparse_infill_density", "15%", "35%", ""}});
+        expect_true(stronger.strength > 0 && stronger.time > 0 && stronger.filament > 0, "more walls and infill: stronger, longer, more");
+        const auto finer = ChangeEffects::estimate({{"layer_height", "0.2", "0.12", ""}});
+        expect_true(finer.surface > 0 && finer.time > 0, "thinner layers: smoother, longer");
+        const auto brim = ChangeEffects::estimate({{"brim_type", "no_brim", "outer_only", ""}});
+        expect_true(brim.adhesion > 0, "brim improves adhesion");
+        expect_true(ChangeEffects::estimate({}).empty(), "no changes, no effect");
+        expect_true(stronger.summary().find("Strength") != std::string::npos, "summary names strength");
+    }
     {
         PrintGoal g = PrintGoalParser::parse("an outdoor part, make it strong");
         expect_true(g.user_text.find("strong") != std::string::npos, "parser keeps the user text");

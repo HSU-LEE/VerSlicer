@@ -96,6 +96,8 @@ set(lisbslic3r_sources
     BambuSmartPrint/BambuSmartPrintJson.cpp
     BambuSmartPrint/BambuSmartPrintJson.hpp
     BambuSmartPrint/BambuSmartPrintTypes.hpp
+    BambuSmartPrint/ChangeEffects.cpp
+    BambuSmartPrint/ChangeEffects.hpp
     BambuSmartPrint/ConfigSnapshot.cpp
     BambuSmartPrint/ConfigSnapshot.hpp
     BambuSmartPrint/ConfigVersionStack.cpp
