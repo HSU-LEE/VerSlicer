@@ -2,6 +2,7 @@
 #include "../slic3r/GUI/Assistant/AssistantConfig.hpp"
 #include "../slic3r/GUI/Assistant/AssistantIntentContext.hpp"
 #include "../slic3r/GUI/Assistant/AssistantModelPick.hpp"
+#include "../slic3r/GUI/Assistant/AssistantPurposeProfiles.hpp"
 #include "../slic3r/GUI/Assistant/AssistantSettingRegistry.hpp"
 #include "../slic3r/GUI/Assistant/AssistantSettingCatalogBuilder.hpp"
 
@@ -45,6 +46,22 @@ int main()
     expect_true(!AssistantSettingRegistry::is_allowed_key("retraction_length", "print"), "retraction not print");
     expect_true(AssistantSettingRegistry::is_virtual_key("enable_brim"), "enable_brim virtual");
     expect_true(AssistantSettingCatalogBuilder::all().size() >= 80, "auto catalog size");
+
+    // Purpose profiles: every key must pass the same checks set_config does,
+    // or the review dialog would silently drop part of the profile.
+    expect_true(AssistantPurposeProfiles::all().size() >= 6, "purpose profiles present");
+    for (const auto& p : AssistantPurposeProfiles::all()) {
+        for (auto it = p.options.begin(); it != p.options.end(); ++it) {
+            const std::string label = "purpose " + p.id + " key " + it.key();
+            expect_true(AssistantSettingRegistry::is_allowed_key(it.key(), "print"), (label + " allowed").c_str());
+            expect_true(!AssistantSettingCatalogBuilder::is_restricted_key(it.key()), (label + " not restricted").c_str());
+        }
+        const auto action = AssistantPurposeProfiles::to_set_config(p.id);
+        expect_true(action && (*action)["type"] == "set_config" && (*action)["preset"] == "print",
+                    ("purpose " + p.id + " -> set_config").c_str());
+    }
+    expect_true(AssistantPurposeProfiles::find(" Functional ").has_value(), "purpose lookup trims and lowercases");
+    expect_true(!AssistantPurposeProfiles::to_set_config("spaceship").has_value(), "unknown purpose rejected");
 
     nlohmann::json layer = 0.8;
     expect_true(AssistantSettingRegistry::clamp_json_value("layer_height", layer), "clamp layer_height high");

@@ -1,4 +1,5 @@
 #include "AssistantToolGateway.hpp"
+#include "AssistantPurposeProfiles.hpp"
 
 #include "AssistantActionWorkflow.hpp"
 #include "AssistantExecutionPolicy.hpp"
@@ -55,6 +56,13 @@ const std::vector<nlohmann::json>& tool_defs()
                  obj_schema({{"preset", {{"type", "string"}, {"enum", {"print", "filament", "printer"}}}},
                               {"options", {{"type", "object"}, {"description", "Setting key to value"}}}},
                             nlohmann::json::array({"options"}))),
+        tool_def("set_purpose",
+                 "Set the print up for what it is for, when the user describes the use instead of settings "
+                 "(a toy, a bracket, a vase, a quick fit test, a gift). Applies a fixed, reviewed set of print "
+                 "settings; prefer this over guessing many set_config keys.",
+                 obj_schema({{"purpose", {{"type", "string"}, {"enum", AssistantPurposeProfiles::ids()},
+                                          {"description", "decorative, functional, toy, vase, prototype or gift"}}}},
+                            nlohmann::json::array({"purpose"}))),
         tool_def("select_object",
                  "Select a model by object_id or object_name.",
                  obj_schema({{"object_id", {{"type", "integer"}}},
@@ -151,6 +159,13 @@ AssistantNormalizedTool AssistantToolGateway::normalize(const std::string& name,
         out.action = {{"type", "set_config"},
                       {"preset", args.value("preset", "print")},
                       {"options", args["options"]}};
+    } else if (name == "set_purpose") {
+        const auto action = AssistantPurposeProfiles::to_set_config(args.value("purpose", ""));
+        if (!action) {
+            out.error = "set_purpose purpose must be one of: decorative, functional, toy, vase, prototype, gift";
+            return out;
+        }
+        out.action = *action;
     } else if (name == "select_object") {
         if (!has_number(args, "object_id") && !(args.contains("object_name") && args["object_name"].is_string())) {
             out.error = "select_object requires object_id or object_name";
