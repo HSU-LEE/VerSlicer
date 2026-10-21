@@ -1501,6 +1501,12 @@ void PreferencesDialog::create_items()
         "ai_coach_show_bed_hints");
     g_sizer->Add(item_ai_coach_bed);
 
+    auto item_bambu_connect_update = create_item_checkbox(
+        _L("Keep Bambu Connect up to date"),
+        _L("Check Bambu Lab's update server at launch and install new Bambu Connect versions automatically."),
+        "bambu_connect_auto_update");
+    g_sizer->Add(item_bambu_connect_update);
+
 #if 0
     g_sizer->Add(create_item_title(_L("Filament Grouping")), 1, wxEXPAND);
     //temporarily disable it

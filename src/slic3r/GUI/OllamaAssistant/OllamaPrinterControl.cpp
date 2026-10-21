@@ -11,6 +11,12 @@
 #include "../DeviceCore/DevManager.h"
 #include "../DeviceManager.hpp"
 #include "../GUI_App.hpp"
+#include "../BambuConnect.hpp"
+#include "../DeviceCore/DevBed.h"
+#include "../DeviceCore/DevExtruderSystem.h"
+#include "OllamaChatPanel.hpp"
+
+#include <wx/timer.h>
 
 #include <boost/log/trivial.hpp>
 #include <wx/msgdlg.h>
@@ -228,6 +234,84 @@ bool OllamaPrinterControl::ensure_consent(wxWindow* parent)
     return true;
 }
 
+namespace {
+
+/** What the printer itself reports for `target` right now. */
+std::optional<int> reported_value(MachineObject* obj, PrinterControlTarget target)
+{
+    switch (target) {
+    case PrinterControlTarget::NozzleTemp:
+        if (auto* ext = obj->GetExtderSystem())
+            return ext->GetNozzleTempTarget(MAIN_EXTRUDER_ID);
+        return std::nullopt;
+    case PrinterControlTarget::BedTemp:
+        if (auto* bed = obj->GetBed())
+            return static_cast<int>(std::lround(bed->GetBedTempTarget()));
+        return std::nullopt;
+    case PrinterControlTarget::ChamberTemp: return static_cast<int>(std::lround(obj->chamber_temp_target));
+    case PrinterControlTarget::PrintSpeed: return static_cast<int>(obj->GetPrintingSpeedLevel());
+    }
+    return std::nullopt;
+}
+
+bool matches(const PrinterControlRequest& req, int reported)
+{
+    return req.target == PrinterControlTarget::PrintSpeed ? reported == req.value : std::abs(reported - req.value) <= 1;
+}
+
+/** Poll the printer's own report for up to ~15 s and tell the user what really
+ *  happened. Cloud printers with Authorization Control firmware silently drop
+ *  control commands from other slicers, so "sent" is never reported as "done". */
+void verify_on_printer(const std::string& dev_id, PrinterControlRequest req, bool lan, std::optional<int> before)
+{
+    // Already at the value: a match would not prove the printer accepted anything.
+    if (before && matches(req, *before)) {
+        if (OllamaChatPanel* panel = OllamaChatPanel::active_panel())
+            panel->post_assistant_note(wxString::Format(_L("The printer already reports %s, so nothing changed."),
+                                                        wxString::FromUTF8(OllamaPrinterControl::describe(req, true))));
+        return;
+    }
+    auto* timer = new wxTimer();
+    auto  ticks = std::make_shared<int>(0);
+    timer->Bind(wxEVT_TIMER, [timer, ticks, dev_id, req, lan](wxTimerEvent&) {
+        auto finish = [timer](const wxString& text, bool error) {
+            timer->Stop();
+            if (OllamaChatPanel* panel = OllamaChatPanel::active_panel())
+                panel->post_assistant_note(text, error);
+            wxTheApp->CallAfter([timer]() { delete timer; });
+        };
+        if (wxGetApp().is_closing()) {
+            timer->Stop();
+            wxTheApp->CallAfter([timer]() { delete timer; });
+            return;
+        }
+        DeviceManager* dm  = wxGetApp().getDeviceManager();
+        MachineObject* obj = dm ? dm->get_selected_machine() : nullptr;
+        if (!obj || obj->get_dev_id() != dev_id) {
+            finish(_L("The printer changed or disconnected before it confirmed the change."), true);
+            return;
+        }
+        const auto now = reported_value(obj, req.target);
+        const wxString what = wxString::FromUTF8(OllamaPrinterControl::describe(req, true));
+        if (now && matches(req, *now)) {
+            finish(wxString::Format(_L("✓ The printer confirmed: %s."), what), false);
+            return;
+        }
+        if (++*ticks < 15)
+            return;
+        if (lan)
+            finish(wxString::Format(_L("The printer did not apply %s. Check that it is online and in Developer Mode, then try again."), what), true);
+        else
+            finish(wxString::Format(_L("The printer did not apply %s. It is connected through the Bambu Lab cloud, and its firmware "
+                                       "(Authorization Control) ignores control commands from slicers other than Bambu's own apps.\n\n"
+                                       "To let VerSlicer control it, turn on LAN Only mode and Developer Mode on the printer and add it "
+                                       "here in LAN mode. Otherwise change the value on the printer's screen."), what), true);
+    });
+    timer->Start(1000);
+}
+
+} // namespace
+
 OllamaActionResult OllamaPrinterControl::apply(const nlohmann::json& action)
 {
     OllamaActionResult result;
@@ -269,6 +353,7 @@ OllamaActionResult OllamaPrinterControl::apply(const nlohmann::json& action)
         return result;
     }
 
+    const std::optional<int> before = reported_value(obj, req->target);
     int rc = 0;
     switch (req->target) {
     case PrinterControlTarget::NozzleTemp:
@@ -285,13 +370,13 @@ OllamaActionResult OllamaPrinterControl::apply(const nlohmann::json& action)
         result.message = "The printer did not accept the command (" + describe(*req, false) + ").";
         return result;
     }
+    // Sent is not done: the printer's own report decides, and the result
+    // follows in the chat (see verify_on_printer).
+    verify_on_printer(obj->get_dev_id(), *req, obj->is_lan_mode_printer(), before);
     result.success          = true;
-    result.effective_change = true;
-    result.message          = (boost::format(ai_catalog_text("Printer set: %s")) % describe(*req, ko)).str();
-    if (!obj->is_lan_mode_printer())
-        // Authorization Control firmware ignores control commands from other
-        // slicers over the cloud; say so instead of claiming success.
-        result.message += ai_catalog_text(" (Command sent. Bambu firmware with Authorization Control may ignore control from other slicers over the cloud; check the printer, and use Bambu Connect if it did not change.)");
+    result.effective_change = false;
+    result.message          = (boost::format(ai_catalog_text("Sent to the printer: %s. Waiting for the printer to confirm; "
+                                                             "the result will appear in the chat.")) % describe(*req, ko)).str();
     return result;
 }
 

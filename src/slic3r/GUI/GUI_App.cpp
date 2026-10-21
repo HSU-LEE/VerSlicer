@@ -2,6 +2,7 @@
 #include "OrcaCloudServiceAgent.hpp"
 #include "libslic3r/Technologies.hpp"
 #include "GUI_App.hpp"
+#include "BambuConnectUpdater.hpp"
 #include "OllamaAssistant/OllamaVoiceInput.hpp"
 #include "OllamaAssistant/OllamaClient.hpp"
 #include "CrashReporter.hpp"
@@ -957,6 +958,7 @@ void GUI_App::post_init()
             }
 
             this->check_new_version_sf();
+            BambuConnect::check_for_updates_async();
             const auto cloud_provider = get_printer_cloud_provider();
             if (is_user_login(cloud_provider) && !app_config->get_stealth_mode()) {
               // this->check_privacy_version(0);

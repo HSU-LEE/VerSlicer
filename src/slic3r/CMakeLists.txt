@@ -155,6 +155,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/OllamaAssistant/ChatGptAccount.cpp
     GUI/BambuConnect.cpp
     GUI/BambuConnect.hpp
+    GUI/BambuConnectUpdater.cpp
+    GUI/BambuConnectUpdater.hpp
     GUI/CrashReporter.cpp
     GUI/CrashReporter.hpp
     GUI/UiDispatch.cpp

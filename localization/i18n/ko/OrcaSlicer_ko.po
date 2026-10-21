@@ -26503,3 +26503,57 @@ msgstr "ChatGPT 플랜 보기"
 
 msgid "This ChatGPT account is on the Free plan. The AI assistant needs ChatGPT Plus or Pro."
 msgstr "이 ChatGPT 계정은 무료 플랜입니다. AI 도우미는 ChatGPT Plus 또는 Pro가 필요합니다."
+
+msgid "Don't show this again"
+msgstr "다시 보지 않기"
+
+msgid "Keep Bambu Connect up to date"
+msgstr "Bambu Connect 자동 업데이트"
+
+msgid "Check Bambu Lab's update server at launch and install new Bambu Connect versions automatically."
+msgstr "시작할 때 Bambu Lab 업데이트 서버를 확인하고 새 Bambu Connect 버전을 자동으로 설치합니다."
+
+msgid "Bambu Connect is already being installed. Try again in a moment."
+msgstr "Bambu Connect를 설치하는 중입니다. 잠시 후 다시 시도하세요."
+
+msgid "Installing Bambu Connect"
+msgstr "Bambu Connect 설치 중"
+
+msgid "Downloading Bambu Connect from Bambu Lab (about 140 MB)…"
+msgstr "Bambu Lab에서 Bambu Connect를 내려받는 중… (약 140MB)"
+
+#, c-format
+msgid "Bambu Connect could not be installed: %s\n\nYou can download it from Bambu Lab's website instead."
+msgstr "Bambu Connect를 설치하지 못했습니다: %s\n\nBambu Lab 웹사이트에서 직접 내려받을 수 있습니다."
+
+msgid "Open download page"
+msgstr "다운로드 페이지 열기"
+
+msgid "Bambu Lab printers with the latest firmware only accept print jobs from other slicers through Bambu Connect, Bambu Lab's free helper app. Developer Mode is not needed.\n\nVerSlicer can install Bambu Connect for you (about 140 MB, from Bambu Lab) and keep it up to date automatically. After installing, sign in to Bambu Connect with your Bambu Lab account."
+msgstr "최신 펌웨어의 Bambu Lab 프린터는 다른 슬라이서의 출력 작업을 Bambu Lab의 무료 도우미 앱인 Bambu Connect를 통해서만 받습니다. 개발자 모드는 필요 없습니다.\n\nVerSlicer가 Bambu Connect를 대신 설치하고(약 140MB, Bambu Lab 제공) 자동으로 최신 상태로 유지할 수 있습니다. 설치한 뒤 Bambu Lab 계정으로 Bambu Connect에 로그인하세요."
+
+msgid "Install Bambu Connect"
+msgstr "Bambu Connect 설치"
+
+msgid "The printer changed or disconnected before it confirmed the change."
+msgstr "프린터가 변경을 확인하기 전에 다른 프린터로 바뀌었거나 연결이 끊겼습니다."
+
+#, c-format
+msgid "✓ The printer confirmed: %s."
+msgstr "✓ 프린터가 적용을 확인했습니다: %s."
+
+#, c-format
+msgid "The printer did not apply %s. Check that it is online and in Developer Mode, then try again."
+msgstr "프린터가 %s을(를) 적용하지 않았습니다. 프린터가 온라인이고 개발자 모드인지 확인한 뒤 다시 시도하세요."
+
+#, c-format
+msgid "The printer did not apply %s. It is connected through the Bambu Lab cloud, and its firmware (Authorization Control) ignores control commands from slicers other than Bambu's own apps.\n\nTo let VerSlicer control it, turn on LAN Only mode and Developer Mode on the printer and add it here in LAN mode. Otherwise change the value on the printer's screen."
+msgstr "프린터가 %s을(를) 적용하지 않았습니다. 이 프린터는 Bambu Lab 클라우드로 연결되어 있고, 펌웨어(권한 제어)가 Bambu 자체 앱이 아닌 슬라이서의 제어 명령을 무시합니다.\n\nVerSlicer로 제어하려면 프린터에서 LAN 전용 모드와 개발자 모드를 켜고 여기에서 LAN 모드로 추가하세요. 아니면 프린터 화면에서 직접 값을 바꾸세요."
+
+#, c-format
+msgid "Sent to the printer: %s. Waiting for the printer to confirm; the result will appear in the chat."
+msgstr "프린터로 보냈습니다: %s. 프린터의 확인을 기다리는 중이며, 결과는 채팅에 표시됩니다."
+
+#, c-format
+msgid "The printer already reports %s, so nothing changed."
+msgstr "프린터가 이미 %s 상태라 바뀐 것이 없습니다."

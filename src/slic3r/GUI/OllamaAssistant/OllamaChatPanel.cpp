@@ -513,6 +513,11 @@ OllamaChatPanel* OllamaChatPanel::active_panel()
     return g_active_chat_panel;
 }
 
+void OllamaChatPanel::post_assistant_note(const wxString& text, bool is_error)
+{
+    append_chat_message(ChatMessageRole::Assistant, text, is_error ? ChatMessageKind::Error : ChatMessageKind::Normal);
+}
+
 static bool process_makerworld_actions(nlohmann::json& root, wxWindow* parent, bool apply_mode,
                                        const std::string& user_req, MakerWorldFlowUiCallbacks callbacks)
 {

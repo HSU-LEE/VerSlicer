@@ -399,6 +399,9 @@ void AppConfig::set_defaults()
         set_bool("show_canvas_zoom_button", true);
     }
 
+    if (get("bambu_connect_auto_update").empty())
+        set_bool("bambu_connect_auto_update", true);
+
     if (get("remember_printer_config").empty()) {
         set_bool("remember_printer_config", true);
     }

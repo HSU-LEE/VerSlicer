@@ -60,6 +60,10 @@ public:
      *  orchestrator (with real chat/busy callbacks) instead of a detached one. */
     static OllamaChatPanel* active_panel();
 
+    /** Add an assistant message that arrives after the reply (e.g. a printer
+     *  confirming a change). Main thread only. */
+    void post_assistant_note(const wxString& text, bool is_error = false);
+
     /** Start an end-to-end find-and-print job on the panel-owned orchestrator
      *  with this panel's UI callbacks. Returns false when the orchestrator flag
      *  is off, a job is already active, or start fails. Main thread only. */

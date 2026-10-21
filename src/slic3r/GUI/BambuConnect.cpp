@@ -1,4 +1,5 @@
 #include "BambuConnect.hpp"
+#include "BambuConnectUpdater.hpp"
 
 #include "libslic3r/Format/bbs_3mf.hpp"
 #include "libslic3r/PresetBundle.hpp"
@@ -7,6 +8,7 @@
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "I18N.hpp"
+#include "MainFrame.hpp"
 #include "PartPlate.hpp"
 #include "Plater.hpp"
 #include "DeviceManager.hpp"
@@ -15,12 +17,15 @@
 #include <boost/log/trivial.hpp>
 
 #include <wx/msgdlg.h>
+#include <wx/richmsgdlg.h>
 #include <wx/utils.h>
 
 #include <cctype>
 #include <cstdio>
 
 namespace Slic3r { namespace GUI { namespace BambuConnect {
+
+namespace { constexpr const char* kLanNoticeDismissedKey = "bambu_lan_mode_notice_dismissed"; }
 
 std::string encode_uri_component(const std::string& s)
 {
@@ -98,7 +103,11 @@ bool send_current_plate(Plater* plater)
         return false;
     }
     if (!installed()) {
-        offer_download(parent);
+        // Install it (with consent), then carry on with this print.
+        offer_install(parent, [plater](bool ok) {
+            if (ok)
+                send_current_plate(plater);
+        });
         return false;
     }
 
@@ -135,24 +144,33 @@ void notify_cloud_printer_selected(wxWindow* parent, MachineObject* obj)
 {
     if (!obj || obj->is_lan_mode_printer())
         return;
-    wxMessageDialog dlg(parent,
-                        wxString::Format(_L("\"%s\" is connected through your Bambu Lab account, not in LAN mode.\n\n"
-                                            "To print and control it directly from VerSlicer, on the printer's screen:\n"
-                                            "1. Open Settings > Network (WLAN) and turn on LAN Only mode.\n"
-                                            "2. Turn on Developer Mode.\n"
-                                            "3. Note the IP address and access code, then add the printer here in LAN mode.\n\n"
-                                            "Without this, print with Bambu Connect instead."),
-                                         wxString::FromUTF8(obj->get_dev_name())),
-                        _L("Turn on LAN mode and Developer Mode"), wxOK | wxICON_INFORMATION);
+    AppConfig* cfg = wxGetApp().app_config;
+    if (cfg && cfg->get_bool(kLanNoticeDismissedKey))
+        return;
+    wxRichMessageDialog dlg(parent,
+                            wxString::Format(_L("\"%s\" is connected through your Bambu Lab account, not in LAN mode.\n\n"
+                                                "To print and control it directly from VerSlicer, on the printer's screen:\n"
+                                                "1. Open Settings > Network (WLAN) and turn on LAN Only mode.\n"
+                                                "2. Turn on Developer Mode.\n"
+                                                "3. Note the IP address and access code, then add the printer here in LAN mode.\n\n"
+                                                "Without this, print with Bambu Connect instead."),
+                                             wxString::FromUTF8(obj->get_dev_name())),
+                            _L("Turn on LAN mode and Developer Mode"), wxOK | wxICON_INFORMATION);
+    dlg.ShowCheckBox(_L("Don't show this again"));
     dlg.ShowModal();
+    if (cfg && dlg.IsCheckBoxChecked()) {
+        cfg->set_bool(kLanNoticeDismissedKey, true);
+        cfg->save();
+    }
 }
 
 void open_app()
 {
-    if (installed())
-        wxExecute("open -a \"Bambu Connect\"", wxEXEC_ASYNC);
-    else
-        wxLaunchDefaultBrowser(kDownloadUrl);
+    if (!launch_installed())
+        offer_install(wxGetApp().mainframe, [](bool ok) {
+            if (ok)
+                launch_installed();
+        });
 }
 
 }}} // namespace Slic3r::GUI::BambuConnect
