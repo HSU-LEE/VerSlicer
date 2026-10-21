@@ -1,3 +1,4 @@
+#include "AssistantModeJudge.hpp"
 #include "AssistantChatPanel.hpp"
 #include "AiCatalog.hpp"
 #include "../UiDispatch.hpp"
@@ -1748,6 +1749,15 @@ void AssistantChatPanel::on_send(wxCommandEvent&)
     if (route_orchestrator_reply(user_utf8))
         return;
     (void) plate_has_model;
+
+    // The selected mode stays the user's default, but the request decides:
+    // a change request in Question mode or a pure question in Apply mode
+    // switches the mode (visible in the selector) before sending.
+    if (const auto want_apply = AssistantModeJudge::judge(user_utf8, m_apply_mode)) {
+        set_assistant_mode(*want_apply);
+        append_thinking_line(*want_apply ? AiLocale::text("Switched to Apply mode for this request.")
+                                         : AiLocale::text("Switched to Question mode: this only needs an answer."));
+    }
 
     std::string user_msg = build_send_user_message(user_text, user_utf8);
 
