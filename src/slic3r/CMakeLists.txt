@@ -141,6 +141,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Assistant/AssistantPurposeProfiles.cpp
     GUI/Assistant/AssistantPurposeProfiles.hpp
     GUI/Assistant/AssistantToolGateway.cpp
+    GUI/Assistant/AssistantCameraWatch.cpp
+    GUI/Assistant/AssistantCameraWatch.hpp
     GUI/Assistant/AssistantLearningSummary.cpp
     GUI/Assistant/AssistantSettingExplain.cpp
     GUI/Assistant/AssistantSettingExplain.hpp

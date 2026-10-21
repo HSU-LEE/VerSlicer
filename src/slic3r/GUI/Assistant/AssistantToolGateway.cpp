@@ -61,6 +61,11 @@ const std::vector<nlohmann::json>& tool_defs()
                  "parts, too big), highlight overhangs on the 3D view and select the worst model. Use it when the "
                  "user asks if a model will print well, or before suggesting fixes.",
                  obj_schema({})),
+        tool_def("camera_watch",
+                 "The printer's own camera AI (AI print monitoring, spaghetti, first-layer, nozzle clumping and air "
+                 "printing checks). Without enable: report which are on. With enable true: turn the supported ones "
+                 "on (asks the user to allow printer control). Use when the user wants the print watched.",
+                 obj_schema({{"enable", {{"type", "boolean"}, {"description", "true to turn the camera checks on"}}}})),
         tool_def("what_was_learned",
                  "Read what Smart Print learned about the current printer from past prints (success rate, the most "
                  "common failure cause, settings it adjusted). Use it when the user asks what VerSlicer knows about "
@@ -169,6 +174,10 @@ AssistantNormalizedTool AssistantToolGateway::normalize(const std::string& name,
         out.action = {{"type", "set_config"},
                       {"preset", args.value("preset", "print")},
                       {"options", args["options"]}};
+    } else if (name == "camera_watch") {
+        out.action = {{"type", "camera_watch"}};
+        if (args.contains("enable") && args["enable"].is_boolean())
+            out.action["enable"] = args["enable"];
     } else if (name == "what_was_learned") {
         out.action = {{"type", "what_was_learned"}};
     } else if (name == "show_weak_spots") {
