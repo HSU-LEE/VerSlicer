@@ -1,4 +1,5 @@
 #include "OG_CustomCtrl.hpp"
+#include "Assistant/AssistantSettingExplain.hpp" // VerSlicer
 #include "OptionsGroup.hpp"
 #include "MarkdownTip.hpp"
 #include "Plater.hpp"
@@ -66,6 +67,7 @@ OG_CustomCtrl::OG_CustomCtrl(   wxWindow*            parent,
     this->Bind(wxEVT_PAINT,     &OG_CustomCtrl::OnPaint, this);
     this->Bind(wxEVT_MOTION,    &OG_CustomCtrl::OnMotion, this);
     this->Bind(wxEVT_LEFT_DOWN, &OG_CustomCtrl::OnLeftDown, this);
+    this->Bind(wxEVT_RIGHT_DOWN, &OG_CustomCtrl::OnRightDown, this); // VerSlicer
     this->Bind(wxEVT_LEAVE_WINDOW, &OG_CustomCtrl::OnLeaveWin, this);
 }
 
@@ -422,6 +424,21 @@ void OG_CustomCtrl::OnMotion(wxMouseEvent& event)
 
     Refresh();
     Update();
+    event.Skip();
+}
+
+// VerSlicer: right-click a setting name to ask the assistant about it.
+void OG_CustomCtrl::OnRightDown(wxMouseEvent& event)
+{
+    const wxPoint pos = event.GetLogicalPosition(wxClientDC(this));
+    for (const CtrlLine& line : ctrl_lines) {
+        if (!line.is_visible || !is_point_in_rect(pos, line.rect_label))
+            continue;
+        const std::vector<Option>& options = line.og_line.get_options();
+        if (!options.empty())
+            AssistantSettingExplain::popup(this, options.front().opt.opt_key, line.og_line.label);
+        return;
+    }
     event.Skip();
 }
 
