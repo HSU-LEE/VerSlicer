@@ -69,7 +69,9 @@ static bool is_workflow_only_action(const std::string& type)
         || type == "add_plate" || type == "delete_plate" || type == "select_plate"
         || type == "open_calibration" || type == "run_smart_print" || type == "select_preset"
         // Gated by the user's one-time printer-control consent instead of a review dialog.
-        || type == "printer_control";
+        || type == "printer_control" || type == "camera_watch"
+        // Records the user's own words about a print; changes no setting now.
+        || type == "report_print_result";
 }
 
 static bool is_geometry_action(const std::string& type)
