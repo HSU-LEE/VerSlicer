@@ -56,6 +56,11 @@ const std::vector<nlohmann::json>& tool_defs()
                  obj_schema({{"preset", {{"type", "string"}, {"enum", {"print", "filament", "printer"}}}},
                               {"options", {{"type", "object"}, {"description", "Setting key to value"}}}},
                             nlohmann::json::array({"options"}))),
+        tool_def("show_weak_spots",
+                 "Find where the models on the plate are likely to fail (overhangs, small base, tipping, thin "
+                 "parts, too big), highlight overhangs on the 3D view and select the worst model. Use it when the "
+                 "user asks if a model will print well, or before suggesting fixes.",
+                 obj_schema({})),
         tool_def("set_purpose",
                  "Set the print up for what it is for, when the user describes the use instead of settings "
                  "(a toy, a bracket, a vase, a quick fit test, a gift). Applies a fixed, reviewed set of print "
@@ -159,6 +164,8 @@ AssistantNormalizedTool AssistantToolGateway::normalize(const std::string& name,
         out.action = {{"type", "set_config"},
                       {"preset", args.value("preset", "print")},
                       {"options", args["options"]}};
+    } else if (name == "show_weak_spots") {
+        out.action = {{"type", "show_weak_spots"}};
     } else if (name == "set_purpose") {
         const auto action = AssistantPurposeProfiles::to_set_config(args.value("purpose", ""));
         if (!action) {

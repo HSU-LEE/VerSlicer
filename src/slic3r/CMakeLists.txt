@@ -141,6 +141,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Assistant/AssistantPurposeProfiles.cpp
     GUI/Assistant/AssistantPurposeProfiles.hpp
     GUI/Assistant/AssistantToolGateway.cpp
+    GUI/Assistant/AssistantWeakSpots.cpp
+    GUI/Assistant/AssistantWeakSpots.hpp
     GUI/Assistant/AssistantToolGateway.hpp
     GUI/Assistant/AssistantMcpServer.cpp
     GUI/Assistant/AssistantMcpServer.hpp

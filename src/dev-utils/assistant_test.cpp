@@ -3,6 +3,7 @@
 #include "../slic3r/GUI/Assistant/AssistantIntentContext.hpp"
 #include "../slic3r/GUI/Assistant/AssistantModelPick.hpp"
 #include "../slic3r/GUI/Assistant/AssistantPurposeProfiles.hpp"
+#include "../slic3r/GUI/Assistant/AssistantWeakSpots.hpp"
 #include "../slic3r/GUI/Assistant/AssistantSettingRegistry.hpp"
 #include "../slic3r/GUI/Assistant/AssistantSettingCatalogBuilder.hpp"
 
@@ -62,6 +63,24 @@ int main()
     }
     expect_true(AssistantPurposeProfiles::find(" Functional ").has_value(), "purpose lookup trims and lowercases");
     expect_true(!AssistantPurposeProfiles::to_set_config("spaceship").has_value(), "unknown purpose rejected");
+
+    // Weak spots: plain findings, worst first, each with a tool the model can call.
+    {
+        Slic3r::BambuSmartPrint::ModelAnalysis a;
+        a.overhang_face_ratio       = 0.4;
+        a.first_layer_contact_ratio = 0.2;
+        a.thin_feature_risk         = true;
+        const auto spots = AssistantWeakSpots::describe(a);
+        expect_true(spots.size() == 3, "weak spots: overhang, small base, thin parts");
+        expect_true(spots.size() >= 1 && spots[0]["severity"] == "high", "weak spots sorted worst first");
+        for (const auto& s : spots)
+            expect_true(s.contains("fix_tool") && s["fix_tool"].contains("tool"), "weak spot has a fix tool");
+        Slic3r::BambuSmartPrint::ModelAnalysis fine;
+        expect_true(AssistantWeakSpots::describe(fine).empty(), "no weak spots on a plain model");
+        fine.fits_bed = false; fine.bed_scale_factor = 0.5;
+        const auto big = AssistantWeakSpots::describe(fine);
+        expect_true(big.size() == 1 && big[0]["id"] == "too_big", "too big reported");
+    }
 
     nlohmann::json layer = 0.8;
     expect_true(AssistantSettingRegistry::clamp_json_value("layer_height", layer), "clamp layer_height high");

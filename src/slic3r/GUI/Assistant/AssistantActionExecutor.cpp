@@ -3,6 +3,7 @@
 #include "AssistantActionRegistry.hpp"
 #include "AssistantFailureDoctor.hpp"
 #include "AssistantPrinterControl.hpp"
+#include "AssistantWeakSpots.hpp"
 #include "AssistantActionJsonExtract.hpp"
 #include "AssistantActionValidator.hpp"
 #include "AssistantConfig.hpp"
@@ -1784,6 +1785,7 @@ const std::unordered_map<std::string, ActionHandler>& action_handlers()
         h["list_objects"]     = apply_list_objects;
         h["select_object"]    = apply_select_object;
         h["set_config"]       = apply_set_config;
+        h["show_weak_spots"]  = AssistantWeakSpots::apply;
         h["ui_select_tab"]    = apply_ui_select_tab;
         h["open_calibration"] = [](const nlohmann::json&) { return apply_open_calibration(); };
         h["delete_selection"] = [](const nlohmann::json&) { return apply_delete_selection(); };

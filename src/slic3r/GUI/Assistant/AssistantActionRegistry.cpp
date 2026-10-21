@@ -17,6 +17,7 @@ const AssistantActionTypeSpec kActionTypes[] = {
     {"printer_diagnostics", true, true, true, "Read printer error codes and HMS alerts"},
     {"select_object", true, true, true, "Select object by id or name"},
     {"set_config", true, true, true, "Change print/filament/printer preset options"},
+    {"show_weak_spots", true, true, true, "Show where the models are likely to fail, on the 3D view"},
     {"translate", true, true, true, "Move selection on the bed"},
     {"rotate", true, true, true, "Rotate selection"},
     {"scale", true, false, false, "Scale selection"},
