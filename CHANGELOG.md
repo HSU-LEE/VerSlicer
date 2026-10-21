@@ -1,5 +1,29 @@
 # Changelog
 
+## 3.2.2
+
+### Bambu Connect inside VerSlicer
+- VerSlicer installs Bambu Connect for you and keeps it on the latest version (checked at launch, verified before install).
+- The LAN-mode notice shown when you pick a cloud printer has **Don't show this again**.
+- AI printer control now confirms each change from what the printer reports, and says so plainly when a cloud printer ignores it.
+
+### AI assistant
+- **Print for a purpose:** say what it is for ("a toy", "a bracket", "a vase", "a quick fit test", "a gift") and a reviewed set of settings is applied.
+- **Weak spots:** "Will this print well?" highlights overhangs on the 3D view, selects the riskiest model, explains each problem and offers the fix.
+- **Explain a setting:** right-click any setting → **Explain with AI**.
+- **Camera watch:** asks the printer's own camera AI (spaghetti, first layer, nozzle clumping, air printing) to watch the print, with your permission.
+- The assistant picks Question or Apply mode from your request; the selector shows when it switches.
+- The review dialog shows the expected effect of a change (print time, strength, filament, surface, bed adhesion).
+
+### Learning from your prints
+- When a print finishes, VerSlicer asks how it came out. Reporting a problem (lifted first layer, warping, stringing, layer shift, rough walls) teaches Smart Print what to change for that printer. You can also just tell the assistant.
+- **Smart Print → What VerSlicer learned…** shows the success rate and each learned adjustment with the reason; Smart Print reviews say "Learned from this printer: …".
+- **Smart Print → Undo last AI change**.
+
+### Fixes
+- Sign-in, local MCP server, consent and notice bugs fixed.
+- The remaining UI is translated into Korean; the app name is spelled VerSlicer everywhere.
+
 ## 3.2.1
 
 ### Printing to Bambu Lab printers
