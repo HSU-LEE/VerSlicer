@@ -13,15 +13,15 @@
 #include "../MakerWorld/MakerWorldPrintOfferDialog.hpp"
 #include "../MakerWorld/MakerWorldTypes.hpp"
 
-#include "../OllamaAssistant/AiLocale.hpp"
+#include "../Assistant/AiLocale.hpp"
 
 #include "../BambuSmartPrint/PrintPlannerGui.hpp"
 
-#include "../OllamaAssistant/OllamaActionExecutor.hpp"
-#include "../OllamaAssistant/OllamaConfigProposalBuilder.hpp"
-#include "../OllamaAssistant/OllamaConfigProposalCache.hpp"
-#include "../OllamaAssistant/OllamaMeshOps.hpp"
-#include "../OllamaAssistant/OllamaUserFlow.hpp"
+#include "../Assistant/AssistantActionExecutor.hpp"
+#include "../Assistant/AssistantConfigProposalBuilder.hpp"
+#include "../Assistant/AssistantConfigProposalCache.hpp"
+#include "../Assistant/AssistantMeshOps.hpp"
+#include "../Assistant/AssistantUserFlow.hpp"
 
 #include "libslic3r/BambuSmartPrint/GeometryAssessmentProducer.hpp"
 #include "libslic3r/BambuSmartPrint/MeshHealthService.hpp"
@@ -205,7 +205,7 @@ int PrintJobStepExecutors::attempt_repair(const nlohmann::json& mesh_health)
                 {"object_id", static_cast<int>(obj_idx)},
                 {"volume_index", static_cast<int>(vol_idx)},
             };
-            const OllamaActionResult r = OllamaMeshOps::apply_repair_mesh(action);
+            const AssistantActionResult r = AssistantMeshOps::apply_repair_mesh(action);
             if (r.success)
                 ++repaired;
         }
@@ -241,9 +241,9 @@ ConfigProposal PrintJobStepExecutors::build_and_cache_proposal(const PlateContex
     Plater* plater = wxGetApp().plater();
     if (!plater)
         return ConfigProposal{};
-    // build_from_context caches into OllamaConfigProposalCache and mirrors into
+    // build_from_context caches into AssistantConfigProposalCache and mirrors into
     // PrintGoalSession, keeping Smart Print + LLM context consistent.
-    return OllamaConfigProposalBuilder::build_from_context(plater, ctx, intent, korean);
+    return AssistantConfigProposalBuilder::build_from_context(plater, ctx, intent, korean);
 }
 
 int PrintJobStepExecutors::apply_config_proposal(const ConfigProposal& proposal)
@@ -253,10 +253,10 @@ int PrintJobStepExecutors::apply_config_proposal(const ConfigProposal& proposal)
 
     nlohmann::json root;
     root["actions"] = proposal.set_config_actions;
-    const std::vector<OllamaActionResult> results = OllamaActionExecutor::execute(root);
+    const std::vector<AssistantActionResult> results = AssistantActionExecutor::execute(root);
 
     int changed = 0;
-    for (const OllamaActionResult& r : results)
+    for (const AssistantActionResult& r : results)
         if (r.success && r.effective_change)
             ++changed;
     return changed;

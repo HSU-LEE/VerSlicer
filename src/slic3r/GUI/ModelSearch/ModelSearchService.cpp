@@ -9,7 +9,7 @@
 
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
-#include "../OllamaAssistant/AiLocale.hpp"
+#include "../Assistant/AiLocale.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -230,7 +230,7 @@ void ModelSearchService::search_all_providers(const std::string&           user_
 
     // `this` is the process-lifetime singleton, so capturing it is safe.
     std::thread([this, user_text, cb = std::move(callback), ctx, rank_cfg, generation]() {
-        // Worker thread: translation (blocking Ollama call) is allowed here.
+        // Worker thread: translation (blocking Assistant call) is allowed here.
         const ModelSearchQuery     query = ModelSearchService::build_query(user_text, /*allow_translation=*/true);
         ModelSearchAggregateResult agg   = this->search_sync(query, ctx, rank_cfg);
 

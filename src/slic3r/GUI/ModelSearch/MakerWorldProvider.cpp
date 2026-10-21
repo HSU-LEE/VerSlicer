@@ -3,7 +3,7 @@
 #include "../MakerWorld/MakerWorldSearchService.hpp"
 #include "../MakerWorld/MakerWorldUrl.hpp"
 
-#include "../OllamaAssistant/AiLocale.hpp"
+#include "../Assistant/AiLocale.hpp"
 
 namespace Slic3r { namespace GUI {
 

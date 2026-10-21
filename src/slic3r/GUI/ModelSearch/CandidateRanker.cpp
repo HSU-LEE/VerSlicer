@@ -1,6 +1,6 @@
 #include "CandidateRanker.hpp"
 
-#include "../OllamaAssistant/AiCatalog.hpp"
+#include "../Assistant/AiCatalog.hpp"
 
 #include <boost/format.hpp>
 

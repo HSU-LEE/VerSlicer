@@ -130,7 +130,7 @@ flowchart TD
 
 | Layer | Role |
 | --- | --- |
-| **Chat / Voice UI** | `OllamaChatPanel` — modes, streaming, pipeline stepper, MakerWorld pick dialog |
+| **Chat / Voice UI** | `AssistantChatPanel` — modes, streaming, pipeline stepper, MakerWorld pick dialog |
 | **Assist loop** | Multi-step agent: observe → plan → act (up to 40 steps) |
 | **Diagnostic pipeline** | Quality complaints with Bambu Lab Wiki evidence |
 | **Print job orchestrator** | Find → import → slice (stops before sending) |
@@ -149,7 +149,7 @@ The model replies with one JSON object:
 }
 ```
 
-Common action types: `set_config`, `rotate`, `translate`, `scale`, `arrange`, `slice`, `makerworld_find_and_print`, `repair_mesh`, `printer_control`, `printer_diagnostics`, `rollback_apply` — see `OllamaActionRegistry` for the full allow-list.
+Common action types: `set_config`, `rotate`, `translate`, `scale`, `arrange`, `slice`, `makerworld_find_and_print`, `repair_mesh`, `printer_control`, `printer_diagnostics`, `rollback_apply` — see `AssistantActionRegistry` for the full allow-list.
 
 </details>
 

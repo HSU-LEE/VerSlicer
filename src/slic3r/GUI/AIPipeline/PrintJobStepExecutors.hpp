@@ -82,7 +82,7 @@ public:
     };
     static GeometryResult build_geometry_context();
 
-    // Build + cache the deterministic proposal (OllamaConfigProposalBuilder).
+    // Build + cache the deterministic proposal (AssistantConfigProposalBuilder).
     static BambuSmartPrint::ConfigProposal build_and_cache_proposal(const BambuSmartPrint::PlateContext& ctx,
                                                                      const BambuSmartPrint::PrintIntent& intent,
                                                                      bool korean);

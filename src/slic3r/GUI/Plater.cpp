@@ -75,10 +75,10 @@
 #include "GUI.hpp"
 #include "GUI_App.hpp"
 #include "BambuSmartPrint/BambuSmartPrintService.hpp"
-#include "OllamaAssistant/OllamaModelLoadAdvisor.hpp"
-#include "OllamaAssistant/OllamaActionExecutor.hpp"
-#include "OllamaAssistant/OllamaChatPanel.hpp"
-#include "OllamaAssistant/AiLocale.hpp"
+#include "Assistant/AssistantModelLoadAdvisor.hpp"
+#include "Assistant/AssistantActionExecutor.hpp"
+#include "Assistant/AssistantChatPanel.hpp"
+#include "Assistant/AiLocale.hpp"
 #include "BambuSmartPrint/BambuSmartPrintUi.hpp"
 #include "AICoach/AICoachController.hpp"
 #include "AICoach/AIGuiOrchestrator.hpp"
@@ -4442,8 +4442,8 @@ struct Plater::priv
     wxPanel* current_panel{ nullptr };
     std::vector<wxPanel*> panels;
     // Fusion-style right-docked AI assistant, created lazily (its ctor starts the
-    // Ollama runtime, so we must not build it at Plater construction time).
-    OllamaChatPanel* ollama_assistant{ nullptr };
+    // Assistant runtime, so we must not build it at Plater construction time).
+    AssistantChatPanel* assistant{ nullptr };
 
     struct SidebarLayout
     {
@@ -10090,7 +10090,7 @@ void Plater::priv::on_process_completed(SlicingProcessCompletedEvent &evt)
             this->q, this->background_process.m_fff_print, slice_ok);
         if (slice_ok) {
             GUI::BeginnerJourney::on_sliced();
-            GUI::OllamaActionExecutor::notify_plater_context_changed(false);
+            GUI::AssistantActionExecutor::notify_plater_context_changed(false);
             if (GUI::AICoachController::is_enabled_for_current_mode()
                 && GUI::AIGuiOrchestrator::instance().should_enqueue_beginner_tour())
                 GUI::BeginnerTour::on_first_slice(this->q);
@@ -12416,7 +12416,7 @@ void Plater::load_project(wxString const& filename2,
 
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << __LINE__ << " load project done";
     m_loading_project = false;
-    GUI::OllamaActionExecutor::notify_plater_context_changed(true);
+    GUI::AssistantActionExecutor::notify_plater_context_changed(true);
 }
 
 // BBS: save logic
@@ -14770,7 +14770,7 @@ void Plater::dock_ai_assistant_right(bool show)
 
 void Plater::ensure_ai_assistant_pane()
 {
-    if (p->ollama_assistant)
+    if (p->assistant)
         return;
 
     // Theme the caption bar to match the app's dark UI (the default AUI caption is a
@@ -14792,8 +14792,8 @@ void Plater::ensure_ai_assistant_pane()
     // Chrome-free panel; the AUI pane caption provides the title and close button.
     // Right-only dock (Fusion-style). Not floatable — floating then redocking was
     // producing a thin top strip that clipped the chat body.
-    p->ollama_assistant = new OllamaChatPanel(this, /*show_header=*/false);
-    p->m_aui_mgr.AddPane(p->ollama_assistant, wxAuiPaneInfo()
+    p->assistant = new AssistantChatPanel(this, /*show_header=*/false);
+    p->m_aui_mgr.AddPane(p->assistant, wxAuiPaneInfo()
                                                   .Name("ai_assistant")
                                                   .Caption(_L("AI Assistant"))
                                                   .Right()
@@ -14824,9 +14824,9 @@ void Plater::toggle_ai_assistant()
         return;
     const bool show = !pane.IsShown();
     dock_ai_assistant_right(show);
-    if (show && p->ollama_assistant) {
-        p->ollama_assistant->Layout();
-        p->ollama_assistant->focus_input();
+    if (show && p->assistant) {
+        p->assistant->Layout();
+        p->assistant->focus_input();
     }
 }
 
@@ -14838,11 +14838,11 @@ void Plater::ai_assistant_submit(const wxString& text)
         return;
     if (!pane.IsShown()) {
         dock_ai_assistant_right(true);
-        if (p->ollama_assistant)
-            p->ollama_assistant->Layout();
+        if (p->assistant)
+            p->assistant->Layout();
     }
-    if (p->ollama_assistant)
-        p->ollama_assistant->submit_text_and_send(text);
+    if (p->assistant)
+        p->assistant->submit_text_and_send(text);
 }
 
 void Plater::ai_assistant_prefill(const wxString& text)
@@ -14853,18 +14853,18 @@ void Plater::ai_assistant_prefill(const wxString& text)
         return;
     if (!pane.IsShown()) {
         dock_ai_assistant_right(true);
-        if (p->ollama_assistant)
-            p->ollama_assistant->Layout();
+        if (p->assistant)
+            p->assistant->Layout();
     }
-    if (p->ollama_assistant) {
-        p->ollama_assistant->set_input_text(text);
-        p->ollama_assistant->focus_input();
+    if (p->assistant) {
+        p->assistant->set_input_text(text);
+        p->assistant->focus_input();
     }
 }
 
 bool Plater::is_ai_assistant_shown() const
 {
-    if (!p->ollama_assistant)
+    if (!p->assistant)
         return false;
     auto& pane = p->m_aui_mgr.GetPane("ai_assistant");
     return pane.IsOk() && pane.IsShown();
@@ -16886,7 +16886,7 @@ void Plater::on_config_change(const DynamicPrintConfig &config)
     t_config_option_keys diff_keys = p->config->diff(config);
 
     if (!diff_keys.empty())
-        GUI::OllamaActionExecutor::notify_plater_context_changed(clear_coach_dedup);
+        GUI::AssistantActionExecutor::notify_plater_context_changed(clear_coach_dedup);
 
     size_t old_nozzle_size = 1, new_nozzle_size = 1;
     auto * opt_old = p->config->option<ConfigOptionFloats>("nozzle_diameter");
@@ -17883,7 +17883,7 @@ int Plater::select_plate(int plate_index, bool need_slice)
     p->on_plate_selected(event);
 
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__ << boost::format(" %1%: plate %2%, return %3%")%__LINE__ %plate_index %ret;
-    GUI::OllamaActionExecutor::notify_plater_context_changed(false);
+    GUI::AssistantActionExecutor::notify_plater_context_changed(false);
     return ret;
 }
 

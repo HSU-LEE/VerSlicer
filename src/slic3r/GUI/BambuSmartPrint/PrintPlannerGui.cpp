@@ -9,7 +9,7 @@
 #include "../MainFrame.hpp"
 #include "../NotificationManager.hpp"
 #include "../Plater.hpp"
-#include "../OllamaAssistant/OllamaSettingDescriptions.hpp"
+#include "../Assistant/AssistantSettingDescriptions.hpp"
 
 #include "../AICoach/AICoachTrustBuilder.hpp"
 #include "../AICoach/AICoachTriggerPolicy.hpp"
@@ -93,7 +93,7 @@ static std::string workflow_summary_from_changes(const std::vector<SettingChange
     if (is_generic_workflow_summary(fallback))
         fallback.clear();
     if (!changes.empty())
-        return OllamaSettingDescriptions::build_summary(changes, fallback, ko);
+        return AssistantSettingDescriptions::build_summary(changes, fallback, ko);
 
     if (!fallback.empty())
         return fallback;
@@ -346,7 +346,7 @@ void PrintPlannerGui::enrich_workflow_content(SmartPrintWorkflowContent& content
     for (const SettingChange& ch : changes) {
         if (content.change_preview.size() >= 8)
             break;
-        content.change_preview.push_back(OllamaSettingDescriptions::preview_line(ch, ko));
+        content.change_preview.push_back(AssistantSettingDescriptions::preview_line(ch, ko));
     }
 }
 

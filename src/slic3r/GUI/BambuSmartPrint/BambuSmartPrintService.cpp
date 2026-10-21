@@ -20,7 +20,7 @@
 #include "BambuSmartPrintBatchDialog.hpp"
 
 #include "../GUI_App.hpp"
-#include "../OllamaAssistant/OllamaModelLoadAdvisor.hpp"
+#include "../Assistant/AssistantModelLoadAdvisor.hpp"
 #include "../AICoach/AICoachController.hpp"
 #include "../AICoach/AIGuiOrchestrator.hpp"
 #include "../MainFrame.hpp" // EVT_UPDATE_MACHINE_LIST

@@ -5,7 +5,7 @@
 #include "PrintJobState.hpp"
 #include "PrintJobStepExecutors.hpp" // ImportResult
 
-#include "../OllamaAssistant/OllamaAgentEventBus.hpp" // OllamaSubscriptionId, OllamaAgentEvent
+#include "../Assistant/AssistantAgentEventBus.hpp" // AssistantSubscriptionId, AssistantAgentEvent
 
 #include <atomic>
 #include <cstdint>
@@ -29,7 +29,7 @@ class ScopedEventSubscription
 {
 public:
     ScopedEventSubscription() = default;
-    explicit ScopedEventSubscription(OllamaSubscriptionId id) : m_id(id) {}
+    explicit ScopedEventSubscription(AssistantSubscriptionId id) : m_id(id) {}
     ~ScopedEventSubscription() { reset(); }
 
     ScopedEventSubscription(ScopedEventSubscription&& other) noexcept : m_id(other.m_id) { other.m_id = 0; }
@@ -49,7 +49,7 @@ public:
     bool active() const { return m_id != 0; }
 
 private:
-    OllamaSubscriptionId m_id{ 0 };
+    AssistantSubscriptionId m_id{ 0 };
 };
 
 /**
@@ -59,7 +59,7 @@ private:
  *
  * Threading / lifetime contract:
  *  - Every method must be called on the wx main thread.
- *  - The orchestrator is owned by OllamaChatPanel via std::unique_ptr. Because it
+ *  - The orchestrator is owned by AssistantChatPanel via std::unique_ptr. Because it
  *    is not shared_ptr-managed, weak_from_this() is unavailable; instead every
  *    async continuation captures a weak handle to an internal liveness token
  *    (m_alive) plus the job's shared_ptr + job_id and re-validates all three
@@ -128,7 +128,7 @@ private:
     void step_estimate();
     void step_ready();
 
-    void on_agent_event(const OllamaAgentEvent& evt);
+    void on_agent_event(const AssistantAgentEvent& evt);
 
     void finish_success();
     void finish_error(const std::string& code, const std::string& message);

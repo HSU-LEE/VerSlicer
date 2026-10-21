@@ -1,6 +1,6 @@
-#include "../slic3r/GUI/OllamaAssistant/BambuLabWikiSearchCore.hpp"
-#include "../slic3r/GUI/OllamaAssistant/OllamaActionCritic.hpp"
-#include "../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.hpp"
+#include "../slic3r/GUI/Assistant/BambuLabWikiSearchCore.hpp"
+#include "../slic3r/GUI/Assistant/AssistantActionCritic.hpp"
+#include "../slic3r/GUI/Assistant/AssistantRequestRouter.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -37,8 +37,8 @@ int main()
     }
 
     {
-        expect_true(!OllamaRequestRouter::benefits_from_wiki("fix it"), "wiki is a tool, not a prefetch");
-        expect_true(!OllamaRequestRouter::benefits_from_wiki("rotate 90"), "wiki is a tool, not a prefetch");
+        expect_true(!AssistantRequestRouter::benefits_from_wiki("fix it"), "wiki is a tool, not a prefetch");
+        expect_true(!AssistantRequestRouter::benefits_from_wiki("rotate 90"), "wiki is a tool, not a prefetch");
     }
 
     {
@@ -46,8 +46,8 @@ int main()
         const nlohmann::json wiki = nlohmann::json::array({
             {{"title", "Stringing"}, {"excerpt", "Increase retraction length and lower nozzle temperature."}},
         });
-        const OllamaCriticResult critic = OllamaActionCritic::review(root, "lots of stringing", wiki);
-        expect_true(critic.verdict == OllamaCriticVerdict::Approve, "empty actions are not a keyword revise");
+        const AssistantCriticResult critic = AssistantActionCritic::review(root, "lots of stringing", wiki);
+        expect_true(critic.verdict == AssistantCriticVerdict::Approve, "empty actions are not a keyword revise");
         expect_true(critic.suggested_keys.empty(), "critic does not invent keys");
     }
 

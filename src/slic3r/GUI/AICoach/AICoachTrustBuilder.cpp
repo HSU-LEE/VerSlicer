@@ -1,8 +1,8 @@
 #include "AICoachTrustBuilder.hpp"
 
 #include "../BambuSmartPrint/BambuSmartPrintService.hpp"
-#include "../OllamaAssistant/OllamaActionPipeline.hpp"
-#include "../OllamaAssistant/OllamaActionWorkflow.hpp"
+#include "../Assistant/AssistantActionPipeline.hpp"
+#include "../Assistant/AssistantActionWorkflow.hpp"
 #include "../GUI_App.hpp"
 #include "../I18N.hpp"
 #include "../Plater.hpp"
@@ -93,12 +93,12 @@ bool AICoachTrustBuilder::enrich_recommendation_card(AICoachCard& card, Plater* 
     BambuSmartPrintService::instance().update_plate_assessment_data(plater);
     const DynamicPrintConfig before = wxGetApp().preset_bundle->full_config(false);
 
-    if (!OllamaActionPipeline::prepare_apply_root(card.apply_root, card.body, /*include_makerworld*/ false)) {
+    if (!AssistantActionPipeline::prepare_apply_root(card.apply_root, card.body, /*include_makerworld*/ false)) {
         card.apply_root.erase("actions");
         return false;
     }
 
-    const DynamicPrintConfig after = OllamaActionWorkflow::simulate_proposed_config(before, card.apply_root);
+    const DynamicPrintConfig after = AssistantActionWorkflow::simulate_proposed_config(before, card.apply_root);
 
     const std::vector<BambuSmartPrint::SettingChange> diff =
         BambuSmartPrint::ConfigSnapshot::diff(before, after);

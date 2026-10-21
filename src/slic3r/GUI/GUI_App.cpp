@@ -4,11 +4,11 @@
 #include "GUI_App.hpp"
 #include "BambuConnect.hpp"
 #include "BambuConnectUpdater.hpp"
-#include "OllamaAssistant/OllamaVoiceInput.hpp"
-#include "OllamaAssistant/OllamaClient.hpp"
+#include "Assistant/AssistantVoiceInput.hpp"
+#include "Assistant/AssistantClient.hpp"
 #include "CrashReporter.hpp"
-#include "OllamaAssistant/AiPrivacyConsent.hpp"
-#include "OllamaAssistant/OllamaMcpServer.hpp"
+#include "Assistant/AiPrivacyConsent.hpp"
+#include "Assistant/AssistantMcpServer.hpp"
 #include "GUI_Init.hpp"
 #include "GUI_ObjectList.hpp"
 #include "slic3r/GUI/UserManager.hpp"
@@ -91,8 +91,8 @@
 #include "MainFrame.hpp"
 #include "Plater.hpp"
 #include "BambuSmartPrint/BambuSmartPrintService.hpp"
-#include "OllamaAssistant/OllamaChatDialog.hpp"
-#include "OllamaAssistant/OllamaProcessingNotice.hpp"
+#include "Assistant/AssistantChatDialog.hpp"
+#include "Assistant/AssistantProcessingNotice.hpp"
 #include "libslic3r/SlicePilot/SlicePilotRestrictions.hpp"
 #include "GLCanvas3D.hpp"
 #include "EncodedFilament.hpp"
@@ -761,7 +761,7 @@ void GUI_App::post_init()
 
     load_ai_privacy_consent();
     CallAfter([this] { CrashReporter::offer_report_from_last_run(mainframe); });
-    OllamaMcpServer::start();
+    AssistantMcpServer::start();
 
     m_open_method = "double_click";
     bool switch_to_3d = false;
@@ -1066,19 +1066,19 @@ GUI_App::GUI_App()
     reset_to_active();
 }
 
-void GUI_App::cleanup_ollama_assistant()
+void GUI_App::cleanup_assistant_assistant()
 {
-    OllamaClient::cancel_active_requests(OllamaCancelDomain::All);
+    AssistantClient::cancel_active_requests(AssistantCancelDomain::All);
 
-    if (ollama_voice_input) {
-        ollama_voice_input->stop();
-        ollama_voice_input.reset();
+    if (assistant_voice_input) {
+        assistant_voice_input->stop();
+        assistant_voice_input.reset();
     }
 
-    OllamaMcpServer::stop();
+    AssistantMcpServer::stop();
 
-    OllamaChatDialog* dlg = ollama_chat_dialog;
-    ollama_chat_dialog    = nullptr;
+    AssistantChatDialog* dlg = assistant_chat_dialog;
+    assistant_chat_dialog    = nullptr;
     if (!dlg || dlg->IsBeingDeleted())
         return;
 
@@ -1087,7 +1087,7 @@ void GUI_App::cleanup_ollama_assistant()
     // During MainFrame close, reparent/destroy can crash on macOS; wx deletes children with the frame.
     if (is_closing()) {
         if (Plater* plater = plater_)
-            OllamaProcessingNotice::hide(plater);
+            AssistantProcessingNotice::hide(plater);
         return;
     }
 
@@ -1117,7 +1117,7 @@ void GUI_App::shutdown()
     if (m_is_recreating_gui) return;
     stop_http_server();
     set_closing(true);
-    cleanup_ollama_assistant();
+    cleanup_assistant_assistant();
     BOOST_LOG_TRIVIAL(info) << "GUI_App::shutdown exit";
 }
 
@@ -2294,7 +2294,7 @@ void GUI_App::init_networking_callbacks()
 GUI_App::~GUI_App()
 {
     BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< boost::format(": enter");
-    cleanup_ollama_assistant();
+    cleanup_assistant_assistant();
 
     if (app_config != nullptr) {
         BOOST_LOG_TRIVIAL(info) << __FUNCTION__<< boost::format(": destroy app_config");
@@ -2675,7 +2675,7 @@ void GUI_App::release_network_for_exit()
 int GUI_App::OnExit()
 {
     set_closing(true);
-    cleanup_ollama_assistant();
+    cleanup_assistant_assistant();
 
     stop_http_server();
     stop_sync_user_preset();

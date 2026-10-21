@@ -18,7 +18,7 @@ ModelSearchQuery ModelSearchQueryBuilder::build_query(const std::string& user_te
     if (q.normalized_text.empty())
         return q;
 
-    // translate_search_query_to_english() is a blocking Ollama HTTP call; only
+    // translate_search_query_to_english() is a blocking Assistant HTTP call; only
     // perform it when the caller guarantees a worker-thread context.
     if (allow_translation && q.contains_cjk)
         q.translated_english = translate_search_query_to_english(q.normalized_text);

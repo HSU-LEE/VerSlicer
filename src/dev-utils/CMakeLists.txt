@@ -24,9 +24,9 @@ endif()
 # using the above encoding-check binary
 
 if (ORCA_TOOLS)
-    # Headless Ollama tests — no verslicer.app required.
-    #   cmake --build build --target ollama_apply_golden_test ollama_pipeline_test
-    #   ctest -R 'ollama_(apply_golden|pipeline)_test' --output-on-failure
+    # Headless Assistant tests — no verslicer.app required.
+    #   cmake --build build --target assistant_apply_golden_test assistant_pipeline_test
+    #   ctest -R 'assistant_(apply_golden|pipeline)_test' --output-on-failure
     # macOS app bundle (manual QA only): build/<arch>/src/Release/verslicer.app
 
     add_executable(makerworld_search_test
@@ -39,7 +39,7 @@ if (ORCA_TOOLS)
         ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
     )
     target_link_libraries(makerworld_search_test libslic3r boost_headeronly)
-    target_compile_definitions(makerworld_search_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST)
+    target_compile_definitions(makerworld_search_test PRIVATE -DBOOST_ALL_NO_LIB -DASSISTANT_HEADLESS_TEST)
 
     add_executable(model_search_ranker_test
         model_search_ranker_test.cpp
@@ -52,42 +52,42 @@ if (ORCA_TOOLS)
         ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
     )
     target_link_libraries(model_search_ranker_test libslic3r boost_headeronly)
-    target_compile_definitions(model_search_ranker_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST)
+    target_compile_definitions(model_search_ranker_test PRIVATE -DBOOST_ALL_NO_LIB -DASSISTANT_HEADLESS_TEST)
 
-    add_executable(ollama_assistant_test
-        ollama_assistant_test.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaActionRegistry.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
+    add_executable(assistant_test
+        assistant_test.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingRegistry.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingCatalogBuilder.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingSearch.cpp
+        ../slic3r/GUI/Assistant/AssistantActionRegistry.cpp
+        ../slic3r/GUI/Assistant/AssistantActionJsonExtract.cpp
+        ../slic3r/GUI/Assistant/AssistantConfig.cpp
     )
-    target_include_directories(ollama_assistant_test PRIVATE
+    target_include_directories(assistant_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/..
         ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
     )
-    target_link_libraries(ollama_assistant_test libslic3r boost_headeronly)
-    target_compile_definitions(ollama_assistant_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST)
+    target_link_libraries(assistant_test libslic3r boost_headeronly)
+    target_compile_definitions(assistant_test PRIVATE -DBOOST_ALL_NO_LIB -DASSISTANT_HEADLESS_TEST)
 
-    add_executable(ollama_pipeline_test
-        ollama_pipeline_test.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaActionPipelineCore.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaBenchmarkScenarios.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaAgentGoalPlanner.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
+    add_executable(assistant_pipeline_test
+        assistant_pipeline_test.cpp
+        ../slic3r/GUI/Assistant/AssistantActionPipelineCore.cpp
+        ../slic3r/GUI/Assistant/AssistantActionJsonExtract.cpp
+        ../slic3r/GUI/Assistant/AssistantBenchmarkScenarios.cpp
+        ../slic3r/GUI/Assistant/AssistantRequestRouter.cpp
+        ../slic3r/GUI/Assistant/AssistantAgentGoalPlanner.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingSearch.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingCatalogBuilder.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingRegistry.cpp
+        ../slic3r/GUI/Assistant/AssistantConfig.cpp
     )
-    target_include_directories(ollama_pipeline_test PRIVATE
+    target_include_directories(assistant_pipeline_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/..
         ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
     )
-    target_link_libraries(ollama_pipeline_test libslic3r boost_headeronly)
-    target_compile_definitions(ollama_pipeline_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST)
+    target_link_libraries(assistant_pipeline_test libslic3r boost_headeronly)
+    target_compile_definitions(assistant_pipeline_test PRIVATE -DBOOST_ALL_NO_LIB -DASSISTANT_HEADLESS_TEST)
 
     add_executable(mesh_assist_test mesh_assist_test.cpp)
     target_include_directories(mesh_assist_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
@@ -99,79 +99,79 @@ if (ORCA_TOOLS)
     target_link_libraries(print_planner_test libslic3r boost_headeronly)
     target_compile_definitions(print_planner_test PRIVATE -DBOOST_ALL_NO_LIB)
 
-    add_executable(ollama_apply_golden_test
-        ollama_apply_golden_test.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
+    add_executable(assistant_apply_golden_test
+        assistant_apply_golden_test.cpp
+        ../slic3r/GUI/Assistant/AssistantActionJsonExtract.cpp
+        ../slic3r/GUI/Assistant/AssistantConfig.cpp
+        ../slic3r/GUI/Assistant/AssistantRequestRouter.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingRegistry.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingCatalogBuilder.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingSearch.cpp
     )
-    target_include_directories(ollama_apply_golden_test PRIVATE
+    target_include_directories(assistant_apply_golden_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/..
         ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
     )
-    target_link_libraries(ollama_apply_golden_test libslic3r boost_headeronly)
-    target_compile_definitions(ollama_apply_golden_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST)
+    target_link_libraries(assistant_apply_golden_test libslic3r boost_headeronly)
+    target_compile_definitions(assistant_apply_golden_test PRIVATE -DBOOST_ALL_NO_LIB -DASSISTANT_HEADLESS_TEST)
 
     add_executable(bambu_wiki_search_test
         bambu_wiki_search_test.cpp
-        ../slic3r/GUI/OllamaAssistant/BambuLabWikiSearchCore.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaActionCritic.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
+        ../slic3r/GUI/Assistant/BambuLabWikiSearchCore.cpp
+        ../slic3r/GUI/Assistant/AssistantActionCritic.cpp
+        ../slic3r/GUI/Assistant/AssistantActionJsonExtract.cpp
+        ../slic3r/GUI/Assistant/AssistantRequestRouter.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingSearch.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingCatalogBuilder.cpp
     )
     target_include_directories(bambu_wiki_search_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/..
         ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
     )
     target_link_libraries(bambu_wiki_search_test libslic3r boost_headeronly)
-    target_compile_definitions(bambu_wiki_search_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST)
+    target_compile_definitions(bambu_wiki_search_test PRIVATE -DBOOST_ALL_NO_LIB -DASSISTANT_HEADLESS_TEST)
 
-    add_executable(ollama_benchmark_test
-        ollama_benchmark_test.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaBenchmarkScenarios.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaRequestRouter.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
+    add_executable(assistant_benchmark_test
+        assistant_benchmark_test.cpp
+        ../slic3r/GUI/Assistant/AssistantBenchmarkScenarios.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingRegistry.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingCatalogBuilder.cpp
+        ../slic3r/GUI/Assistant/AssistantRequestRouter.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingSearch.cpp
+        ../slic3r/GUI/Assistant/AssistantActionJsonExtract.cpp
+        ../slic3r/GUI/Assistant/AssistantConfig.cpp
     )
-    target_include_directories(ollama_benchmark_test PRIVATE
+    target_include_directories(assistant_benchmark_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/..
         ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r
     )
-    target_link_libraries(ollama_benchmark_test libslic3r boost_headeronly)
-    target_compile_definitions(ollama_benchmark_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST)
+    target_link_libraries(assistant_benchmark_test libslic3r boost_headeronly)
+    target_compile_definitions(assistant_benchmark_test PRIVATE -DBOOST_ALL_NO_LIB -DASSISTANT_HEADLESS_TEST)
 
     add_executable(assistant_eval_test
         assistant_eval_test.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaEvalGrader.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaActionJsonExtract.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaFailureDoctor.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaPrinterControl.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingRegistry.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingCatalogBuilder.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaSettingSearch.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaConfig.cpp
-        ../slic3r/GUI/OllamaAssistant/OllamaActionRegistry.cpp
+        ../slic3r/GUI/Assistant/AssistantEvalGrader.cpp
+        ../slic3r/GUI/Assistant/AssistantActionJsonExtract.cpp
+        ../slic3r/GUI/Assistant/AssistantFailureDoctor.cpp
+        ../slic3r/GUI/Assistant/AssistantPrinterControl.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingRegistry.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingCatalogBuilder.cpp
+        ../slic3r/GUI/Assistant/AssistantSettingSearch.cpp
+        ../slic3r/GUI/Assistant/AssistantConfig.cpp
+        ../slic3r/GUI/Assistant/AssistantActionRegistry.cpp
     )
     target_include_directories(assistant_eval_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/.. ${CMAKE_CURRENT_SOURCE_DIR}/../slic3r)
     target_link_libraries(assistant_eval_test libslic3r boost_headeronly)
-    target_compile_definitions(assistant_eval_test PRIVATE -DBOOST_ALL_NO_LIB -DOLLAMA_HEADLESS_TEST
+    target_compile_definitions(assistant_eval_test PRIVATE -DBOOST_ALL_NO_LIB -DASSISTANT_HEADLESS_TEST
         -DASSISTANT_EVAL_CASES="${CMAKE_CURRENT_SOURCE_DIR}/eval/assistant_cases.json")
 
-    add_test(NAME ollama_assistant_test COMMAND ollama_assistant_test)
+    add_test(NAME assistant_test COMMAND assistant_test)
     add_test(NAME assistant_eval_test COMMAND assistant_eval_test)
-    add_test(NAME ollama_pipeline_test COMMAND ollama_pipeline_test)
+    add_test(NAME assistant_pipeline_test COMMAND assistant_pipeline_test)
     add_test(NAME mesh_assist_test COMMAND mesh_assist_test)
     add_test(NAME print_planner_test COMMAND print_planner_test)
-    add_test(NAME ollama_benchmark_test COMMAND ollama_benchmark_test)
-    add_test(NAME ollama_apply_golden_test COMMAND ollama_apply_golden_test)
+    add_test(NAME assistant_benchmark_test COMMAND assistant_benchmark_test)
+    add_test(NAME assistant_apply_golden_test COMMAND assistant_apply_golden_test)
     add_test(NAME bambu_wiki_search_test COMMAND bambu_wiki_search_test)
     add_test(NAME makerworld_search_test COMMAND makerworld_search_test)
     add_test(NAME model_search_ranker_test COMMAND model_search_ranker_test)

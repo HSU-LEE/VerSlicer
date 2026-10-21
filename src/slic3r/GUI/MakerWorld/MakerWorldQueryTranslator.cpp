@@ -1,7 +1,7 @@
 #include "MakerWorldQueryTranslator.hpp"
 
-#include "../OllamaAssistant/ChatGptAccount.hpp"
-#include "../OllamaAssistant/OllamaConfig.hpp"
+#include "../Assistant/ChatGptAccount.hpp"
+#include "../Assistant/AssistantConfig.hpp"
 #include "MakerWorldTelemetry.hpp"
 
 #include <boost/algorithm/string.hpp>
@@ -90,7 +90,7 @@ std::map<std::string, TranslationCacheEntry>& translation_cache()
     return cache;
 }
 
-std::string ollama_translate_sync(const std::string& host, const std::string& model, const std::string& query)
+std::string assistant_translate_sync(const std::string& host, const std::string& model, const std::string& query)
 {
     (void) host;
     const ChatGptCompletion completion = ChatGptAccount::complete(
@@ -133,7 +133,7 @@ std::string translate_search_query_to_english(const std::string& query)
             return it->second.value;
     }
 
-    const std::string translated = ollama_translate_sync(ollama_host_from_config(), ollama_model_from_config(), trimmed);
+    const std::string translated = assistant_translate_sync(assistant_host_from_config(), assistant_model_from_config(), trimmed);
     if (translated.empty())
         MakerWorldTelemetry::translation_failed(trimmed);
     {

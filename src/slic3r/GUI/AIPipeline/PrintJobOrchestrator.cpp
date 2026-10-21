@@ -7,7 +7,7 @@
 #include "../GUI_App.hpp"
 #include "../AICoach/AIGuiOrchestrator.hpp"
 #include "../ModelSearch/ModelSearchService.hpp"
-#include "../OllamaAssistant/AiLocale.hpp"
+#include "../Assistant/AiLocale.hpp"
 
 #include "libslic3r/AppConfig.hpp"
 #include "libslic3r/PresetBundle.hpp"
@@ -60,7 +60,7 @@ private:
 
 // Waiting-state deadlines: import waits on Plater's download/import hook,
 // slicing waits on the SliceDone event — both can silently never arrive.
-// Search waits on a detached worker (Ollama translation + MakerWorld HTTP) and
+// Search waits on a detached worker (Assistant translation + MakerWorld HTTP) and
 // can also hang without a deadline, leaving the UI stuck on "1/6 Search".
 constexpr int kSearchTimeoutMs = 60 * 1000;
 constexpr int kImportTimeoutMs = 120 * 1000;
@@ -90,7 +90,7 @@ bool print_job_orchestrator_enabled()
 void ScopedEventSubscription::reset()
 {
     if (m_id != 0) {
-        OllamaAgentEventBus::instance().unsubscribe(m_id);
+        AssistantAgentEventBus::instance().unsubscribe(m_id);
         m_id = 0;
     }
 }
@@ -625,14 +625,14 @@ void PrintJobOrchestrator::step_slice()
     set_slicing_job();
 
     // Job-scoped one-shot SliceDone subscription. The permanent
-    // OllamaAgentController subscriber is untouched.
+    // AssistantAgentController subscriber is untouched.
     std::weak_ptr<std::atomic<bool>> weak_alive = m_alive;
     std::weak_ptr<PrintJob>          weak_job   = m_job;
     const std::uint64_t              jid        = m_job->job_id;
 
-    const OllamaSubscriptionId id = OllamaAgentEventBus::instance().subscribe(
-        [this, weak_alive, weak_job, jid](const OllamaAgentEvent& evt) {
-            if (evt.kind != OllamaAgentEventKind::SliceDone)
+    const AssistantSubscriptionId id = AssistantAgentEventBus::instance().subscribe(
+        [this, weak_alive, weak_job, jid](const AssistantAgentEvent& evt) {
+            if (evt.kind != AssistantAgentEventKind::SliceDone)
                 return;
             // Strict job-id match. AIGuiOrchestrator stamps every SliceDone with
             // current_slicing_job_id(), which we registered (set_slicing_job)
@@ -669,11 +669,11 @@ void PrintJobOrchestrator::step_slice()
                  AiLocale::text("Slicing did not finish in time. Please try again."));
 }
 
-void PrintJobOrchestrator::on_agent_event(const OllamaAgentEvent& evt)
+void PrintJobOrchestrator::on_agent_event(const AssistantAgentEvent& evt)
 {
     if (!m_job || m_job->state != PrintJobState::Slicing)
         return;
-    if (evt.kind != OllamaAgentEventKind::SliceDone)
+    if (evt.kind != AssistantAgentEventKind::SliceDone)
         return;
 
     disarm_watchdog();
