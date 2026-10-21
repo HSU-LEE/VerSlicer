@@ -4,6 +4,7 @@
 #include "../slic3r/GUI/Assistant/AssistantModelPick.hpp"
 #include "../slic3r/GUI/Assistant/AssistantPurposeProfiles.hpp"
 #include "../slic3r/GUI/Assistant/AssistantWeakSpots.hpp"
+#include "../slic3r/GUI/Assistant/AssistantLearningSummary.hpp"
 #include "../slic3r/GUI/Assistant/AssistantSettingRegistry.hpp"
 #include "../slic3r/GUI/Assistant/AssistantSettingCatalogBuilder.hpp"
 
@@ -80,6 +81,22 @@ int main()
         fine.fits_bed = false; fine.bed_scale_factor = 0.5;
         const auto big = AssistantWeakSpots::describe(fine);
         expect_true(big.size() == 1 && big[0]["id"] == "too_big", "too big reported");
+    }
+
+    // Learning summary in plain words.
+    {
+        Slic3r::BambuSmartPrint::PrinterLearningProfile p;
+        expect_true(AssistantLearningSummary::describe(p)["empty"].get<bool>(), "empty learning");
+        p.total_prints = 10; p.successful_prints = 7; p.failed_prints = 3;
+        p.failures_by_category["adhesion"] = 2; p.failures_by_category["filament"] = 1;
+        p.setting_adjustments["bed_temperature"] = 3.f;
+        p.setting_adjustments["initial_layer_speed"] = -5.f;
+        const auto s = AssistantLearningSummary::describe(p);
+        expect_true(s["success_rate"].get<long>() == 70, "learning success rate");
+        expect_true(s["facts"].size() >= 2, "learning facts");
+        expect_true(s["facts"][1].get<std::string>().find("first layer") != std::string::npos, "top cause is adhesion");
+        expect_true(s["adjustments"].size() == 2, "learning adjustments listed");
+        expect_eq(s["adjustments"][0]["change"].get<std::string>(), "+3 °C", "bed temp change text");
     }
 
     nlohmann::json layer = 0.8;

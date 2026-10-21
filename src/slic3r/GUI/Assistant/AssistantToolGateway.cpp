@@ -61,6 +61,11 @@ const std::vector<nlohmann::json>& tool_defs()
                  "parts, too big), highlight overhangs on the 3D view and select the worst model. Use it when the "
                  "user asks if a model will print well, or before suggesting fixes.",
                  obj_schema({})),
+        tool_def("what_was_learned",
+                 "Read what Smart Print learned about the current printer from past prints (success rate, the most "
+                 "common failure cause, settings it adjusted). Use it when the user asks what VerSlicer knows about "
+                 "their printer, or why a suggestion changed.",
+                 obj_schema({})),
         tool_def("set_purpose",
                  "Set the print up for what it is for, when the user describes the use instead of settings "
                  "(a toy, a bracket, a vase, a quick fit test, a gift). Applies a fixed, reviewed set of print "
@@ -164,6 +169,8 @@ AssistantNormalizedTool AssistantToolGateway::normalize(const std::string& name,
         out.action = {{"type", "set_config"},
                       {"preset", args.value("preset", "print")},
                       {"options", args["options"]}};
+    } else if (name == "what_was_learned") {
+        out.action = {{"type", "what_was_learned"}};
     } else if (name == "show_weak_spots") {
         out.action = {{"type", "show_weak_spots"}};
     } else if (name == "set_purpose") {

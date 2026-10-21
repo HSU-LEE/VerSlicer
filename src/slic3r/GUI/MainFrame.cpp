@@ -1,5 +1,6 @@
 #include "BambuConnect.hpp"
 #include "Assistant/AssistantPrinterControl.hpp"
+#include "Assistant/AssistantLearningSummary.hpp"
 #include "MainFrame.hpp"
 
 #include <wx/panel.h>
@@ -3616,6 +3617,10 @@ void MainFrame::init_menubar_as_editor()
         _L("Let the AI assistant set nozzle, bed and chamber temperature and print speed on the connected printer"),
         [](wxCommandEvent&) { AssistantPrinterControl::set_enabled(!AssistantPrinterControl::enabled()); },
         this, []() { return true; }, []() { return AssistantPrinterControl::enabled(); }, this);
+    append_menu_item(smart_print_menu, wxID_ANY, _L("What VerSlicer learned…"),
+        _L("See what Smart Print learned about this printer from past prints"),
+        [](wxCommandEvent&) { AssistantLearningSummary::show_dialog(wxGetApp().plater()); },
+        "", nullptr, []() { return true; }, this);
     append_menu_item(smart_print_menu, wxID_ANY, _L("View failure history"), _L("Browse recorded print failures and feedback"),
         [](wxCommandEvent&) { BambuSmartPrintService::instance().show_history_dialog(wxGetApp().plater()); },
         "", nullptr, []() { return true; }, this);

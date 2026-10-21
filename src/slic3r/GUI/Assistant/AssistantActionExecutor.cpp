@@ -1,4 +1,5 @@
 #include "AssistantMeshOps.hpp"
+#include "AssistantLearningSummary.hpp"
 #include "AssistantActionExecutor.hpp"
 #include "AssistantActionRegistry.hpp"
 #include "AssistantFailureDoctor.hpp"
@@ -1786,6 +1787,7 @@ const std::unordered_map<std::string, ActionHandler>& action_handlers()
         h["select_object"]    = apply_select_object;
         h["set_config"]       = apply_set_config;
         h["show_weak_spots"]  = AssistantWeakSpots::apply;
+        h["what_was_learned"] = AssistantLearningSummary::apply;
         h["ui_select_tab"]    = apply_ui_select_tab;
         h["open_calibration"] = [](const nlohmann::json&) { return apply_open_calibration(); };
         h["delete_selection"] = [](const nlohmann::json&) { return apply_delete_selection(); };

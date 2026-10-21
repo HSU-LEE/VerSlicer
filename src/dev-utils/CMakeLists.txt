@@ -58,6 +58,7 @@ if (ORCA_TOOLS)
         assistant_test.cpp
         ../slic3r/GUI/Assistant/AssistantPurposeProfiles.cpp
         ../slic3r/GUI/Assistant/AssistantWeakSpots.cpp
+        ../slic3r/GUI/Assistant/AssistantLearningSummary.cpp
         ../slic3r/GUI/Assistant/AssistantSettingRegistry.cpp
         ../slic3r/GUI/Assistant/AssistantSettingCatalogBuilder.cpp
         ../slic3r/GUI/Assistant/AssistantSettingSearch.cpp
