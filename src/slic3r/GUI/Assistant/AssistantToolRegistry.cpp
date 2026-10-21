@@ -15,6 +15,14 @@ const AssistantToolSpec kTools[] = {
     {"list_objects", AssistantToolCategory::Readonly, "List models on the plate"},
     {"printer_diagnostics", AssistantToolCategory::Readonly,
      "Read the printer's current error code, HMS alerts and print stage, with suspect areas and settings to check. Call first when the user says a print failed."},
+    {"show_weak_spots", AssistantToolCategory::Readonly,
+     "Find where the models will likely fail and highlight it on the 3D view. Each problem comes with fix_tool. "
+     "Call it when the user asks if a model will print well, then explain the problems and apply the fixes."},
+    {"what_was_learned", AssistantToolCategory::Readonly, "Read what Smart Print learned about the current printer"},
+    {"camera_watch", AssistantToolCategory::Mutating,
+     "Report the printer's camera failure checks; enable:true turns them on (the user must allow printer control)."},
+    {"report_print_result", AssistantToolCategory::Mutating,
+     "Record how the last print came out (result: good, first_layer_lifted, warping, stringing, layer_shift, rough_walls, other)."},
     {"printer_control", AssistantToolCategory::Mutating,
      "Change the connected printer: target nozzle_temp, bed_temp or chamber_temp (value in °C, 0 = off), or print_speed "
      "(silent/standard/sport/ludicrous, while printing). Only when the user asks. The user must allow it once; limits are enforced."},

@@ -56,6 +56,7 @@ if (ORCA_TOOLS)
 
     add_executable(assistant_test
         assistant_test.cpp
+        ../slic3r/GUI/Assistant/AssistantModeJudge.cpp
         ../slic3r/GUI/Assistant/AssistantPurposeProfiles.cpp
         ../slic3r/GUI/Assistant/AssistantWeakSpots.cpp
         ../slic3r/GUI/Assistant/AssistantLearningSummary.cpp

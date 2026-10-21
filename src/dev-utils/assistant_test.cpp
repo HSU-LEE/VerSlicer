@@ -6,6 +6,7 @@
 #include "../slic3r/GUI/Assistant/AssistantWeakSpots.hpp"
 #include "../slic3r/GUI/Assistant/AssistantLearningSummary.hpp"
 #include "libslic3r/BambuSmartPrint/PrintFeedback.hpp"
+#include "../slic3r/GUI/Assistant/AssistantModeJudge.hpp"
 #include "../slic3r/GUI/Assistant/AssistantSettingRegistry.hpp"
 #include "../slic3r/GUI/Assistant/AssistantSettingCatalogBuilder.hpp"
 
@@ -106,6 +107,19 @@ int main()
         for (const auto& f : with_reports["facts"])
             reported = reported || f.get<std::string>().find("reported 1 problem") != std::string::npos;
         expect_true(reported, "user-reported problems counted");
+    }
+
+    // Mode judge: the request picks Question or Apply.
+    {
+        expect_true(AssistantModeJudge::judge("벽 4개로 해줘", false) == std::optional<bool>(true), "change in question mode -> apply");
+        expect_true(AssistantModeJudge::judge("Make this stronger", false) == std::optional<bool>(true), "en change -> apply");
+        expect_true(AssistantModeJudge::judge("이거 출력 잘될까", false) == std::optional<bool>(true), "check needs tools -> apply");
+        expect_true(AssistantModeJudge::judge("리트랙션이 뭐야?", true) == std::optional<bool>(false), "pure question -> question");
+        expect_true(AssistantModeJudge::judge("What is ironing?", true) == std::optional<bool>(false), "en question -> question");
+        expect_true(!AssistantModeJudge::judge("리트랙션이 뭐야?", false).has_value(), "question stays question");
+        expect_true(!AssistantModeJudge::judge("이거 출력 잘될까", true).has_value(), "check stays apply");
+        expect_true(!AssistantModeJudge::judge("왜 실패했는지 보고 고쳐줘", true).has_value(), "explain+fix stays apply");
+        expect_true(!AssistantModeJudge::judge("안녕", true).has_value(), "small talk keeps mode");
     }
 
     // Post-print feedback maps to the failure category it teaches.

@@ -29562,3 +29562,9 @@ msgstr "출력이 끝난 뒤 문제를 %1%번 알려주셨습니다."
 
 msgid "because %s"
 msgstr "%s 때문"
+
+msgid "Switched to Apply mode for this request."
+msgstr "요청에 맞춰 적용 모드로 바꿨습니다."
+
+msgid "Switched to Question mode: this only needs an answer."
+msgstr "답변만 필요한 질문이라 질문 모드로 바꿨습니다."

@@ -59,7 +59,9 @@ const std::vector<nlohmann::json>& tool_defs()
         tool_def("show_weak_spots",
                  "Find where the models on the plate are likely to fail (overhangs, small base, tipping, thin "
                  "parts, too big), highlight overhangs on the 3D view and select the worst model. Use it when the "
-                 "user asks if a model will print well, or before suggesting fixes.",
+                 "user asks if a model will print well, or before suggesting fixes. Then, without asking, explain the "
+                 "problems in plain words and call each problem's fix_tool (settings go to the user's review); "
+                 "when there are no problems, say it should print well.",
                  obj_schema({})),
         tool_def("camera_watch",
                  "The printer's own camera AI (AI print monitoring, spaghetti, first-layer, nozzle clumping and air "

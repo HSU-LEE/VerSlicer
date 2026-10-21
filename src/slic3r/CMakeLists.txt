@@ -140,6 +140,8 @@ set(SLIC3R_GUI_SOURCES
     GUI/Assistant/AssistantExecutionPolicy.hpp
     GUI/Assistant/AssistantToolRegistry.cpp
     GUI/Assistant/AssistantToolRegistry.hpp
+    GUI/Assistant/AssistantModeJudge.cpp
+    GUI/Assistant/AssistantModeJudge.hpp
     GUI/Assistant/AssistantPurposeProfiles.cpp
     GUI/Assistant/AssistantPurposeProfiles.hpp
     GUI/Assistant/AssistantToolGateway.cpp
