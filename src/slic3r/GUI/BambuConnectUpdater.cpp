@@ -298,7 +298,8 @@ bool auto_update_enabled()
 void check_for_updates_async()
 {
     AppConfig* cfg = wxGetApp().app_config;
-    if (!cfg || !auto_update_enabled() || !installed() || g_busy.exchange(true))
+    // Stealth Mode promises no traffic to Bambu Lab's servers.
+    if (!cfg || cfg->get_stealth_mode() || !auto_update_enabled() || !installed() || g_busy.exchange(true))
         return;
     const long long now  = static_cast<long long>(std::time(nullptr));
     long long       last = 0;

@@ -22,10 +22,13 @@
 
 #include <cctype>
 #include <cstdio>
+#include <ctime>
 
 namespace Slic3r { namespace GUI { namespace BambuConnect {
 
 namespace { constexpr const char* kLanNoticeDismissedKey = "bambu_lan_mode_notice_dismissed"; }
+
+bool g_network_restriction_notice_shown = false;
 
 std::string encode_uri_component(const std::string& s)
 {
@@ -115,6 +118,14 @@ bool send_current_plate(Plater* plater)
     const fs::path dir = fs::path(data_dir()) / "bambu_connect";
     boost::system::error_code ec;
     fs::create_directories(dir, ec);
+    // Each print leaves a sliced copy for Bambu Connect to read; drop the ones
+    // older than a day so the folder does not grow without bound.
+    const std::time_t day_ago = std::time(nullptr) - 24 * 3600;
+    for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
+        boost::system::error_code ignore;
+        if (fs::is_regular_file(it->path(), ignore) && fs::last_write_time(it->path(), ignore) < day_ago)
+            fs::remove(it->path(), ignore);
+    }
 
     std::string name = plater->get_project_name().utf8_string();
     const int   plate_idx = plater->get_partplate_list().get_curr_plate_index();
@@ -142,7 +153,7 @@ bool send_current_plate(Plater* plater)
 
 void notify_cloud_printer_selected(wxWindow* parent, MachineObject* obj)
 {
-    if (!obj || obj->is_lan_mode_printer())
+    if (!obj || obj->is_lan_mode_printer() || g_network_restriction_notice_shown)
         return;
     AppConfig* cfg = wxGetApp().app_config;
     if (cfg && cfg->get_bool(kLanNoticeDismissedKey))

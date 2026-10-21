@@ -2,6 +2,7 @@
 #include "OrcaCloudServiceAgent.hpp"
 #include "libslic3r/Technologies.hpp"
 #include "GUI_App.hpp"
+#include "BambuConnect.hpp"
 #include "BambuConnectUpdater.hpp"
 #include "OllamaAssistant/OllamaVoiceInput.hpp"
 #include "OllamaAssistant/OllamaClient.hpp"
@@ -5765,9 +5766,8 @@ bool GUI_App::process_network_msg(std::string dev_id, std::string msg)
         }
         else if (msg == "unsigned_studio") {
             BOOST_LOG_TRIVIAL(info) << "process_network_msg, unsigned_studio";
-            static bool unsigned_studio_shown = false;
-            if (!unsigned_studio_shown) {
-                unsigned_studio_shown = true;
+            if (!BambuConnect::g_network_restriction_notice_shown) {
+                BambuConnect::g_network_restriction_notice_shown = true;
                 MessageDialog msg_dlg(nullptr,
                     wxString::Format(_L("To use %s with Bambu Lab printers, enable LAN mode and Developer mode on the printer.\n\n"
                        "1. Printer settings → turn on LAN mode\n"

@@ -565,35 +565,22 @@ struct CallbackResult
     std::string state;
     std::string client_id;
     std::string scope;
+    int         client{-1}; // browser connection, kept open until sign-in finishes
+    bool        denied{false}; // the user cancelled in the browser
 };
 
-CallbackResult wait_for_callback(int listen_fd)
+/** Answer the browser with the real outcome, then close the connection. */
+void send_callback_page(int client, bool ok, bool denied)
 {
-    CallbackResult out;
-    struct timeval tv;
-    tv.tv_sec  = 180;
-    tv.tv_usec = 0;
-    setsockopt(listen_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    const int client = ::accept(listen_fd, nullptr, nullptr);
-    if (client < 0) {
-        out.error = "ChatGPT sign-in timed out.";
-        return out;
-    }
-    std::string request;
-    char        buf[1024];
-    while (request.find("\r\n\r\n") == std::string::npos && request.size() < 8192) {
-        const ssize_t n = ::recv(client, buf, sizeof(buf), 0);
-        if (n <= 0)
-            break;
-        request.append(buf, buf + n);
-    }
-    const bool denied = request.find("error=") != std::string::npos;
-    const std::string title = denied ? _u8L("Connection cancelled") : _u8L("Connected");
-    const std::string body  = denied
-        ? _u8L("You did not press Allow in the browser. Close this window and connect again from VerSlicer.")
-        : _u8L("Your ChatGPT account is connected to VerSlicer. Close this window and return to the app.");
-    const char* mark  = denied ? "!" : "✓";
-    const char* tone  = denied ? "#E14747" : "#FF8F4A";
+    if (client < 0)
+        return;
+    const std::string title = ok ? _u8L("Connected") : denied ? _u8L("Connection cancelled") : _u8L("Connection failed");
+    const std::string body  = ok
+        ? _u8L("Your ChatGPT account is connected to VerSlicer. Close this window and return to the app.")
+        : denied ? _u8L("You did not press Allow in the browser. Close this window and connect again from VerSlicer.")
+                 : _u8L("Sign-in did not finish. Return to VerSlicer to see why, then connect again.");
+    const char* mark = ok ? "✓" : "!";
+    const char* tone = ok ? "#FF8F4A" : "#E14747";
     const std::string html = std::string(
         "<!doctype html><html><head><meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
@@ -616,30 +603,69 @@ CallbackResult wait_for_callback(int listen_fd)
         + std::to_string(html.size()) + "\r\n\r\n" + html;
     ::send(client, response.data(), response.size(), 0);
     ::close(client);
+}
 
-    const auto line_end = request.find("\r\n");
-    const std::string line = line_end == std::string::npos ? request : request.substr(0, line_end);
-    const auto qpos = line.find('?');
-    const auto sp   = line.find(' ', qpos == std::string::npos ? 0 : qpos);
-    if (qpos == std::string::npos || sp == std::string::npos) {
-        out.error = "ChatGPT callback was empty.";
+/** Wait up to 3 minutes for GET /auth/callback. Browsers also open empty
+ *  speculative connections and ask for /favicon.ico; those are answered and
+ *  skipped instead of being taken for the callback. */
+CallbackResult wait_for_callback(int listen_fd)
+{
+    CallbackResult out;
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(3);
+    for (;;) {
+        const auto left = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now()).count();
+        if (left <= 0) {
+            out.error = "ChatGPT sign-in timed out.";
+            return out;
+        }
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(listen_fd, &fds);
+        timeval wait{static_cast<long>(left / 1000), static_cast<int>((left % 1000) * 1000)};
+        if (::select(listen_fd + 1, &fds, nullptr, nullptr, &wait) <= 0)
+            continue;
+        const int client = ::accept(listen_fd, nullptr, nullptr);
+        if (client < 0)
+            continue;
+        timeval rcv{5, 0};
+        setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &rcv, sizeof(rcv));
+        std::string request;
+        char        buf[1024];
+        while (request.find("\r\n\r\n") == std::string::npos && request.size() < 8192) {
+            const ssize_t n = ::recv(client, buf, sizeof(buf), 0);
+            if (n <= 0)
+                break;
+            request.append(buf, buf + n);
+        }
+        if (request.rfind("GET /auth/callback?", 0) != 0) {
+            static const std::string not_found = "HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
+            if (!request.empty())
+                ::send(client, not_found.data(), not_found.size(), 0);
+            ::close(client);
+            continue;
+        }
+        out.client = client;
+        const auto line_end = request.find("\r\n");
+        const std::string line = request.substr(0, line_end);
+        const auto qpos = line.find('?');
+        const auto sp   = line.find(' ', qpos);
+        const std::string query = line.substr(qpos + 1, sp == std::string::npos ? std::string::npos : sp - qpos - 1);
+        out.code      = query_value(query, "code");
+        out.state     = query_value(query, "state");
+        out.client_id = query_value(query, "client_id");
+        out.scope     = query_value(query, "scope");
+        out.error     = query_value(query, "error");
+        if (!out.error.empty()) {
+            out.denied = true;
+            const std::string desc = query_value(query, "error_description");
+            if (!desc.empty())
+                out.error = desc;
+            return out;
+        }
+        if (out.code.empty())
+            out.error = "ChatGPT did not return an authorization code.";
         return out;
     }
-    const std::string query = line.substr(qpos + 1, sp - qpos - 1);
-    out.code      = query_value(query, "code");
-    out.state     = query_value(query, "state");
-    out.client_id = query_value(query, "client_id");
-    out.scope     = query_value(query, "scope");
-    out.error     = query_value(query, "error");
-    if (!out.error.empty()) {
-        const std::string desc = query_value(query, "error_description");
-        if (!desc.empty())
-            out.error = desc;
-        return out;
-    }
-    if (out.code.empty())
-        out.error = "ChatGPT did not return an authorization code.";
-    return out;
 }
 
 bool scope_allows_inference(const std::string& scope)
@@ -991,6 +1017,40 @@ void ChatGptAccount::sign_out()
     boost::filesystem::remove(account_path(), ec);
 }
 
+/** Everything after the browser callback: checks and the token exchange. */
+static std::string finish_sign_in(const CallbackResult& callback, const std::string& state, bool fresh,
+                           const std::string& saved_client, const std::string& verifier,
+                           const std::string& redirect, const std::string& nonce, const std::string& host)
+{
+    if (!callback.error.empty())
+        return callback.error;
+    if (callback.state != state)
+        return "ChatGPT sign-in state did not match.";
+
+    std::string issued = callback.client_id.empty() ? saved_client : callback.client_id;
+    if (fresh && (issued.empty() || issued == "dynamic_agent_client"))
+        return "ChatGPT did not finish registering VerSlicer.";
+    if (!fresh && !callback.client_id.empty() && callback.client_id != saved_client)
+        return "ChatGPT returned a different app registration.";
+
+    const std::string form = "grant_type=authorization_code&client_id=" + url_encode(issued)
+        + "&code=" + url_encode(callback.code)
+        + "&code_verifier=" + url_encode(verifier)
+        + "&redirect_uri=" + url_encode(redirect)
+        + "&resource=" + url_encode(kResource);
+    const HttpResult token_http = http_request(
+        "POST", kAuthToken, form, {{"Content-Type", "application/x-www-form-urlencoded"}}, 30, nullptr, nullptr);
+    if (token_http.status < 200 || token_http.status >= 300) {
+        const std::string message = json_error_message(token_http.body);
+        return message.empty() ? "ChatGPT token exchange failed." : message;
+    }
+    try {
+        return apply_token_response(nlohmann::json::parse(token_http.body), issued, nonce, host, true);
+    } catch (...) {
+        return "ChatGPT token response could not be read.";
+    }
+}
+
 std::string ChatGptAccount::sign_in()
 {
     const std::string host = host_id();
@@ -1068,33 +1128,9 @@ std::string ChatGptAccount::sign_in()
 
     const CallbackResult callback = wait_for_callback(listen_fd);
     ::close(listen_fd);
-    if (!callback.error.empty())
-        return callback.error;
-    if (callback.state != state)
-        return "ChatGPT sign-in state did not match.";
-
-    std::string issued = callback.client_id.empty() ? saved_client : callback.client_id;
-    if (fresh && (issued.empty() || issued == "dynamic_agent_client"))
-        return "ChatGPT did not finish registering VerSlicer.";
-    if (!fresh && !callback.client_id.empty() && callback.client_id != saved_client)
-        return "ChatGPT returned a different app registration.";
-
-    const std::string form = "grant_type=authorization_code&client_id=" + url_encode(issued)
-        + "&code=" + url_encode(callback.code)
-        + "&code_verifier=" + url_encode(verifier)
-        + "&redirect_uri=" + url_encode(redirect)
-        + "&resource=" + url_encode(kResource);
-    const HttpResult token_http = http_request(
-        "POST", kAuthToken, form, {{"Content-Type", "application/x-www-form-urlencoded"}}, 30, nullptr, nullptr);
-    if (token_http.status < 200 || token_http.status >= 300) {
-        const std::string message = json_error_message(token_http.body);
-        return message.empty() ? "ChatGPT token exchange failed." : message;
-    }
-    try {
-        return apply_token_response(nlohmann::json::parse(token_http.body), issued, nonce, host, true);
-    } catch (...) {
-        return "ChatGPT token response could not be read.";
-    }
+    const std::string result = finish_sign_in(callback, state, fresh, saved_client, verifier, redirect, nonce, host);
+    send_callback_page(callback.client, result.empty(), callback.denied);
+    return result;
 }
 
 std::vector<std::string> ChatGptAccount::list_models(std::string* error)

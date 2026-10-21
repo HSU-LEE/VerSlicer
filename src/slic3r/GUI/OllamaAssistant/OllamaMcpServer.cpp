@@ -7,10 +7,12 @@
 #include "libslic3r/Utils.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
 
+#include <boost/algorithm/string.hpp>
 #include <boost/log/trivial.hpp>
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -38,6 +40,8 @@ std::thread       g_thread;
 int               g_listen_fd{-1};
 std::mutex        g_listen_mutex;
 std::string       g_token;
+std::atomic<int>  g_clients{0};
+constexpr int     kMaxClients = 8;
 
 std::string random_token()
 {
@@ -73,13 +77,28 @@ void write_cursor_config(int port)
     BOOST_LOG_TRIVIAL(info) << "VerSlicer MCP config written to " << path;
 }
 
+/** Value of an HTTP header. Header names are case-insensitive (Node-based MCP
+ *  clients send them lowercase), so match the name without regard to case. */
+std::string header_value(const std::string& headers, const std::string& name)
+{
+    std::istringstream in(headers);
+    std::string        line;
+    while (std::getline(in, line)) {
+        const auto colon = line.find(':');
+        if (colon == std::string::npos)
+            continue;
+        if (boost::iequals(boost::trim_copy(line.substr(0, colon)), name))
+            return boost::trim_copy(line.substr(colon + 1));
+    }
+    return {};
+}
+
 bool authorized(const std::string& headers)
 {
-    const std::string bearer = "Authorization: Bearer " + g_token;
-    if (headers.find(bearer) != std::string::npos)
+    const std::string auth = header_value(headers, "Authorization");
+    if (auth.size() > 7 && boost::iequals(auth.substr(0, 7), "Bearer ") && auth.substr(7) == g_token)
         return true;
-    const std::string alt = "X-VerSlicer-Token: " + g_token;
-    return headers.find(alt) != std::string::npos;
+    return header_value(headers, "X-VerSlicer-Token") == g_token;
 }
 
 std::string http_response(int status, const std::string& body, const char* content_type)
@@ -158,6 +177,10 @@ nlohmann::json handle_rpc(const nlohmann::json& msg)
 
 void handle_client(int fd)
 {
+    // A client that connects and goes quiet must not hold this thread forever.
+    timeval rcv{10, 0};
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &rcv, sizeof(rcv));
+    struct Slot { ~Slot() { --g_clients; } } slot;
     std::string data;
     char buf[4096];
     while (data.find("\r\n\r\n") == std::string::npos) {
@@ -175,9 +198,8 @@ void handle_client(int fd)
     }
     const std::string headers = data.substr(0, header_end);
     std::string body = data.substr(header_end + 4);
-    size_t content_length = 0;
-    if (const auto pos = headers.find("Content-Length:"); pos != std::string::npos)
-        content_length = static_cast<size_t>(std::strtoul(headers.c_str() + pos + 15, nullptr, 10));
+    const size_t content_length =
+        std::min<size_t>(std::strtoul(header_value(headers, "Content-Length").c_str(), nullptr, 10), 4 * 1024 * 1024);
     while (body.size() < content_length) {
         const ssize_t n = ::recv(fd, buf, sizeof(buf), 0);
         if (n <= 0)
@@ -240,6 +262,11 @@ void serve(int port)
         const int fd = ::accept(g_listen_fd, reinterpret_cast<sockaddr*>(&client), &len);
         if (fd < 0)
             continue;
+        if (g_clients.load() >= kMaxClients) {
+            ::close(fd); // too many open requests at once
+            continue;
+        }
+        ++g_clients;
         std::thread(handle_client, fd).detach();
     }
     (void) port;

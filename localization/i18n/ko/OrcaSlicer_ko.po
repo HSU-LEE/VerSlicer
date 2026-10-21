@@ -26557,3 +26557,9 @@ msgstr "프린터로 보냈습니다: %s. 프린터의 확인을 기다리는 �
 #, c-format
 msgid "The printer already reports %s, so nothing changed."
 msgstr "프린터가 이미 %s 상태라 바뀐 것이 없습니다."
+
+msgid "Connection failed"
+msgstr "연결 실패"
+
+msgid "Sign-in did not finish. Return to VerSlicer to see why, then connect again."
+msgstr "로그인이 끝나지 않았습니다. VerSlicer로 돌아가 이유를 확인한 뒤 다시 연결하세요."

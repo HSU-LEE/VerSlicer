@@ -15,6 +15,8 @@
 #include "../DeviceCore/DevBed.h"
 #include "../DeviceCore/DevExtruderSystem.h"
 #include "OllamaChatPanel.hpp"
+#include "../NotificationManager.hpp"
+#include "../Plater.hpp"
 
 #include <wx/timer.h>
 
@@ -236,6 +238,19 @@ bool OllamaPrinterControl::ensure_consent(wxWindow* parent)
 
 namespace {
 
+/** Show a printer-control result in the chat, or as an app notification when
+ *  the chat panel is closed, so the outcome is never lost. */
+void report(const wxString& text, bool error)
+{
+    if (OllamaChatPanel* panel = OllamaChatPanel::active_panel()) {
+        panel->post_assistant_note(text, error);
+        return;
+    }
+    if (Plater* plater = wxGetApp().plater())
+        if (NotificationManager* nm = plater->get_notification_manager())
+            nm->push_notification(text.utf8_string());
+}
+
 /** What the printer itself reports for `target` right now. */
 std::optional<int> reported_value(MachineObject* obj, PrinterControlTarget target)
 {
@@ -266,9 +281,10 @@ void verify_on_printer(const std::string& dev_id, PrinterControlRequest req, boo
 {
     // Already at the value: a match would not prove the printer accepted anything.
     if (before && matches(req, *before)) {
-        if (OllamaChatPanel* panel = OllamaChatPanel::active_panel())
-            panel->post_assistant_note(wxString::Format(_L("The printer already reports %s, so nothing changed."),
-                                                        wxString::FromUTF8(OllamaPrinterControl::describe(req, true))));
+        // After the reply that is being built now, so the chat reads in order.
+        const wxString text = wxString::Format(_L("The printer already reports %s, so nothing changed."),
+                                               wxString::FromUTF8(OllamaPrinterControl::describe(req, true)));
+        wxTheApp->CallAfter([text]() { report(text, false); });
         return;
     }
     auto* timer = new wxTimer();
@@ -276,8 +292,7 @@ void verify_on_printer(const std::string& dev_id, PrinterControlRequest req, boo
     timer->Bind(wxEVT_TIMER, [timer, ticks, dev_id, req, lan](wxTimerEvent&) {
         auto finish = [timer](const wxString& text, bool error) {
             timer->Stop();
-            if (OllamaChatPanel* panel = OllamaChatPanel::active_panel())
-                panel->post_assistant_note(text, error);
+            report(text, error);
             wxTheApp->CallAfter([timer]() { delete timer; });
         };
         if (wxGetApp().is_closing()) {

@@ -15,7 +15,8 @@ bool ai_privacy_consent_given();
 /** Main thread, at startup: load the stored answer into the thread-safe cache. */
 void load_ai_privacy_consent();
 
-constexpr const char* kAiPrivacyConsentVersion = "1";
+// 2: the sign-in moved from the Keychain to an owner-only file (3.2.1).
+constexpr const char* kAiPrivacyConsentVersion = "2";
 
 }} // namespace
 

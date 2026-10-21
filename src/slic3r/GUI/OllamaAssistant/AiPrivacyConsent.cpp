@@ -14,14 +14,16 @@ namespace {
 constexpr const char* kConsentKey = "privacy_consent";
 std::atomic<bool>     g_consent{false};
 
-// AppConfig writes "1" back to disk as JSON true, so after a restart the value
-// reads as "true". Accept both, or the notice reappears on every launch.
+// The stored value is the notice version the user agreed to. AppConfig turns
+// "1" into JSON true, which reads back as "true": that was version 1.
 bool stored_consent(AppConfig* cfg)
 {
     if (!cfg)
         return false;
-    const std::string v = cfg->get(kOllamaConfigSection, kConsentKey);
-    return v == kAiPrivacyConsentVersion || v == "true";
+    std::string v = cfg->get(kOllamaConfigSection, kConsentKey);
+    if (v == "true")
+        v = "1";
+    return v == kAiPrivacyConsentVersion;
 }
 }
 
