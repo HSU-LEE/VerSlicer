@@ -76,7 +76,7 @@ SuccessPrediction SuccessPredictor::predict(const std::string& printer_id, const
 
     if (config.has("raft_layers") && config_get_int(config, "raft_layers", 0) > 0) {
         score -= 5.f;
-        p.risk_factors.push_back("Raft enabled — Verslicer recommends brim + tree supports instead");
+        p.risk_factors.push_back("Raft enabled — VerSlicer recommends brim + tree supports instead");
     }
 
     if (slice && slice->valid) {

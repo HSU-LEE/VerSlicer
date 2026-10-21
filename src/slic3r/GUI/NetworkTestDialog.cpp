@@ -137,11 +137,11 @@ wxBoxSizer* NetworkTestDialog::create_content_sizer(wxWindow* parent)
 	grid_sizer->SetFlexibleDirection(wxBOTH);
 	grid_sizer->SetNonFlexibleGrowMode(wxFLEX_GROWMODE_SPECIFIED);
 
-	btn_link = new Button(this, _L("Test Verslicer (GitHub)"));
+	btn_link = new Button(this, _L("Test VerSlicer (GitHub)"));
     btn_link->SetStyle(ButtonStyle::Regular, ButtonType::Window);
 	grid_sizer->Add(btn_link, 0, wxEXPAND | wxALL, 5);
 
-	text_link_title = new wxStaticText(this, wxID_ANY, _L("Test Verslicer (GitHub):"), wxDefaultPosition, wxDefaultSize, 0);
+	text_link_title = new wxStaticText(this, wxID_ANY, _L("Test VerSlicer (GitHub):"), wxDefaultPosition, wxDefaultSize, 0);
 	text_link_title->Wrap(-1);
 	grid_sizer->Add(text_link_title, 0, wxALIGN_RIGHT | wxALL | wxALIGN_CENTER_VERTICAL, 5);
 

@@ -155,10 +155,10 @@ static std::string build_summary_text(const std::string& assistant_msg,
         return assistant_msg;
 
     if (change_count > 0) {
-        return (boost::format(ai_catalog_text("Verslicer AI proposes %s setting change(s).")) % change_count).str();
+        return (boost::format(ai_catalog_text("VerSlicer AI proposes %s setting change(s).")) % change_count).str();
     }
 
-    return ai_catalog_text("Review Verslicer AI suggestions.");
+    return ai_catalog_text("Review VerSlicer AI suggestions.");
 }
 
 static void prepend_ai_change_insights(SmartPrintWorkflowContent& content,
@@ -169,7 +169,7 @@ static void prepend_ai_change_insights(SmartPrintWorkflowContent& content,
 
     BambuSmartPrint::PrintInsight header;
     header.label    = ai_catalog_text("AI adjustments");
-    header.detail   = ai_catalog_text("Verslicer AI proposes the settings below — review before applying.");
+    header.detail   = ai_catalog_text("VerSlicer AI proposes the settings below — review before applying.");
     header.severity = BambuSmartPrint::RiskSeverity::Low;
     content.insights.insert(content.insights.begin(), header);
 

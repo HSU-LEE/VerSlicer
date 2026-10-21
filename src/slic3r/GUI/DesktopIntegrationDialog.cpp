@@ -316,7 +316,7 @@ void DesktopIntegrationDialog::perform_desktop_integration()
         }
     }
     if(target_dir_icons.empty()) {
-        BOOST_LOG_TRIVIAL(error) << "Copying Verslicer icon to icons directory failed.";
+        BOOST_LOG_TRIVIAL(error) << "Copying VerSlicer icon to icons directory failed.";
     } else 
     	// save path to icon
         app_config->set("desktop_integration_icon_slicer_path", GUI::format("%1%/images/%2%Verslicer%3%.png", target_dir_icons, icon_theme_path, version_suffix));
@@ -346,11 +346,11 @@ void DesktopIntegrationDialog::perform_desktop_integration()
 
             std::string path = GUI::format("%1%/applications/com.orcaslicer.Verslicer%2%.desktop", target_dir_desktop, version_suffix);
             if (create_desktop_file(path, desktop_file)){
-                BOOST_LOG_TRIVIAL(debug) << "com.orcaslicer.Verslicer.desktop file installation success.";
+                BOOST_LOG_TRIVIAL(debug) << "com.orcaslicer.VerSlicer.desktop file installation success.";
                 break;
             } else {
             	// write failed - try another path
-                BOOST_LOG_TRIVIAL(debug) << "Attempt to com.orcaslicer.Verslicer.desktop file installation failed. failed path: " << target_candidates[i];
+                BOOST_LOG_TRIVIAL(debug) << "Attempt to com.orcaslicer.VerSlicer.desktop file installation failed. failed path: " << target_candidates[i];
                 target_dir_desktop.clear(); 
             }
             // if all failed - try creating default home folder
@@ -420,7 +420,7 @@ void DesktopIntegrationDialog::perform_desktop_integration()
             app_config->set("desktop_integration_app_viewer_path", desktop_path);
         else {
             BOOST_LOG_TRIVIAL(error) << "Performing desktop integration failed - could not create Gcodeviewer desktop file";
-            show_error(nullptr, _L("Performing desktop integration failed - could not create Gcodeviewer desktop file. Verslicer desktop file was probably created successfully."));
+            show_error(nullptr, _L("Performing desktop integration failed - could not create Gcodeviewer desktop file. VerSlicer desktop file was probably created successfully."));
         }
     }
     
@@ -535,7 +535,7 @@ void DesktopIntegrationDialog::perform_downloader_desktop_integration(std::strin
 
     std::string desktop_file_downloader = GUI::format(
         "[Desktop Entry]\n"
-        "Name=Verslicer URL Protocol %1% %2%\n"
+        "Name=VerSlicer URL Protocol %1% %2%\n"
         "Exec=%3% %%u\n"
         "Terminal=false\n"
         "Type=Application\n"
@@ -553,12 +553,12 @@ void DesktopIntegrationDialog::perform_downloader_desktop_integration(std::strin
             if (create_desktop_file(path, desktop_file_downloader)) {
                 app_config->set("desktop_integration_URL_path", path);
                 candidate_found = true;
-                BOOST_LOG_TRIVIAL(debug) << "VerslicerURLProtocol.desktop file installation success.";
+                BOOST_LOG_TRIVIAL(debug) << "VerSlicerURLProtocol.desktop file installation success.";
                 break;
             }
             else {
                 // write failed - try another path
-                BOOST_LOG_TRIVIAL(debug) << "Attempt to VerslicerURLProtocol.desktop file installation failed. failed path: " << target_candidates[i];
+                BOOST_LOG_TRIVIAL(debug) << "Attempt to VerSlicerURLProtocol.desktop file installation failed. failed path: " << target_candidates[i];
                 target_dir_desktop.clear();
             }
         }
@@ -598,14 +598,14 @@ void DesktopIntegrationDialog::perform_downloader_desktop_integration(std::strin
         // save path to desktop file
         app_config->set("desktop_integration_URL_path", desktop_path);
         // finish registration on mime type
-        std::string command = GUI::format("xdg-mime default VerslicerURLProtocol-%1%%2%.desktop x-scheme-handler/%1%", url_prefix, version_suffix);
+        std::string command = GUI::format("xdg-mime default VerSlicerURLProtocol-%1%%2%.desktop x-scheme-handler/%1%", url_prefix, version_suffix);
         BOOST_LOG_TRIVIAL(debug) << "system command: " << command;
         int r = system(command.c_str());
         BOOST_LOG_TRIVIAL(debug) << "system result: " << r;
     }
 
     // finish registration on mime type
-    std::string command = GUI::format("xdg-mime default VerslicerURLProtocol-%1%%2%.desktop x-scheme-handler/%1%", url_prefix, version_suffix);
+    std::string command = GUI::format("xdg-mime default VerSlicerURLProtocol-%1%%2%.desktop x-scheme-handler/%1%", url_prefix, version_suffix);
     BOOST_LOG_TRIVIAL(debug) << "system command: " << command;
     int r = system(command.c_str());
     BOOST_LOG_TRIVIAL(debug) << "system result: " << r;

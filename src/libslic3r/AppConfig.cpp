@@ -573,7 +573,7 @@ void AppConfig::set_defaults()
 
     if (get("installed_networking").empty()) {
         // Verslicer depends on Bambu networking; stock Orca defaults off.
-        const bool verslicer = std::string(SLIC3R_APP_FULL_NAME) == "Verslicer";
+        const bool verslicer = std::string(SLIC3R_APP_FULL_NAME) == "VerSlicer";
         set_bool("installed_networking", verslicer);
     }
 

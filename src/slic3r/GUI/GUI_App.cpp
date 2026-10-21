@@ -914,7 +914,7 @@ void GUI_App::post_init()
 
     m_show_gcode_window = app_config->get_bool("show_gcode_window");
     if (m_networking_need_update) {
-        if (std::string(SLIC3R_APP_FULL_NAME) == "Verslicer") {
+        if (std::string(SLIC3R_APP_FULL_NAME) == "VerSlicer") {
             CallAfter([this]() {
                 if (!ensure_bambu_network_plugin_installed(true))
                     show_network_plugin_download_dialog(false);
@@ -922,7 +922,7 @@ void GUI_App::post_init()
         } else {
             show_network_plugin_download_dialog(false);
         }
-    } else if (std::string(SLIC3R_APP_FULL_NAME) == "Verslicer"
+    } else if (std::string(SLIC3R_APP_FULL_NAME) == "VerSlicer"
         && app_config->get_bool("installed_networking")
         && !Slic3r::NetworkAgent::is_network_module_loaded()) {
         CallAfter([this]() { ensure_bambu_network_plugin_installed(true); });
@@ -2385,9 +2385,9 @@ static boost::optional<Semver> parse_semver_from_ini(std::string path)
     std::stringstream buffer;
     buffer << stream.rdbuf();
     std::string body = buffer.str();
-    size_t start = body.find("Verslicer ");
+    size_t start = body.find("VerSlicer ");
     if (start == std::string::npos) {
-        start = body.find("Verslicer ");
+        start = body.find("VerSlicer ");
         if (start == std::string::npos)
             return boost::none;
     }
@@ -2421,7 +2421,7 @@ void GUI_App::init_webview_runtime()
 {
     // Check WebView Runtime
     if (!WebView::CheckWebViewRuntime()) {
-        int nRet = wxMessageBox(_L("Verslicer requires the Microsoft WebView2 Runtime to operate certain features.\nClick Yes to install it now."),
+        int nRet = wxMessageBox(_L("VerSlicer requires the Microsoft WebView2 Runtime to operate certain features.\nClick Yes to install it now."),
                                 _L("WebView2 Runtime"), wxYES_NO);
         if (nRet == wxYES) {
             WebView::DownloadAndInstallWebViewRuntime();
@@ -2546,22 +2546,22 @@ void GUI_App::init_app_config()
     set_logging_level(Slic3r::level_string_to_boost(app_config->get("log_severity_level")));
 
     // Verslicer requires Bambu network plugin + cloud (unlike stock Orca where these are optional).
-    if (std::string(SLIC3R_APP_FULL_NAME) == "Verslicer") {
+    if (std::string(SLIC3R_APP_FULL_NAME) == "VerSlicer") {
         bool changed = false;
         if (!app_config->get_bool("installed_networking")) {
             app_config->set_bool("installed_networking", true);
             changed = true;
-            BOOST_LOG_TRIVIAL(info) << "Verslicer: enabled installed_networking";
+            BOOST_LOG_TRIVIAL(info) << "VerSlicer: enabled installed_networking";
         }
         if (!app_config->has_cloud_provider(BBL_CLOUD_PROVIDER)) {
             app_config->add_cloud_provider(BBL_CLOUD_PROVIDER);
             changed = true;
-            BOOST_LOG_TRIVIAL(info) << "Verslicer: enabled Bambu cloud provider";
+            BOOST_LOG_TRIVIAL(info) << "VerSlicer: enabled Bambu cloud provider";
         }
         if (app_config->get_network_plugin_version().empty()) {
             app_config->set_network_plugin_version(get_latest_network_version());
             changed = true;
-            BOOST_LOG_TRIVIAL(info) << "Verslicer: defaulted network_plugin_version";
+            BOOST_LOG_TRIVIAL(info) << "VerSlicer: defaulted network_plugin_version";
         }
         if (changed)
             app_config->save();
@@ -3029,7 +3029,7 @@ bool GUI_App::on_init_inner()
                /* wxString tips = wxString::Format(_L("Click to download new version in default browser: %s"), version_info.version_str);
                 DownloadDialog dialog(this->mainframe,
                     tips,
-                    _L("New version of Verslicer"),
+                    _L("New version of VerSlicer"),
                     false,
                     wxCENTER | wxICON_INFORMATION);
 
@@ -5058,7 +5058,7 @@ void GUI_App::on_http_error(wxCommandEvent &evt)
 
     // Version limit
     if (code == HttpErrorVersionLimited) {
-        MessageDialog msg_dlg(nullptr, _L("The version of Verslicer is too low and needs to be updated to the latest version before it can be used normally."), "", wxAPPLY | wxOK);
+        MessageDialog msg_dlg(nullptr, _L("The version of VerSlicer is too low and needs to be updated to the latest version before it can be used normally."), "", wxAPPLY | wxOK);
         if (msg_dlg.ShowModal() == wxOK) {
         }
     }
@@ -6077,7 +6077,7 @@ bool GUI_App::maybe_migrate_user_presets_on_login()
 {
     namespace fs = boost::filesystem;
 
-    BOOST_LOG_TRIVIAL(info) << "Migrate user presets to the Verslicer user folder if needed.";
+    BOOST_LOG_TRIVIAL(info) << "Migrate user presets to the VerSlicer user folder if needed.";
 
     if (!m_agent || !m_agent->is_user_login())
         return false;
@@ -6098,16 +6098,16 @@ bool GUI_App::maybe_migrate_user_presets_on_login()
         std::map<std::string, std::map<std::string, std::string>> cloud_presets;
         int ret = m_agent->get_user_presets(&cloud_presets);
         if (ret == 0 && !cloud_presets.empty()) {
-            BOOST_LOG_TRIVIAL(info) << "Verslicer already has " << cloud_presets.size()
+            BOOST_LOG_TRIVIAL(info) << "VerSlicer already has " << cloud_presets.size()
                                     << " presets, skipping migration for user: " << new_user_id;
             return false;
         }
         if (ret != 0) {
-            BOOST_LOG_TRIVIAL(warning) << "Failed to query Verslicer presets (error " << ret
+            BOOST_LOG_TRIVIAL(warning) << "Failed to query VerSlicer presets (error " << ret
                                        << "), skipping migration to avoid overwriting cloud data.";
             return false;
         }
-        BOOST_LOG_TRIVIAL(info) << "Verslicer has no presets for user " << new_user_id << ", proceeding with migration check.";
+        BOOST_LOG_TRIVIAL(info) << "VerSlicer has no presets for user " << new_user_id << ", proceeding with migration check.";
     }
 
     // Helper to check if a local directory has any .json preset files.
@@ -6194,7 +6194,7 @@ bool GUI_App::maybe_migrate_user_presets_on_login()
 
     wxString msg = wxString::Format(
         _L("Existing user presets were found in %s.\n"
-           "Do you want to migrate them to your Verslicer profile?\n"
+           "Do you want to migrate them to your VerSlicer profile?\n"
            "This will copy your presets so they are available under your new account."),
         source_description);
 
@@ -7252,7 +7252,7 @@ bool GUI_App::load_language(wxString language, bool initial)
     	// Get the active language from PrusaSlicer.ini, or empty string if the key does not exist.
         language = app_config->get("language");
         if (! language.empty())
-        	BOOST_LOG_TRIVIAL(info) << boost::format("language provided by Verslicer.conf: %1%") % language;
+        	BOOST_LOG_TRIVIAL(info) << boost::format("language provided by VerSlicer.conf: %1%") % language;
         else {
             // Get the system language.
             const wxLanguage lang_system = wxLanguage(wxLocale::GetSystemLanguage());
@@ -7309,7 +7309,7 @@ bool GUI_App::load_language(wxString language, bool initial)
 	}
 
 	if (language_info != nullptr && language_info->LayoutDirection == wxLayout_RightToLeft) {
-    	BOOST_LOG_TRIVIAL(trace) << boost::format("The following language code requires right to left layout, which is not supported by Verslicer: %1%") % language_info->CanonicalName.ToUTF8().data();
+    	BOOST_LOG_TRIVIAL(trace) << boost::format("The following language code requires right to left layout, which is not supported by VerSlicer: %1%") % language_info->CanonicalName.ToUTF8().data();
 		language_info = nullptr;
 	}
 
@@ -7428,14 +7428,14 @@ bool GUI_App::load_language(wxString language, bool initial)
 
     if (!wxLocale::IsAvailable(locale_language_info->Language)) {
     	// Loading the language dictionary failed.
-	    wxString message = "Switching Verslicer to language " + requested_language_code + " failed.";
+	    wxString message = "Switching VerSlicer to language " + requested_language_code + " failed.";
 #if !defined(_WIN32) && !defined(__APPLE__)
         // likely some linux system
         message += "\nYou may need to reconfigure the missing locales, likely by running the \"locale-gen\" and \"dpkg-reconfigure locales\" commands.\n";
 #endif
         if (initial)
         	message + "\n\nApplication will close.";
-        wxMessageBox(message, "Verslicer - Switching language failed", wxOK | wxICON_ERROR);
+        wxMessageBox(message, "VerSlicer - Switching language failed", wxOK | wxICON_ERROR);
         if (initial)
 			std::exit(EXIT_FAILURE);
 		else

@@ -104,7 +104,7 @@ wxMediaCtrl2::wxMediaCtrl2(wxWindow *parent)
     if (m_native_wayland && is_gstreamer_feature_available("gtksink"))
         configure_wayland_gstreamer_liveview_path();
     else if (m_native_wayland) {
-        m_gtk_sink_error = _L("Native Wayland liveview requires the GStreamer GTK video sink. Please install the gtksink plugin for GStreamer, then restart Verslicer.");
+        m_gtk_sink_error = _L("Native Wayland liveview requires the GStreamer GTK video sink. Please install the gtksink plugin for GStreamer, then restart VerSlicer.");
         BOOST_LOG_TRIVIAL(warning) << "wxMediaCtrl2: native Wayland liveview disabled because GStreamer gtksink is unavailable";
     }
 #endif
@@ -388,7 +388,7 @@ void wxMediaCtrl2::Load(wxURI url)
                 });
             } else {
                 CallAfter([] {
-                    wxMessageBox(_L("Missing BambuSource component registered for media playing! Please re-install Verslicer or seek community help."), _L("Error"), wxOK);
+                    wxMessageBox(_L("Missing BambuSource component registered for media playing! Please re-install VerSlicer or seek community help."), _L("Error"), wxOK);
                 });
             }
             m_error = clsid != CLSID_BAMBU_SOURCE ? 101 : path.empty() ? 102 : 103;
@@ -460,7 +460,7 @@ void wxMediaCtrl2::Load(wxURI url)
     
     if (!hasplugins) {
         CallAfter([] {
-            wxMessageBox(_L("Your system is missing H.264 codecs for GStreamer, which are required to play video. (Try installing the gstreamer1.0-plugins-bad or gstreamer1.0-libav packages, then restart Verslicer?)"), _L("Error"), wxOK);
+            wxMessageBox(_L("Your system is missing H.264 codecs for GStreamer, which are required to play video. (Try installing the gstreamer1.0-plugins-bad or gstreamer1.0-libav packages, then restart VerSlicer?)"), _L("Error"), wxOK);
         });
         m_error = 101;
         wxMediaEvent event(wxEVT_MEDIA_STATECHANGED);

@@ -85,7 +85,7 @@ int ZUserLogin::ensure_loopback_port()
 }
 
 ZUserLogin::ZUserLogin(std::shared_ptr<ICloudServiceAgent> cloud_agent)
-    : wxDialog((wxWindow*) (wxGetApp().mainframe), wxID_ANY, "Verslicer"), m_cloud_agent(cloud_agent)
+    : wxDialog((wxWindow*) (wxGetApp().mainframe), wxID_ANY, "VerSlicer"), m_cloud_agent(cloud_agent)
 {
     SetBackgroundColour(*wxWHITE);
 
@@ -96,7 +96,7 @@ ZUserLogin::ZUserLogin(std::shared_ptr<ICloudServiceAgent> cloud_agent)
         m_sizer_main->Add(m_line_top, 0, wxEXPAND, 0);
 
         auto* m_message = new wxStaticText(this, wxID_ANY,
-                                          _L("Cloud agent is not available. Please restart Verslicer and try again."),
+                                          _L("Cloud agent is not available. Please restart VerSlicer and try again."),
                                           wxDefaultPosition, wxDefaultSize, 0);
         m_message->SetForegroundColour(*wxBLACK);
         m_message->Wrap(FromDIP(360));

@@ -605,16 +605,16 @@ wxBoxSizer *Newer3mfVersionDialog::get_msg_sizer()
     wxBoxSizer *     horizontal_sizer = new wxBoxSizer(wxHORIZONTAL);
     wxString    msg_str;
     if (file_version_newer) { 
-        text1 = new wxStaticText(this, wxID_ANY, _L("The 3MF file version is in Beta and it is newer than the current Verslicer version."));
-        wxStaticText *   text2       = new wxStaticText(this, wxID_ANY, _L("If you would like to try Verslicer Beta, you may click to"));
+        text1 = new wxStaticText(this, wxID_ANY, _L("The 3MF file version is in Beta and it is newer than the current VerSlicer version."));
+        wxStaticText *   text2       = new wxStaticText(this, wxID_ANY, _L("If you would like to try VerSlicer Beta, you may click to"));
         // ORCA standardized HyperLink
         HyperLink *      github_link = new HyperLink(this, _L("Download Beta Version"), "https://github.com/HSU-LEE/VerSlicer/releases");
         horizontal_sizer->Add(text2, 0, wxEXPAND, 0);
         horizontal_sizer->Add(github_link, 0, wxEXPAND | wxLEFT, 5);
         
     } else {
-        text1 = new wxStaticText(this, wxID_ANY, _L("The 3MF file version is newer than the current Verslicer version."));
-        wxStaticText *text2 = new wxStaticText(this, wxID_ANY, _L("Updating your Verslicer could enable all functionality in the 3MF file."));
+        text1 = new wxStaticText(this, wxID_ANY, _L("The 3MF file version is newer than the current VerSlicer version."));
+        wxStaticText *text2 = new wxStaticText(this, wxID_ANY, _L("Updating your VerSlicer could enable all functionality in the 3MF file."));
         horizontal_sizer->Add(text2, 0, wxEXPAND, 0);
     }
     Semver        app_version = *(Semver::parse(SLIC3R_VERSION));

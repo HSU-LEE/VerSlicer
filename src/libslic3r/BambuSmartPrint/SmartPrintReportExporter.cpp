@@ -36,7 +36,7 @@ std::string SmartPrintReportExporter::build_report_json(const ModelAnalysis& mes
                                                         const SliceAnalysis* slice)
 {
     json root;
-    root["app"]        = "Verslicer Smart Print";
+    root["app"]        = "VerSlicer Smart Print";
     root["generated"]  = iso_timestamp_utc();
     if (plate_index >= 0)
         root["plate_index"] = plate_index;

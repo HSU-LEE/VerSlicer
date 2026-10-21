@@ -9,7 +9,9 @@
   <key>CFBundleIconFile</key>
   <string>Icon.icns</string>
   <key>CFBundleName</key>
-  <string>@SLIC3R_APP_KEY@</string>
+  <string>VerSlicer</string>
+  <key>CFBundleDisplayName</key>
+  <string>VerSlicer</string>
   <key>CFBundleShortVersionString</key>
   <string>@SoftFever_VERSION@</string>
   <key>CFBundleIdentifier</key>

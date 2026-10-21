@@ -28,7 +28,7 @@ void SlicePilotNetworkSetup::maybe_offer_first_run_plugin_install()
 
     wxWindow* parent = wxGetApp().plater() ? static_cast<wxWindow*>(wxGetApp().plater()) : nullptr;
     wxMessageDialog dlg(parent,
-        _L("Verslicer works best with the Bambu Network plug-in for sending prints.\n\n"
+        _L("VerSlicer works best with the Bambu Network plug-in for sending prints.\n\n"
            "Install it now? You can still slice and export G-code without it."),
         _L("Bambu Network plug-in"), wxYES_NO | wxICON_INFORMATION);
     dlg.SetYesNoLabels(_L("Install now"), _L("Later"));
